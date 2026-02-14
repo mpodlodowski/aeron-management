@@ -1,29 +1,202 @@
 package it.podlodowski.aeronmgmt.server.aggregator;
 
+import it.podlodowski.aeronmgmt.common.proto.ClusterMetrics;
 import it.podlodowski.aeronmgmt.common.proto.CommandResult;
 import it.podlodowski.aeronmgmt.common.proto.MetricsReport;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
+import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.beans.factory.annotation.Value;
+import org.springframework.messaging.simp.SimpMessagingTemplate;
 import org.springframework.stereotype.Component;
 
+import java.util.*;
+import java.util.concurrent.CompletableFuture;
+import java.util.concurrent.ConcurrentHashMap;
+
 /**
- * Aggregates cluster state from agent metrics reports.
- * Minimal stub — full implementation in Task 8.
+ * Aggregates cluster state from all connected agents.
+ * Maintains per-node rolling metrics windows and pushes updates via WebSocket.
  */
 @Component
 public class ClusterStateAggregator {
 
     private static final Logger LOGGER = LoggerFactory.getLogger(ClusterStateAggregator.class);
 
+    private final SimpMessagingTemplate messagingTemplate;
+    private final long windowDurationMs;
+
+    private final ConcurrentHashMap<Integer, MetricsWindow> metricsWindows = new ConcurrentHashMap<>();
+    private final ConcurrentHashMap<Integer, MetricsReport> latestMetrics = new ConcurrentHashMap<>();
+    private final ConcurrentHashMap<String, CompletableFuture<CommandResult>> pendingCommands = new ConcurrentHashMap<>();
+
+    @Autowired
+    public ClusterStateAggregator(
+            @Autowired(required = false) SimpMessagingTemplate messagingTemplate,
+            @Value("${management.metrics.history-seconds:300}") int historySeconds) {
+        this.messagingTemplate = messagingTemplate;
+        this.windowDurationMs = historySeconds * 1000L;
+    }
+
     public void onMetricsReceived(MetricsReport report) {
-        LOGGER.debug("Metrics received from node {}", report.getNodeId());
+        int nodeId = report.getNodeId();
+
+        latestMetrics.put(nodeId, report);
+        metricsWindows.computeIfAbsent(nodeId, id -> new MetricsWindow(windowDurationMs))
+                .add(report);
+
+        LOGGER.debug("Metrics received from node {}", nodeId);
+
+        pushToWebSocket("/topic/nodes/" + nodeId, convertMetricsToMap(report));
+        pushToWebSocket("/topic/cluster", buildClusterOverview());
     }
 
     public void onCommandResult(CommandResult result) {
-        LOGGER.debug("Command result received: {}", result.getCommandId());
+        LOGGER.info("Command result received: id={}, success={}", result.getCommandId(), result.getSuccess());
+        CompletableFuture<CommandResult> future = pendingCommands.remove(result.getCommandId());
+        if (future != null) {
+            future.complete(result);
+        }
     }
 
     public void onAgentDisconnected(int nodeId) {
         LOGGER.info("Agent disconnected: nodeId={}", nodeId);
+        latestMetrics.remove(nodeId);
+        metricsWindows.remove(nodeId);
+
+        Map<String, Object> alert = new LinkedHashMap<>();
+        alert.put("type", "AGENT_DISCONNECTED");
+        alert.put("nodeId", nodeId);
+        alert.put("timestamp", System.currentTimeMillis());
+        alert.put("message", "Agent for node " + nodeId + " disconnected");
+
+        pushToWebSocket("/topic/alerts", alert);
+        pushToWebSocket("/topic/cluster", buildClusterOverview());
+    }
+
+    public CompletableFuture<CommandResult> registerPendingCommand(String commandId) {
+        CompletableFuture<CommandResult> future = new CompletableFuture<>();
+        pendingCommands.put(commandId, future);
+        return future;
+    }
+
+    public Map<Integer, MetricsReport> getLatestMetrics() {
+        return Collections.unmodifiableMap(new HashMap<>(latestMetrics));
+    }
+
+    public MetricsReport getLatestMetrics(int nodeId) {
+        return latestMetrics.get(nodeId);
+    }
+
+    public Map<String, Object> buildClusterOverview() {
+        Map<String, Object> overview = new LinkedHashMap<>();
+        List<Map<String, Object>> nodes = new ArrayList<>();
+
+        int leaderNodeId = -1;
+        String leaderHostname = null;
+
+        for (Map.Entry<Integer, MetricsReport> entry : latestMetrics.entrySet()) {
+            MetricsReport report = entry.getValue();
+            Map<String, Object> nodeInfo = new LinkedHashMap<>();
+            nodeInfo.put("nodeId", report.getNodeId());
+            nodeInfo.put("timestamp", report.getTimestamp());
+
+            if (report.hasClusterMetrics()) {
+                ClusterMetrics cm = report.getClusterMetrics();
+                nodeInfo.put("role", cm.getNodeRole());
+                nodeInfo.put("commitPosition", cm.getCommitPosition());
+                nodeInfo.put("leaderMemberId", cm.getLeaderMemberId());
+                nodeInfo.put("connectedClients", cm.getConnectedClientCount());
+
+                if ("LEADER".equals(cm.getNodeRole())) {
+                    leaderNodeId = report.getNodeId();
+                }
+            }
+
+            if (report.hasSystemMetrics()) {
+                Map<String, Object> sys = new LinkedHashMap<>();
+                sys.put("heapUsedBytes", report.getSystemMetrics().getHeapUsedBytes());
+                sys.put("heapMaxBytes", report.getSystemMetrics().getHeapMaxBytes());
+                sys.put("cpuUsage", report.getSystemMetrics().getCpuUsage());
+                nodeInfo.put("system", sys);
+            }
+
+            nodes.add(nodeInfo);
+        }
+
+        overview.put("nodeCount", nodes.size());
+        overview.put("leaderNodeId", leaderNodeId);
+        overview.put("nodes", nodes);
+
+        return overview;
+    }
+
+    /**
+     * Converts a MetricsReport protobuf to a JSON-friendly Map structure.
+     */
+    public Map<String, Object> convertMetricsToMap(MetricsReport report) {
+        Map<String, Object> result = new LinkedHashMap<>();
+        result.put("nodeId", report.getNodeId());
+        result.put("timestamp", report.getTimestamp());
+
+        if (report.hasClusterMetrics()) {
+            ClusterMetrics cm = report.getClusterMetrics();
+            Map<String, Object> cluster = new LinkedHashMap<>();
+            cluster.put("nodeRole", cm.getNodeRole());
+            cluster.put("commitPosition", cm.getCommitPosition());
+            cluster.put("logPosition", cm.getLogPosition());
+            cluster.put("appendPosition", cm.getAppendPosition());
+            cluster.put("leaderMemberId", cm.getLeaderMemberId());
+            cluster.put("connectedClientCount", cm.getConnectedClientCount());
+            cluster.put("electionState", cm.getElectionState());
+            result.put("clusterMetrics", cluster);
+        }
+
+        List<Map<String, Object>> counters = new ArrayList<>();
+        for (var counter : report.getCountersList()) {
+            Map<String, Object> c = new LinkedHashMap<>();
+            c.put("counterId", counter.getCounterId());
+            c.put("label", counter.getLabel());
+            c.put("value", counter.getValue());
+            c.put("typeId", counter.getTypeId());
+            counters.add(c);
+        }
+        result.put("counters", counters);
+
+        List<Map<String, Object>> recordings = new ArrayList<>();
+        for (var rec : report.getRecordingsList()) {
+            Map<String, Object> r = new LinkedHashMap<>();
+            r.put("recordingId", rec.getRecordingId());
+            r.put("streamId", rec.getStreamId());
+            r.put("channel", rec.getChannel());
+            r.put("startPosition", rec.getStartPosition());
+            r.put("stopPosition", rec.getStopPosition());
+            r.put("startTimestamp", rec.getStartTimestamp());
+            r.put("stopTimestamp", rec.getStopTimestamp());
+            recordings.add(r);
+        }
+        result.put("recordings", recordings);
+
+        if (report.hasSystemMetrics()) {
+            Map<String, Object> sys = new LinkedHashMap<>();
+            sys.put("heapUsedBytes", report.getSystemMetrics().getHeapUsedBytes());
+            sys.put("heapMaxBytes", report.getSystemMetrics().getHeapMaxBytes());
+            sys.put("cpuUsage", report.getSystemMetrics().getCpuUsage());
+            sys.put("gcCount", report.getSystemMetrics().getGcCount());
+            sys.put("gcTimeMs", report.getSystemMetrics().getGcTimeMs());
+            result.put("systemMetrics", sys);
+        }
+
+        return result;
+    }
+
+    private void pushToWebSocket(String destination, Object payload) {
+        if (messagingTemplate != null) {
+            try {
+                messagingTemplate.convertAndSend(destination, payload);
+            } catch (Exception e) {
+                LOGGER.debug("Failed to push to WebSocket {}: {}", destination, e.getMessage());
+            }
+        }
     }
 }
