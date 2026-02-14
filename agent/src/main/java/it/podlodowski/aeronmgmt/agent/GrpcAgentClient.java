@@ -8,22 +8,45 @@ import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
 import java.util.concurrent.TimeUnit;
+import java.util.concurrent.atomic.AtomicBoolean;
 
 public class GrpcAgentClient {
 
     private static final Logger LOGGER = LoggerFactory.getLogger(GrpcAgentClient.class);
+    private static final long RECONNECT_DELAY_MS = 5000;
 
     private final AgentConfig config;
     private final AdminCommandExecutor commandExecutor;
+    private final AtomicBoolean connected = new AtomicBoolean(false);
+
     private ManagedChannel channel;
-    private StreamObserver<AgentMessage> requestObserver;
+    private volatile StreamObserver<AgentMessage> requestObserver;
 
     public GrpcAgentClient(AgentConfig config, AdminCommandExecutor commandExecutor) {
         this.config = config;
         this.commandExecutor = commandExecutor;
     }
 
+    /**
+     * Attempts to connect, retrying indefinitely until successful.
+     * Safe to call from any thread.
+     */
     public void connect() {
+        while (!Thread.currentThread().isInterrupted()) {
+            try {
+                doConnect();
+                return;
+            } catch (Exception e) {
+                LOGGER.warn("Failed to connect to management server: {}. Retrying in {}ms...",
+                        e.getMessage(), RECONNECT_DELAY_MS);
+                sleep(RECONNECT_DELAY_MS);
+            }
+        }
+    }
+
+    private void doConnect() {
+        closeChannel();
+
         channel = ManagedChannelBuilder
                 .forAddress(config.managementServerHost, config.managementServerPort)
                 .usePlaintext()
@@ -46,13 +69,14 @@ public class GrpcAgentClient {
 
             @Override
             public void onError(Throwable t) {
-                LOGGER.error("gRPC stream error", t);
-                scheduleReconnect();
+                LOGGER.error("gRPC stream error: {}", t.getMessage());
+                handleDisconnect();
             }
 
             @Override
             public void onCompleted() {
-                LOGGER.info("gRPC stream completed");
+                LOGGER.info("gRPC stream completed by server");
+                handleDisconnect();
             }
         };
 
@@ -67,48 +91,83 @@ public class GrpcAgentClient {
                         .build())
                 .build());
 
-        LOGGER.info("Connected to management server at {}:{}", config.managementServerHost, config.managementServerPort);
+        connected.set(true);
+        LOGGER.info("Connected to management server at {}:{}",
+                config.managementServerHost, config.managementServerPort);
+    }
+
+    private void handleDisconnect() {
+        if (connected.compareAndSet(true, false)) {
+            LOGGER.info("Disconnected. Will reconnect in {}ms...", RECONNECT_DELAY_MS);
+            new Thread(() -> {
+                sleep(RECONNECT_DELAY_MS);
+                connect();
+            }, "grpc-reconnect").start();
+        }
+    }
+
+    public boolean isConnected() {
+        return connected.get();
     }
 
     public void sendMetrics(MetricsReport report) {
-        if (requestObserver != null) {
-            try {
-                requestObserver.onNext(AgentMessage.newBuilder()
-                        .setMetrics(report)
-                        .build());
-            } catch (Exception e) {
-                LOGGER.error("Failed to send metrics", e);
-            }
+        StreamObserver<AgentMessage> observer = requestObserver;
+        if (observer == null || !connected.get()) {
+            return;
+        }
+        try {
+            observer.onNext(AgentMessage.newBuilder()
+                    .setMetrics(report)
+                    .build());
+        } catch (Exception e) {
+            LOGGER.warn("Failed to send metrics: {}", e.getMessage());
+            handleDisconnect();
         }
     }
 
     private void sendCommandResult(CommandResult result) {
-        if (requestObserver != null) {
-            requestObserver.onNext(AgentMessage.newBuilder()
-                    .setCommandResult(result)
-                    .build());
+        StreamObserver<AgentMessage> observer = requestObserver;
+        if (observer != null && connected.get()) {
+            try {
+                observer.onNext(AgentMessage.newBuilder()
+                        .setCommandResult(result)
+                        .build());
+            } catch (Exception e) {
+                LOGGER.warn("Failed to send command result: {}", e.getMessage());
+            }
         }
     }
 
     public void shutdown() {
+        connected.set(false);
         if (requestObserver != null) {
-            requestObserver.onCompleted();
+            try {
+                requestObserver.onCompleted();
+            } catch (Exception ignored) {}
         }
-        if (channel != null) {
-            channel.shutdown();
-        }
+        closeChannel();
     }
 
-    private void scheduleReconnect() {
-        LOGGER.info("Will attempt reconnect in 5 seconds...");
-        new Thread(() -> {
+    private void closeChannel() {
+        if (channel != null && !channel.isShutdown()) {
+            channel.shutdown();
             try {
-                Thread.sleep(5000);
-                connect();
+                channel.awaitTermination(2, TimeUnit.SECONDS);
             } catch (InterruptedException e) {
                 Thread.currentThread().interrupt();
             }
-        }).start();
+            if (!channel.isTerminated()) {
+                channel.shutdownNow();
+            }
+        }
+    }
+
+    private static void sleep(long ms) {
+        try {
+            Thread.sleep(ms);
+        } catch (InterruptedException e) {
+            Thread.currentThread().interrupt();
+        }
     }
 
     private static String getHostname() {
