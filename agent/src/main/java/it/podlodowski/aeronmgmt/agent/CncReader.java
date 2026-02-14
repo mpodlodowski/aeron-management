@@ -24,16 +24,20 @@ public class CncReader {
     private static final Logger LOGGER = LoggerFactory.getLogger(CncReader.class);
 
     // Aeron cluster counter type IDs.
-    // These correspond to constants in io.aeron.cluster.ConsensusModule.Configuration
-    // and io.aeron.cluster.Election in Aeron 1.44.1.
-    /** ConsensusModule.Configuration.CONSENSUS_MODULE_ROLE_TYPE_ID */
-    private static final int CLUSTER_NODE_ROLE_TYPE_ID = 200;
-    /** ConsensusModule.Configuration.COMMIT_POSITION_TYPE_ID */
+    // See io.aeron.cluster.ConsensusModule.Configuration and io.aeron.cluster.Election.
+    // Verified against Aeron 1.46.5 counter labels from live cluster.
+    /** Type 200: Consensus Module state (INIT=0, ACTIVE=1, SUSPENDED=2, SNAPSHOT=3, QUITTING=4, TERMINATING=5, CLOSED=6) */
+    private static final int CONSENSUS_MODULE_STATE_TYPE_ID = 200;
+    /** Type 201: Cluster node role (FOLLOWER=0, CANDIDATE=1, LEADER=2) */
+    private static final int CLUSTER_NODE_ROLE_TYPE_ID = 201;
+    /** Type 203: Cluster commit position */
     private static final int COMMIT_POSITION_TYPE_ID = 203;
-    /** Election counter type ID for election state */
+    /** Type 207: Election state */
     private static final int ELECTION_STATE_TYPE_ID = 207;
-    /** Cluster client count counter type ID */
-    private static final int CLUSTER_CLIENT_COUNT_TYPE_ID = 215;
+    /** Type 213: Timed out client count */
+    private static final int CLUSTER_TIMED_OUT_CLIENT_COUNT_TYPE_ID = 213;
+    /** Type 239: Leadership term id */
+    private static final int LEADERSHIP_TERM_ID_TYPE_ID = 239;
 
     private final String aeronDir;
 
@@ -119,8 +123,11 @@ public class CncReader {
                     case ELECTION_STATE_TYPE_ID:
                         builder.setElectionState(String.valueOf(value));
                         break;
-                    case CLUSTER_CLIENT_COUNT_TYPE_ID:
+                    case CLUSTER_TIMED_OUT_CLIENT_COUNT_TYPE_ID:
                         builder.setConnectedClientCount((int) value);
+                        break;
+                    case LEADERSHIP_TERM_ID_TYPE_ID:
+                        builder.setLeaderMemberId((int) value);
                         break;
                     default:
                         break;

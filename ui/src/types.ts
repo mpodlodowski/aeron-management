@@ -36,6 +36,7 @@ export interface SystemMetrics {
 export interface MetricsReport {
   nodeId: number
   timestamp: number
+  agentConnected?: boolean
   clusterMetrics: ClusterMetrics
   counters: AeronCounter[]
   recordings: ArchiveRecording[]
@@ -52,4 +53,5 @@ export interface Alert {
   type: string
   nodeId: number
   timestamp: number
+  message?: string
 }

@@ -1,0 +1,168 @@
+name: 'aeron-cluster-managed'
+
+services:
+  # === Aeron Cluster Nodes (3-node Raft consensus) ===
+  node0:
+    image: aeron-cluster-demo:local
+    pull_policy: always
+    shm_size: '1gb'
+    ipc: shareable
+    environment:
+      NODE_ID: 0
+      CLUSTER_ADDRESSES: node0,node1,node2
+      DEBUG: false
+    restart: always
+    volumes:
+      - node-data-0:/home/aeron/aeron-cluster
+    networks:
+      - net
+
+  node1:
+    image: aeron-cluster-demo:local
+    pull_policy: always
+    shm_size: '1gb'
+    ipc: shareable
+    environment:
+      NODE_ID: 1
+      CLUSTER_ADDRESSES: node0,node1,node2
+      DEBUG: false
+    restart: always
+    volumes:
+      - node-data-1:/home/aeron/aeron-cluster
+    networks:
+      - net
+
+  node2:
+    image: aeron-cluster-demo:local
+    pull_policy: always
+    shm_size: '1gb'
+    ipc: shareable
+    environment:
+      NODE_ID: 2
+      CLUSTER_ADDRESSES: node0,node1,node2
+      DEBUG: false
+    restart: always
+    volumes:
+      - node-data-2:/home/aeron/aeron-cluster
+    networks:
+      - net
+
+  # === Aeron Backup ===
+  backup:
+    image: aeron-cluster-demo:local
+    pull_policy: always
+    shm_size: '1gb'
+    environment:
+      MODE: BACKUP
+      CLUSTER_ADDRESSES: node0,node1,node2
+      POD_IP: backup
+      CLUSTER_BACKUP_INTERVAL_NS: 60000000000
+      DEBUG: false
+    restart: always
+    volumes:
+      - node-backup:/home/aeron/aeron-cluster
+    networks:
+      - net
+
+  # === Aeron Snapshot ===
+  snapshot:
+    image: aeron-cluster-demo:local
+    pull_policy: always
+    shm_size: '1gb'
+    environment:
+      CLUSTER_ADDRESSES: node0,node1,node2
+      POD_IP: snapshot
+      MESSAGE_TIMEOUT_NS: 5000000000
+      MODE: SNAPSHOT
+      NODE_ID: 4
+      SNAPSHOT_PERIOD: 5s
+    restart: always
+    networks:
+      - net
+
+  # === Management Server (UI + gRPC aggregator) ===
+  management-server:
+    build:
+      context: ..
+      dockerfile: docker/Dockerfile.server
+    ports:
+      - "8080:8080"
+      - "8081:8081"
+    environment:
+      GRPC_SERVER_PORT: "8081"
+    restart: always
+    networks:
+      - net
+
+  # === Management Agents (sidecar per cluster node, shares /dev/shm for CnC access) ===
+  agent-0:
+    build:
+      context: ..
+      dockerfile: docker/Dockerfile.agent
+    ipc: service:node0
+    volumes:
+      - node-data-0:/home/aeron/aeron-cluster
+    environment:
+      MANAGEMENT_SERVER_HOST: management-server
+      MANAGEMENT_SERVER_PORT: "8081"
+      AERON_DIR: /dev/shm/-0-driver
+      CLUSTER_DIR: /home/aeron/aeron-cluster/aeron-cluster-0/cluster
+      AGENT_NODE_ID: "0"
+      AGENT_MODE: cluster
+    depends_on:
+      - node0
+      - management-server
+    restart: always
+    networks:
+      - net
+
+  agent-1:
+    build:
+      context: ..
+      dockerfile: docker/Dockerfile.agent
+    ipc: service:node1
+    volumes:
+      - node-data-1:/home/aeron/aeron-cluster
+    environment:
+      MANAGEMENT_SERVER_HOST: management-server
+      MANAGEMENT_SERVER_PORT: "8081"
+      AERON_DIR: /dev/shm/-1-driver
+      CLUSTER_DIR: /home/aeron/aeron-cluster/aeron-cluster-1/cluster
+      AGENT_NODE_ID: "1"
+      AGENT_MODE: cluster
+    depends_on:
+      - node1
+      - management-server
+    restart: always
+    networks:
+      - net
+
+  agent-2:
+    build:
+      context: ..
+      dockerfile: docker/Dockerfile.agent
+    ipc: service:node2
+    volumes:
+      - node-data-2:/home/aeron/aeron-cluster
+    environment:
+      MANAGEMENT_SERVER_HOST: management-server
+      MANAGEMENT_SERVER_PORT: "8081"
+      AERON_DIR: /dev/shm/-2-driver
+      CLUSTER_DIR: /home/aeron/aeron-cluster/aeron-cluster-2/cluster
+      AGENT_NODE_ID: "2"
+      AGENT_MODE: cluster
+    depends_on:
+      - node2
+      - management-server
+    restart: always
+    networks:
+      - net
+
+networks:
+  net:
+
+volumes:
+  node-data-0:
+  node-data-1:
+  node-data-2:
+  node-backup:

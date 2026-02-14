@@ -56,6 +56,8 @@ public class AgentConnectionService extends AgentServiceGrpc.AgentServiceImplBas
                         observer
                 );
 
+                aggregator.onAgentConnected(nodeId);
+
                 ServerMessage ack = ServerMessage.newBuilder()
                         .setAck(Ack.newBuilder()
                                 .setMessage("Registered node " + nodeId)

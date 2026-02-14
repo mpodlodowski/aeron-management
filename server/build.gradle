@@ -7,6 +7,14 @@ springBoot {
     mainClass = 'it.podlodowski.aeronmgmt.server.ServerApplication'
 }
 
+bootJar {
+    dependsOn ':ui:copyUi'
+}
+
+processResources {
+    dependsOn ':ui:copyUi'
+}
+
 dependencies {
     implementation project(':common')
     implementation 'org.springframework.boot:spring-boot-starter-web'

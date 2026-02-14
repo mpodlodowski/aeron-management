@@ -83,6 +83,9 @@ public class CommandRouter {
             if (!result.getError().isEmpty()) {
                 response.put("error", result.getError());
             }
+            if (!result.getOutput().isEmpty()) {
+                response.put("output", result.getOutput());
+            }
             return response;
         } catch (TimeoutException e) {
             LOGGER.error("Command {} timed out after {}s", commandId, COMMAND_TIMEOUT_SECONDS);

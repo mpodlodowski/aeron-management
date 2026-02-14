@@ -5,6 +5,7 @@ import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RestController;
 
+import java.util.List;
 import java.util.Map;
 
 @RestController
@@ -20,5 +21,10 @@ public class ClusterController {
     @GetMapping
     public Map<String, Object> getClusterOverview() {
         return aggregator.buildClusterOverview();
+    }
+
+    @GetMapping("/events")
+    public List<Map<String, Object>> getRecentEvents() {
+        return aggregator.getRecentEvents();
     }
 }

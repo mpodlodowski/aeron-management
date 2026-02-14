@@ -27,7 +27,8 @@ public class GrpcAgentClient {
         channel = ManagedChannelBuilder
                 .forAddress(config.managementServerHost, config.managementServerPort)
                 .usePlaintext()
-                .keepAliveTime(30, TimeUnit.SECONDS)
+                .keepAliveTime(60, TimeUnit.SECONDS)
+                .keepAliveTimeout(10, TimeUnit.SECONDS)
                 .build();
 
         AgentServiceGrpc.AgentServiceStub asyncStub = AgentServiceGrpc.newStub(channel);

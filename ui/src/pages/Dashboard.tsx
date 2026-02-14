@@ -4,18 +4,23 @@ import { useClusterStore } from '../stores/clusterStore'
 import { useWebSocket } from '../hooks/useWebSocket'
 import NodeCard from '../components/NodeCard'
 import EventLog from '../components/EventLog'
-import { ClusterOverview } from '../types'
+import { Alert, ClusterOverview } from '../types'
 
 export default function Dashboard() {
   useWebSocket()
-  const { nodes, leaderNodeId, alerts, connected, updateCluster } = useClusterStore()
+  const { nodes, leaderNodeId, alerts, connected, updateCluster, setAlerts } = useClusterStore()
 
   useEffect(() => {
     fetch('/api/cluster')
       .then((res) => res.json())
       .then((data: ClusterOverview) => updateCluster(data))
       .catch((err) => console.error('Failed to fetch cluster state:', err))
-  }, [updateCluster])
+
+    fetch('/api/cluster/events')
+      .then((res) => res.json())
+      .then((data: Alert[]) => setAlerts(data))
+      .catch((err) => console.error('Failed to fetch events:', err))
+  }, [updateCluster, setAlerts])
 
   const sortedNodes = Array.from(nodes.values()).sort(
     (a, b) => a.nodeId - b.nodeId,

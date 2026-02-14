@@ -74,6 +74,7 @@ message CommandResult {
   bool success = 2;
   string message = 3;
   string error = 4;
+  string output = 5;  // raw ClusterTool stdout
 }
 
 // --- Server -> Agent messages ---
@@ -87,7 +88,8 @@ message ServerMessage {
 
 message AdminCommand {
   string command_id = 1;
-  string type = 2;   // SNAPSHOT, SUSPEND, RESUME, STEP_DOWN, REMOVE_MEMBER, LIST_RECORDINGS, PURGE_RECORDINGS
+  string type = 2;   // Mutating: SNAPSHOT, SUSPEND, RESUME, SHUTDOWN, ABORT, INVALIDATE_SNAPSHOT
+                     // Diagnostic: DESCRIBE, PID, RECOVERY_PLAN, RECORDING_LOG, ERRORS, LIST_MEMBERS, IS_LEADER, DESCRIBE_SNAPSHOT
   map<string, string> parameters = 3;
 }
 

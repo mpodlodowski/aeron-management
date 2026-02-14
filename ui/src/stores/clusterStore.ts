@@ -10,6 +10,7 @@ interface ClusterState {
   updateNode: (metrics: MetricsReport) => void
   updateCluster: (overview: ClusterOverview) => void
   addAlert: (alert: Alert) => void
+  setAlerts: (alerts: Alert[]) => void
   setConnected: (connected: boolean) => void
 }
 
@@ -37,8 +38,10 @@ export const useClusterStore = create<ClusterState>((set) => ({
 
   addAlert: (alert) =>
     set((state) => ({
-      alerts: [alert, ...state.alerts].slice(0, 100),
+      alerts: [alert, ...state.alerts].slice(0, 200),
     })),
+
+  setAlerts: (alerts) => set({ alerts }),
 
   setConnected: (connected) => set({ connected }),
 }))

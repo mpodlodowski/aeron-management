@@ -63,9 +63,61 @@ public class NodeController {
         return commandRouter.sendCommand(id, "SHUTDOWN");
     }
 
+    @PostMapping("/{id}/abort")
+    public Map<String, Object> abortNode(@PathVariable int id) {
+        return commandRouter.sendCommand(id, "ABORT");
+    }
+
+    @PostMapping("/{id}/invalidate-snapshot")
+    public Map<String, Object> invalidateSnapshot(@PathVariable int id) {
+        return commandRouter.sendCommand(id, "INVALIDATE_SNAPSHOT");
+    }
+
     /** Backwards-compatible alias for {@link #shutdownNode(int)}. */
     @PostMapping("/{id}/step-down")
     public Map<String, Object> stepDown(@PathVariable int id) {
         return commandRouter.sendCommand(id, "SHUTDOWN");
+    }
+
+    // --- Read-only diagnostics (GET) ---
+
+    @GetMapping("/{id}/describe")
+    public Map<String, Object> describe(@PathVariable int id) {
+        return commandRouter.sendCommand(id, "DESCRIBE");
+    }
+
+    @GetMapping("/{id}/pid")
+    public Map<String, Object> pid(@PathVariable int id) {
+        return commandRouter.sendCommand(id, "PID");
+    }
+
+    @GetMapping("/{id}/recovery-plan")
+    public Map<String, Object> recoveryPlan(@PathVariable int id) {
+        return commandRouter.sendCommand(id, "RECOVERY_PLAN");
+    }
+
+    @GetMapping("/{id}/recording-log")
+    public Map<String, Object> recordingLog(@PathVariable int id) {
+        return commandRouter.sendCommand(id, "RECORDING_LOG");
+    }
+
+    @GetMapping("/{id}/errors")
+    public Map<String, Object> errors(@PathVariable int id) {
+        return commandRouter.sendCommand(id, "ERRORS");
+    }
+
+    @GetMapping("/{id}/list-members")
+    public Map<String, Object> listMembers(@PathVariable int id) {
+        return commandRouter.sendCommand(id, "LIST_MEMBERS");
+    }
+
+    @GetMapping("/{id}/is-leader")
+    public Map<String, Object> isLeader(@PathVariable int id) {
+        return commandRouter.sendCommand(id, "IS_LEADER");
+    }
+
+    @GetMapping("/{id}/describe-snapshot")
+    public Map<String, Object> describeSnapshot(@PathVariable int id) {
+        return commandRouter.sendCommand(id, "DESCRIBE_SNAPSHOT");
     }
 }

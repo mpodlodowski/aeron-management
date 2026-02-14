@@ -6,6 +6,7 @@ import it.podlodowski.aeronmgmt.common.proto.CommandResult;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
+import java.io.ByteArrayOutputStream;
 import java.io.File;
 import java.io.PrintStream;
 
@@ -14,9 +15,11 @@ import java.io.PrintStream;
  * protobuf message and executes the corresponding Aeron tool operation on the
  * local cluster directory.
  *
- * <p>The Aeron 1.44.1 ClusterTool API uses {@code (File, PrintStream)} signatures
- * for all admin operations. This executor delegates to those methods and captures
- * the boolean result to report success or failure back to the management server.
+ * <p>The Aeron 1.44.1 ClusterTool API uses two parameter orderings:
+ * <ul>
+ *   <li>Mutating actions: {@code (File, PrintStream)} — return boolean</li>
+ *   <li>Read-only diagnostics: {@code (PrintStream, File)} — return void (throw on failure)</li>
+ * </ul>
  */
 public class AdminCommandExecutor {
 
@@ -37,11 +40,21 @@ public class AdminCommandExecutor {
     public CommandResult execute(AdminCommand command) {
         LOGGER.info("Executing command: {} (id: {})", command.getType(), command.getCommandId());
         try {
-            String result = dispatch(command);
+            ByteArrayOutputStream baos = new ByteArrayOutputStream();
+            PrintStream capture = new PrintStream(baos);
+            boolean success = dispatch(command, capture);
+            capture.flush();
+            String output = baos.toString();
+
+            String message = success
+                    ? command.getType() + " completed successfully"
+                    : command.getType() + " failed (ClusterTool returned false)";
+            LOGGER.info("Command {} result: success={}, output length={}", command.getType(), success, output.length());
             return CommandResult.newBuilder()
                     .setCommandId(command.getCommandId())
-                    .setSuccess(true)
-                    .setMessage(result)
+                    .setSuccess(success)
+                    .setMessage(message)
+                    .setOutput(output)
                     .build();
         } catch (Exception e) {
             LOGGER.error("Command failed: {}", command.getType(), e);
@@ -53,38 +66,52 @@ public class AdminCommandExecutor {
         }
     }
 
-    private String dispatch(AdminCommand command) {
+    private boolean dispatch(AdminCommand command, PrintStream out) {
         switch (command.getType()) {
+            // --- Mutating actions: (File, PrintStream) → boolean ---
             case "SNAPSHOT":
-                return takeSnapshot();
+                return ClusterTool.snapshot(clusterDir, out);
             case "SUSPEND":
-                return suspendService();
+                return ClusterTool.suspend(clusterDir, out);
             case "RESUME":
-                return resumeService();
+                return ClusterTool.resume(clusterDir, out);
             case "SHUTDOWN":
-                return shutdown();
+                return ClusterTool.shutdown(clusterDir, out);
+            case "ABORT":
+                return ClusterTool.abort(clusterDir, out);
+            case "INVALIDATE_SNAPSHOT":
+                return ClusterTool.invalidateLatestSnapshot(out, clusterDir);
+
+            // --- Read-only diagnostics: (PrintStream, File) → void ---
+            case "DESCRIBE":
+                ClusterTool.describe(out, clusterDir);
+                return true;
+            case "PID":
+                ClusterTool.pid(out, clusterDir);
+                return true;
+            case "RECOVERY_PLAN":
+                ClusterTool.recoveryPlan(out, clusterDir, 1);
+                return true;
+            case "RECORDING_LOG":
+                ClusterTool.recordingLog(out, clusterDir);
+                return true;
+            case "ERRORS":
+                ClusterTool.errors(out, clusterDir);
+                return true;
+            case "LIST_MEMBERS":
+                ClusterTool.listMembers(out, clusterDir);
+                return true;
+            case "IS_LEADER": {
+                int result = ClusterTool.isLeader(out, clusterDir);
+                out.println("isLeader result: " + result + " (0=leader, 1=not leader)");
+                return true;
+            }
+            case "DESCRIBE_SNAPSHOT":
+                ClusterTool.describeLatestConsensusModuleSnapshot(out, clusterDir);
+                return true;
+
             default:
                 throw new IllegalArgumentException("Unknown command type: " + command.getType());
         }
-    }
-
-    private String takeSnapshot() {
-        boolean success = ClusterTool.snapshot(clusterDir, System.out);
-        return success ? "Snapshot triggered" : "Snapshot request failed";
-    }
-
-    private String suspendService() {
-        boolean success = ClusterTool.suspend(clusterDir, System.out);
-        return success ? "Service suspended" : "Suspend request failed";
-    }
-
-    private String resumeService() {
-        boolean success = ClusterTool.resume(clusterDir, System.out);
-        return success ? "Service resumed" : "Resume request failed";
-    }
-
-    private String shutdown() {
-        boolean success = ClusterTool.shutdown(clusterDir, System.out);
-        return success ? "Shutdown requested" : "Shutdown request failed";
     }
 }
