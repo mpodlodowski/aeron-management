@@ -56,7 +56,9 @@ public class ClusterStateAggregator {
 
         LOGGER.debug("Metrics received from node {}", nodeId);
 
-        pushToWebSocket("/topic/nodes/" + nodeId, convertMetricsToMap(report));
+        Map<String, Object> metricsMap = convertMetricsToMap(report);
+        pushToWebSocket("/topic/nodes/" + nodeId, metricsMap);
+        pushToWebSocket("/topic/nodes", metricsMap);
         pushToWebSocket("/topic/cluster", buildClusterOverview());
     }
 
