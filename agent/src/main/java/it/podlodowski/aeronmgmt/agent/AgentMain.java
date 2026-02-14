@@ -18,7 +18,7 @@ public class AgentMain {
 
         CncReader cncReader = new CncReader(config.aeronDir);
         ArchiveMetricsCollector archiveCollector = new ArchiveMetricsCollector(config.aeronDir);
-        MetricsCollector metricsCollector = new MetricsCollector(cncReader, archiveCollector, config.nodeId);
+        MetricsCollector metricsCollector = new MetricsCollector(cncReader, archiveCollector, config.nodeId, config.agentMode);
         AdminCommandExecutor commandExecutor = new AdminCommandExecutor(config.clusterDir);
         GrpcAgentClient grpcClient = new GrpcAgentClient(config, commandExecutor);
         HealthEndpoint healthEndpoint = new HealthEndpoint(7070);

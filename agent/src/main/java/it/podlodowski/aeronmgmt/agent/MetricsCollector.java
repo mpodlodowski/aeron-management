@@ -1,5 +1,6 @@
 package it.podlodowski.aeronmgmt.agent;
 
+import it.podlodowski.aeronmgmt.common.proto.ClusterMetrics;
 import it.podlodowski.aeronmgmt.common.proto.MetricsReport;
 import it.podlodowski.aeronmgmt.common.proto.SystemMetrics;
 
@@ -12,18 +13,27 @@ public class MetricsCollector {
     private final CncReader cncReader;
     private final ArchiveMetricsCollector archiveCollector;
     private final int nodeId;
+    private final String agentMode;
 
-    public MetricsCollector(CncReader cncReader, ArchiveMetricsCollector archiveCollector, int nodeId) {
+    public MetricsCollector(CncReader cncReader, ArchiveMetricsCollector archiveCollector, int nodeId, String agentMode) {
         this.cncReader = cncReader;
         this.archiveCollector = archiveCollector;
         this.nodeId = nodeId;
+        this.agentMode = agentMode;
     }
 
     public MetricsReport collect() {
+        ClusterMetrics clusterMetrics = cncReader.readClusterMetrics();
+        if ("backup".equals(agentMode)) {
+            clusterMetrics = clusterMetrics.toBuilder()
+                    .setNodeRole("BACKUP")
+                    .build();
+        }
+
         return MetricsReport.newBuilder()
                 .setNodeId(nodeId)
                 .setTimestamp(System.currentTimeMillis())
-                .setClusterMetrics(cncReader.readClusterMetrics())
+                .setClusterMetrics(clusterMetrics)
                 .addAllCounters(cncReader.readCounters())
                 .addAllRecordings(archiveCollector.collectRecordings())
                 .setSystemMetrics(collectSystemMetrics())
