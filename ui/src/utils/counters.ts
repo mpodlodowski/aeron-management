@@ -67,7 +67,8 @@ export function formatDuration(seconds: number): string {
   if (seconds < 3600) return `${Math.round(seconds / 60)}m`
   if (seconds < 86400) return `${(seconds / 3600).toFixed(1)}h`
   if (seconds < 604800) return `${(seconds / 86400).toFixed(1)}d`
-  return `${(seconds / 604800).toFixed(1)}w`
+  if (seconds < 31536000) return `${(seconds / 604800).toFixed(1)}w`
+  return `${(seconds / 31536000).toFixed(1)}y`
 }
 
 export function formatGrowthRate(bytesPerHour: number): string {
