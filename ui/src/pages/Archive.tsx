@@ -109,6 +109,8 @@ export default function Archive() {
         output: data.output,
       })
       fetchRecordings()
+      // Agent needs a metrics cycle to reflect changes; refetch after delay
+      setTimeout(fetchRecordings, 2000)
     } catch (err) {
       setActionResult({
         action: label,
