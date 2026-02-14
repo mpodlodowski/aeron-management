@@ -1,4 +1,6 @@
 **/build/
+!server/build/libs/
+!agent/build/libs/
 **/.gradle/
 **/node_modules/
 ui/dist/

@@ -6,32 +6,6 @@
     "allDeclaredConstructors": true
   },
   {
-    "name": "io.netty.channel.socket.nio.NioSocketChannel",
-    "allDeclaredConstructors": true
-  },
-  {
-    "name": "io.netty.channel.socket.nio.NioServerSocketChannel",
-    "allDeclaredConstructors": true
-  },
-  {
-    "name": "io.netty.handler.codec.http2.Http2MultiplexHandler",
-    "allDeclaredConstructors": true,
-    "allDeclaredMethods": true
-  },
-  {
-    "name": "io.grpc.netty.shaded.io.netty.channel.socket.nio.NioSocketChannel",
-    "allDeclaredConstructors": true
-  },
-  {
-    "name": "io.grpc.netty.shaded.io.netty.channel.socket.nio.NioServerSocketChannel",
-    "allDeclaredConstructors": true
-  },
-  {
-    "name": "io.grpc.netty.shaded.io.netty.handler.codec.http2.Http2MultiplexHandler",
-    "allDeclaredConstructors": true,
-    "allDeclaredMethods": true
-  },
-  {
     "name": "sun.nio.ch.SelectorImpl",
     "allDeclaredFields": true
   }

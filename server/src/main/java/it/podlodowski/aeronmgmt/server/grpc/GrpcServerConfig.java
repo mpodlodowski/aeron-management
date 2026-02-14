@@ -1,7 +1,7 @@
 package it.podlodowski.aeronmgmt.server.grpc;
 
 import io.grpc.Server;
-import io.grpc.netty.shaded.io.grpc.netty.NettyServerBuilder;
+import io.grpc.netty.NettyServerBuilder;
 import it.podlodowski.aeronmgmt.server.aggregator.ClusterStateAggregator;
 import jakarta.annotation.PreDestroy;
 import org.slf4j.Logger;

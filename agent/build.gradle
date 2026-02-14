@@ -12,28 +12,24 @@ dependencies {
     implementation project(':common')
     implementation 'io.aeron:aeron-all:1.46.5'
     implementation 'org.agrona:agrona:1.20.0'
-    implementation 'io.grpc:grpc-netty-shaded:1.62.2'
+    implementation 'io.grpc:grpc-netty:1.62.2'
     implementation 'ch.qos.logback:logback-classic:1.4.14'
     implementation 'org.slf4j:slf4j-api:2.0.9'
 }
 
 graalvmNative {
     metadataRepository {
-        // Disable GraalVM reachability metadata repository — it pulls in configs
-        // (e.g. for logback) that register ManagementFactory, causing PlatformManagedObject errors
-        enabled = false
+        enabled = true
     }
     binaries {
         main {
             imageName = 'agent'
             mainClass = 'it.podlodowski.aeronmgmt.agent.AgentMain'
+            resources.autodetect()
             buildArgs.addAll(
                 '--no-fallback',
                 '--enable-url-protocols=http',
                 '-H:+ReportExceptionStackTraces',
-                // Exclude gRPC-shaded Netty transport reflection config that registers
-                // ManagementFactory, causing PlatformManagedObject errors on GraalVM CE 21
-                '--exclude-config', 'grpc-netty-shaded.*\\.jar', 'META-INF/native-image/io\\.grpc\\.netty\\.shaded\\.io\\.netty/netty-transport/reflection-config\\.json',
             )
         }
     }
@@ -42,11 +38,6 @@ graalvmNative {
 shadowJar {
     archiveClassifier.set('')
     mergeServiceFiles()
-    // Exclude grpc-netty-shaded's bundled native-image transport config that registers
-    // ManagementFactory for reflection (causes PlatformManagedObject errors on GraalVM CE 21).
-    // Our own reflect-config.json provides the needed Netty reflection entries.
-    exclude 'META-INF/native-image/io.grpc.netty.shaded.io.netty/netty-transport/native-image.properties'
-    exclude 'META-INF/native-image/io.grpc.netty.shaded.io.netty/netty-transport/reflection-config.json'
 }
 
 // Disable the standard jar to avoid conflicts with shadowJar (both produce the same artifact name)
