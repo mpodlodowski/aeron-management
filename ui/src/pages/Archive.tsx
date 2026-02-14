@@ -38,6 +38,15 @@ const typeBadgeClass: Record<RecordingType, string> = {
 
 const RECORDING_TYPES: RecordingType[] = ['LOG', 'SNAPSHOT', 'OTHER']
 
+function formatTimestamp(ts: number): string {
+  if (ts <= 0) return '\u2014'
+  const d = new Date(ts)
+  return d.toLocaleString(undefined, {
+    month: 'short', day: 'numeric',
+    hour: '2-digit', minute: '2-digit', second: '2-digit',
+  })
+}
+
 export default function Archive() {
   useWebSocket()
   const nodes = useClusterStore((s) => s.nodes)
@@ -244,6 +253,12 @@ export default function Archive() {
                 Stop Pos
               </th>
               <th className="px-4 py-3 text-left text-xs font-medium text-gray-400 uppercase tracking-wider">
+                Started
+              </th>
+              <th className="px-4 py-3 text-left text-xs font-medium text-gray-400 uppercase tracking-wider">
+                Stopped
+              </th>
+              <th className="px-4 py-3 text-left text-xs font-medium text-gray-400 uppercase tracking-wider">
                 Status
               </th>
               <th className="px-4 py-3 text-left text-xs font-medium text-gray-400 uppercase tracking-wider">
@@ -254,7 +269,7 @@ export default function Archive() {
           <tbody className="divide-y divide-gray-800">
             {filtered.length === 0 ? (
               <tr>
-                <td colSpan={9} className="px-4 py-8 text-center text-gray-500">
+                <td colSpan={11} className="px-4 py-8 text-center text-gray-500">
                   No recordings available
                 </td>
               </tr>
@@ -283,6 +298,12 @@ export default function Archive() {
                     </td>
                     <td className="px-4 py-2 font-mono text-gray-400">
                       {isActive ? '\u2014' : rec.stopPosition.toLocaleString()}
+                    </td>
+                    <td className="px-4 py-2 text-gray-400 whitespace-nowrap">
+                      {formatTimestamp(rec.startTimestamp)}
+                    </td>
+                    <td className="px-4 py-2 text-gray-400 whitespace-nowrap">
+                      {formatTimestamp(rec.stopTimestamp)}
                     </td>
                     <td className="px-4 py-2">
                       <span
