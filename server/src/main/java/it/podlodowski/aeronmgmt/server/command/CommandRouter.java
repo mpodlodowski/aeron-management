@@ -57,6 +57,13 @@ public class CommandRouter {
             return error;
         }
 
+        if ("backup".equals(connection.getAgentMode())) {
+            Map<String, Object> error = new LinkedHashMap<>();
+            error.put("success", false);
+            error.put("error", "Commands not supported on backup nodes");
+            return error;
+        }
+
         String commandId = UUID.randomUUID().toString();
         CompletableFuture<CommandResult> future = aggregator.registerPendingCommand(commandId);
 
