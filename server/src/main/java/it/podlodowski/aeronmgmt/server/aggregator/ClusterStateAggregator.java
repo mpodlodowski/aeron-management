@@ -33,6 +33,7 @@ public class ClusterStateAggregator {
     private final ConcurrentHashMap<String, CompletableFuture<CommandResult>> pendingCommands = new ConcurrentHashMap<>();
     private final ConcurrentHashMap<Integer, String> nodeAgentModes = new ConcurrentHashMap<>();
     private final Set<Integer> connectedNodes = ConcurrentHashMap.newKeySet();
+    private final Set<Integer> reachableNodes = ConcurrentHashMap.newKeySet();
     private final LinkedList<Map<String, Object>> recentEvents = new LinkedList<>();
 
     @Autowired
@@ -51,6 +52,7 @@ public class ClusterStateAggregator {
                 .add(report);
 
         detectStateChanges(nodeId, previous, report);
+        detectNodeReachability(nodeId, report);
 
         LOGGER.debug("Metrics received from node {}", nodeId);
 
@@ -77,7 +79,8 @@ public class ClusterStateAggregator {
     public void onAgentDisconnected(int nodeId) {
         LOGGER.info("Agent disconnected: nodeId={}", nodeId);
         connectedNodes.remove(nodeId);
-        emitAlert("AGENT_DISCONNECTED", nodeId, "disconnected");
+        reachableNodes.remove(nodeId);
+        emitAlert("AGENT_DISCONNECTED", nodeId, "agent disconnected");
         pushToWebSocket("/topic/cluster", buildClusterOverview());
     }
 
@@ -106,6 +109,19 @@ public class ClusterStateAggregator {
                 && !"17".equals(curr.getElectionState())) {
             emitAlert("ELECTION_STARTED", nodeId,
                     "election state: " + curr.getElectionState());
+        }
+    }
+
+    private void detectNodeReachability(int nodeId, MetricsReport report) {
+        boolean hasCounters = report.getCountersCount() > 0;
+        boolean wasReachable = reachableNodes.contains(nodeId);
+
+        if (hasCounters && !wasReachable) {
+            reachableNodes.add(nodeId);
+            emitAlert("NODE_UP", nodeId, "node is reachable");
+        } else if (!hasCounters && wasReachable) {
+            reachableNodes.remove(nodeId);
+            emitAlert("NODE_DOWN", nodeId, "node is unreachable (CnC unavailable)");
         }
     }
 
@@ -179,6 +195,7 @@ public class ClusterStateAggregator {
         result.put("nodeId", report.getNodeId());
         result.put("timestamp", report.getTimestamp());
         result.put("agentConnected", connectedNodes.contains(report.getNodeId()));
+        result.put("nodeReachable", reachableNodes.contains(report.getNodeId()));
         String agentMode = nodeAgentModes.get(report.getNodeId());
         if (agentMode != null) {
             result.put("agentMode", agentMode);

@@ -15,19 +15,25 @@ function PageTitle() {
   if (match) {
     const id = Number(match[1])
     const metrics = nodes.get(id)
+    const agentDown = metrics?.agentConnected === false
+    const nodeDown = !agentDown && metrics?.nodeReachable === false
     const isBackup = metrics?.agentMode === 'backup'
-    if (isBackup) {
-      return <>Backup <RoleBadge role="BACKUP" /></>
-    }
-    const role = metrics?.clusterMetrics?.nodeRole ?? 'UNKNOWN'
-    return <>Node {id} <RoleBadge role={role} /></>
+    const name = isBackup ? 'Backup' : `Node ${id}`
+
+    if (agentDown) return <>{name} <RoleBadge role="OFFLINE" /></>
+    if (nodeDown) return <>{name} <RoleBadge role="DOWN" /></>
+
+    const role = isBackup ? 'BACKUP' : (metrics?.clusterMetrics?.nodeRole ?? 'UNKNOWN')
+    return <>{name} <RoleBadge role={role} /></>
   }
 
   return null
 }
 
 function RoleBadge({ role }: { role: string }) {
-  const color = role === 'BACKUP' ? 'bg-purple-500' :
+  const color = role === 'OFFLINE' ? 'bg-gray-500' :
+    role === 'DOWN' ? 'bg-red-500' :
+    role === 'BACKUP' ? 'bg-purple-500' :
     role === 'LEADER' ? 'bg-green-500' :
     role === 'FOLLOWER' ? 'bg-blue-500' :
     role === 'CANDIDATE' ? 'bg-yellow-500' : 'bg-red-500'
