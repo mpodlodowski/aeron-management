@@ -1,5 +1,5 @@
 import { useEffect, useState } from 'react'
-import { Link, useParams } from 'react-router-dom'
+import { useParams } from 'react-router-dom'
 import { useClusterStore } from '../stores/clusterStore'
 import { useWebSocket } from '../hooks/useWebSocket'
 import CounterTable from '../components/CounterTable'
@@ -60,13 +60,8 @@ export default function NodeDetail() {
 
   if (!metrics) {
     return (
-      <div className="space-y-4">
-        <Link to="/" className="text-sm text-blue-400 hover:text-blue-300">
-          &larr; Back to Dashboard
-        </Link>
-        <div className="text-gray-500">
-          No data available for Node {id}. Waiting for metrics...
-        </div>
+      <div className="text-gray-500">
+        No data available for Node {id}. Waiting for metrics...
       </div>
     )
   }
@@ -104,10 +99,6 @@ export default function NodeDetail() {
 
   return (
     <div className="space-y-6">
-      <Link to="/" className="text-sm text-blue-400 hover:text-blue-300">
-        &larr; Back to Dashboard
-      </Link>
-
       <div className="flex items-center justify-between">
         <div className="flex items-center gap-3">
           <h2 className="text-2xl font-semibold">

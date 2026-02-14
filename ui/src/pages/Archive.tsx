@@ -1,5 +1,4 @@
 import { useState, useMemo } from 'react'
-import { Link } from 'react-router-dom'
 import { useClusterStore } from '../stores/clusterStore'
 import { ArchiveRecording } from '../types'
 
@@ -35,10 +34,6 @@ export default function Archive() {
 
   return (
     <div className="space-y-6">
-      <Link to="/" className="text-sm text-blue-400 hover:text-blue-300">
-        &larr; Back to Dashboard
-      </Link>
-
       <div className="flex items-center justify-between">
         <h2 className="text-2xl font-semibold">Archive Recordings</h2>
         <span className="text-sm text-gray-400">

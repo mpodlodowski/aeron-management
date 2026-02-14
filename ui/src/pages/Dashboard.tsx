@@ -1,5 +1,4 @@
 import { useEffect } from 'react'
-import { Link } from 'react-router-dom'
 import { useClusterStore } from '../stores/clusterStore'
 import { useWebSocket } from '../hooks/useWebSocket'
 import NodeCard from '../components/NodeCard'
@@ -32,15 +31,7 @@ export default function Dashboard() {
   return (
     <div className="space-y-6">
       <div className="flex items-center justify-between">
-        <div className="flex items-center gap-4">
-          <h2 className="text-2xl font-semibold">Cluster Dashboard</h2>
-          <Link
-            to="/archive"
-            className="text-sm text-gray-400 hover:text-gray-200 transition-colors"
-          >
-            Archive Recordings
-          </Link>
-        </div>
+        <h2 className="text-2xl font-semibold">Cluster Dashboard</h2>
         <div className="flex items-center gap-2 text-sm">
           <span
             className={`inline-block h-2 w-2 rounded-full ${
