@@ -1,0 +1,96 @@
+syntax = "proto3";
+
+package it.podlodowski.aeronmgmt;
+
+option java_package = "it.podlodowski.aeronmgmt.common.proto";
+option java_multiple_files = true;
+
+service AgentService {
+  rpc Connect(stream AgentMessage) returns (stream ServerMessage);
+}
+
+// --- Agent -> Server messages ---
+
+message AgentMessage {
+  oneof payload {
+    AgentRegistration registration = 1;
+    MetricsReport metrics = 2;
+    CommandResult command_result = 3;
+  }
+}
+
+message AgentRegistration {
+  int32 node_id = 1;
+  string agent_mode = 2;  // "cluster" or "backup"
+  string hostname = 3;
+}
+
+message MetricsReport {
+  int32 node_id = 1;
+  int64 timestamp = 2;
+  ClusterMetrics cluster_metrics = 3;
+  repeated AeronCounter counters = 4;
+  repeated ArchiveRecording recordings = 5;
+  SystemMetrics system_metrics = 6;
+}
+
+message ClusterMetrics {
+  string node_role = 1;          // LEADER, FOLLOWER, CANDIDATE
+  int64 commit_position = 2;
+  int64 log_position = 3;
+  int64 append_position = 4;
+  int32 leader_member_id = 5;
+  int32 connected_client_count = 6;
+  string election_state = 7;
+}
+
+message AeronCounter {
+  int32 counter_id = 1;
+  string label = 2;
+  int64 value = 3;
+  int32 type_id = 4;
+}
+
+message ArchiveRecording {
+  int64 recording_id = 1;
+  int32 stream_id = 2;
+  string channel = 3;
+  int64 start_position = 4;
+  int64 stop_position = 5;     // -1 if active
+  int64 start_timestamp = 6;
+  int64 stop_timestamp = 7;    // -1 if active
+}
+
+message SystemMetrics {
+  int64 heap_used_bytes = 1;
+  int64 heap_max_bytes = 2;
+  double cpu_usage = 3;
+  int64 gc_count = 4;
+  int64 gc_time_ms = 5;
+}
+
+message CommandResult {
+  string command_id = 1;
+  bool success = 2;
+  string message = 3;
+  string error = 4;
+}
+
+// --- Server -> Agent messages ---
+
+message ServerMessage {
+  oneof payload {
+    AdminCommand command = 1;
+    Ack ack = 2;
+  }
+}
+
+message AdminCommand {
+  string command_id = 1;
+  string type = 2;   // SNAPSHOT, SUSPEND, RESUME, STEP_DOWN, REMOVE_MEMBER, LIST_RECORDINGS, PURGE_RECORDINGS
+  map<string, string> parameters = 3;
+}
+
+message Ack {
+  string message = 1;
+}
