@@ -4,7 +4,7 @@ plugins {
 }
 
 springBoot {
-    mainClass = 'it.podlodowski.aeronmgmt.server.ServerMain'
+    mainClass = 'it.podlodowski.aeronmgmt.server.ServerApplication'
 }
 
 dependencies {
