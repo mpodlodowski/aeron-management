@@ -105,10 +105,7 @@ public class ClusterController {
 
     private String deriveRecordingType(String channel) {
         Matcher m = ALIAS_PATTERN.matcher(channel);
-        if (!m.find()) return "OTHER";
-        String alias = m.group(1).toLowerCase();
-        if ("log".equals(alias)) return "LOG";
-        if ("snapshot".equals(alias)) return "SNAPSHOT";
-        return "OTHER";
+        if (!m.find()) return "UNKNOWN";
+        return m.group(1).toUpperCase();
     }
 }

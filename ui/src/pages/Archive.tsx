@@ -15,13 +15,15 @@ function nodeName(nodeId: number, agentMode?: string) {
   return agentMode === 'backup' ? 'Backup' : `Node ${nodeId}`
 }
 
-const typeBadgeClass: Record<RecordingType, string> = {
+const KNOWN_BADGE_CLASS: Record<string, string> = {
   LOG: 'bg-blue-900/50 text-blue-300',
   SNAPSHOT: 'bg-purple-900/50 text-purple-300',
-  OTHER: 'bg-gray-700 text-gray-300',
 }
+const DEFAULT_BADGE_CLASS = 'bg-gray-700 text-gray-300'
 
-const RECORDING_TYPES: RecordingType[] = ['LOG', 'SNAPSHOT', 'OTHER']
+function typeBadgeClass(type: string): string {
+  return KNOWN_BADGE_CLASS[type] ?? DEFAULT_BADGE_CLASS
+}
 
 function formatTimestamp(ts: number): string {
   if (ts <= 0) return '\u2014'
@@ -87,6 +89,11 @@ export default function Archive() {
   const nodeIds = useMemo(
     () => Array.from(nodes.keys()).sort((a, b) => a - b),
     [nodes],
+  )
+
+  const recordingTypes = useMemo(
+    () => [...new Set(recordings.map((r) => r.type))].sort(),
+    [recordings],
   )
 
   async function executeAction(label: string, nodeId: number, endpoint: string, method: 'POST' | 'GET' = 'POST') {
@@ -201,7 +208,7 @@ export default function Archive() {
         </div>
         <div className="flex items-center gap-2">
           <span className="text-xs font-medium text-gray-500 w-10">Type</span>
-          {RECORDING_TYPES.map((t) => (
+          {recordingTypes.map((t) => (
             <button
               key={t}
               onClick={() => setFilterType(filterType === t ? null : t)}
@@ -387,7 +394,7 @@ export default function Archive() {
                       {rec.recordingId}
                     </td>
                     <td className="px-4 py-2">
-                      <span className={`inline-flex rounded-full px-2 py-0.5 text-xs font-medium ${typeBadgeClass[rec.type]}`}>
+                      <span className={`inline-flex rounded-full px-2 py-0.5 text-xs font-medium ${typeBadgeClass(rec.type)}`}>
                         {rec.type}
                       </span>
                     </td>

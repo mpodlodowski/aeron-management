@@ -111,7 +111,7 @@ export interface Alert {
   message?: string
 }
 
-export type RecordingType = 'LOG' | 'SNAPSHOT' | 'OTHER'
+export type RecordingType = string
 export type RecordingState = 'VALID' | 'INVALID' | 'DELETED'
 
 export interface RecordingRow extends ArchiveRecording {
