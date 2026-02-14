@@ -1,0 +1,69 @@
+services:
+  management-server:
+    build:
+      context: ..
+      dockerfile: docker/Dockerfile.server
+    ports:
+      - "8080:8080"
+      - "8081:8081"
+    environment:
+      GRPC_SERVER_PORT: "8081"
+
+  agent-0:
+    build:
+      context: ..
+      dockerfile: docker/Dockerfile.agent
+    volumes:
+      - aeron-cluster-0-shm:/dev/shm/aeron-cluster-0:ro
+      - aeron-cluster-0-data:/app/aeron-cluster-0:ro
+    environment:
+      MANAGEMENT_SERVER_HOST: management-server
+      MANAGEMENT_SERVER_PORT: "8081"
+      AERON_DIR: /dev/shm/aeron-cluster-0
+      CLUSTER_DIR: /app/aeron-cluster-0/cluster
+      AGENT_NODE_ID: "0"
+      AGENT_MODE: cluster
+
+  agent-1:
+    build:
+      context: ..
+      dockerfile: docker/Dockerfile.agent
+    volumes:
+      - aeron-cluster-1-shm:/dev/shm/aeron-cluster-1:ro
+      - aeron-cluster-1-data:/app/aeron-cluster-1:ro
+    environment:
+      MANAGEMENT_SERVER_HOST: management-server
+      MANAGEMENT_SERVER_PORT: "8081"
+      AERON_DIR: /dev/shm/aeron-cluster-1
+      CLUSTER_DIR: /app/aeron-cluster-1/cluster
+      AGENT_NODE_ID: "1"
+      AGENT_MODE: cluster
+
+  agent-2:
+    build:
+      context: ..
+      dockerfile: docker/Dockerfile.agent
+    volumes:
+      - aeron-cluster-2-shm:/dev/shm/aeron-cluster-2:ro
+      - aeron-cluster-2-data:/app/aeron-cluster-2:ro
+    environment:
+      MANAGEMENT_SERVER_HOST: management-server
+      MANAGEMENT_SERVER_PORT: "8081"
+      AERON_DIR: /dev/shm/aeron-cluster-2
+      CLUSTER_DIR: /app/aeron-cluster-2/cluster
+      AGENT_NODE_ID: "2"
+      AGENT_MODE: cluster
+
+volumes:
+  aeron-cluster-0-shm:
+    external: true
+  aeron-cluster-0-data:
+    external: true
+  aeron-cluster-1-shm:
+    external: true
+  aeron-cluster-1-data:
+    external: true
+  aeron-cluster-2-shm:
+    external: true
+  aeron-cluster-2-data:
+    external: true
