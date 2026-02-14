@@ -10,10 +10,12 @@ import java.lang.management.MemoryMXBean;
 public class MetricsCollector {
 
     private final CncReader cncReader;
+    private final ArchiveMetricsCollector archiveCollector;
     private final int nodeId;
 
-    public MetricsCollector(CncReader cncReader, int nodeId) {
+    public MetricsCollector(CncReader cncReader, ArchiveMetricsCollector archiveCollector, int nodeId) {
         this.cncReader = cncReader;
+        this.archiveCollector = archiveCollector;
         this.nodeId = nodeId;
     }
 
@@ -23,6 +25,7 @@ public class MetricsCollector {
                 .setTimestamp(System.currentTimeMillis())
                 .setClusterMetrics(cncReader.readClusterMetrics())
                 .addAllCounters(cncReader.readCounters())
+                .addAllRecordings(archiveCollector.collectRecordings())
                 .setSystemMetrics(collectSystemMetrics())
                 .build();
     }

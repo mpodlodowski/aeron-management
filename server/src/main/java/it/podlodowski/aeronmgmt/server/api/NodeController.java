@@ -58,6 +58,12 @@ public class NodeController {
         return commandRouter.sendCommand(id, "RESUME");
     }
 
+    @PostMapping("/{id}/shutdown")
+    public Map<String, Object> shutdownNode(@PathVariable int id) {
+        return commandRouter.sendCommand(id, "SHUTDOWN");
+    }
+
+    /** Backwards-compatible alias for {@link #shutdownNode(int)}. */
     @PostMapping("/{id}/step-down")
     public Map<String, Object> stepDown(@PathVariable int id) {
         return commandRouter.sendCommand(id, "SHUTDOWN");

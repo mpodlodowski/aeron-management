@@ -17,14 +17,12 @@ export default function NodeDetail() {
   const [actionResult, setActionResult] = useState<ActionResult | null>(null)
   const [loading, setLoading] = useState<string | null>(null)
 
-  async function executeAction(action: string) {
+  async function executeAction(action: string, endpoint: string) {
     setLoading(action)
     setActionResult(null)
     try {
-      const res = await fetch(`/api/nodes/${id}/actions`, {
+      const res = await fetch(`/api/nodes/${id}/${endpoint}`, {
         method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ action }),
       })
       const data = await res.json()
       setActionResult({
@@ -62,10 +60,10 @@ export default function NodeDetail() {
     : 0
 
   const actions = [
-    { id: 'SNAPSHOT', label: 'Snapshot', color: 'bg-blue-600 hover:bg-blue-500' },
-    { id: 'SUSPEND', label: 'Suspend', color: 'bg-yellow-600 hover:bg-yellow-500' },
-    { id: 'RESUME', label: 'Resume', color: 'bg-green-600 hover:bg-green-500' },
-    { id: 'STEP_DOWN', label: 'Step Down', color: 'bg-red-600 hover:bg-red-500' },
+    { id: 'SNAPSHOT', label: 'Snapshot', endpoint: 'snapshot', color: 'bg-blue-600 hover:bg-blue-500' },
+    { id: 'SUSPEND', label: 'Suspend', endpoint: 'suspend', color: 'bg-yellow-600 hover:bg-yellow-500' },
+    { id: 'RESUME', label: 'Resume', endpoint: 'resume', color: 'bg-green-600 hover:bg-green-500' },
+    { id: 'SHUTDOWN', label: 'Shutdown', endpoint: 'shutdown', color: 'bg-red-600 hover:bg-red-500' },
   ]
 
   return (
@@ -110,7 +108,7 @@ export default function NodeDetail() {
           {actions.map((action) => (
             <button
               key={action.id}
-              onClick={() => executeAction(action.id)}
+              onClick={() => executeAction(action.id, action.endpoint)}
               disabled={loading !== null}
               className={`rounded-md px-4 py-2 text-sm font-medium text-white transition-colors disabled:opacity-50 disabled:cursor-not-allowed ${action.color}`}
             >
