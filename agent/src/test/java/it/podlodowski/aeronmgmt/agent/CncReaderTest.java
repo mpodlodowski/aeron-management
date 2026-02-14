@@ -7,17 +7,13 @@ import static org.assertj.core.api.Assertions.assertThat;
 class CncReaderTest {
 
     @Test
-    void readCountersFromNonexistentDir() {
+    void readFromNonexistentDir() {
         CncReader reader = new CncReader("/tmp/nonexistent-aeron-dir");
-        var counters = reader.readCounters();
-        assertThat(counters).isEmpty();
-    }
-
-    @Test
-    void readClusterMetricsFromNonexistentDir() {
-        CncReader reader = new CncReader("/tmp/nonexistent-aeron-dir");
-        var metrics = reader.readClusterMetrics();
-        assertThat(metrics.getNodeRole()).isEmpty();
-        assertThat(metrics.getCommitPosition()).isZero();
+        CncReader.CncSnapshot snapshot = reader.read();
+        assertThat(snapshot.cncAccessible).isFalse();
+        assertThat(snapshot.driverActive).isFalse();
+        assertThat(snapshot.counters).isEmpty();
+        assertThat(snapshot.clusterMetrics.getNodeRole()).isEmpty();
+        assertThat(snapshot.clusterMetrics.getCommitPosition()).isZero();
     }
 }

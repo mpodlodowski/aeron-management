@@ -6,6 +6,7 @@ import it.podlodowski.aeronmgmt.common.proto.ClusterMetrics;
 import org.agrona.DirectBuffer;
 import org.agrona.IoUtil;
 import org.agrona.concurrent.AtomicBuffer;
+import org.agrona.concurrent.ringbuffer.ManyToOneRingBuffer;
 import org.agrona.concurrent.status.CountersReader;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -18,10 +19,13 @@ import java.util.List;
 /**
  * Reads Aeron's CnC (Command and Control) file using CountersReader to extract
  * all counters and cluster-specific metrics. This is the same mechanism used by AeronStat.
+ *
+ * All data is read in a single {@link #read()} call to avoid mapping the file multiple times.
  */
 public class CncReader {
 
     private static final Logger LOGGER = LoggerFactory.getLogger(CncReader.class);
+    private static final long DRIVER_TIMEOUT_MS = 2_000;
 
     // Aeron cluster counter type IDs.
     // See io.aeron.cluster.ConsensusModule.Configuration and io.aeron.cluster.Election.
@@ -46,30 +50,67 @@ public class CncReader {
     }
 
     /**
-     * Reads ALL counters from the Aeron CnC file.
-     *
-     * @return list of all counters, or empty list if the CnC file does not exist or has a version mismatch
+     * Result of reading the CnC file in a single pass.
      */
-    public List<AeronCounter> readCounters() {
+    public static class CncSnapshot {
+        public final boolean cncAccessible;
+        public final boolean driverActive;
+        public final List<AeronCounter> counters;
+        public final ClusterMetrics clusterMetrics;
+
+        private CncSnapshot(boolean cncAccessible, boolean driverActive,
+                            List<AeronCounter> counters, ClusterMetrics clusterMetrics) {
+            this.cncAccessible = cncAccessible;
+            this.driverActive = driverActive;
+            this.counters = counters;
+            this.clusterMetrics = clusterMetrics;
+        }
+
+        static CncSnapshot unavailable() {
+            return new CncSnapshot(false, false, List.of(), ClusterMetrics.getDefaultInstance());
+        }
+
+        static CncSnapshot inactive() {
+            return new CncSnapshot(true, false, List.of(), ClusterMetrics.getDefaultInstance());
+        }
+    }
+
+    /**
+     * Reads all data from the CnC file in a single memory-mapped pass:
+     * driver liveness, all counters, and cluster-specific metrics.
+     */
+    public CncSnapshot read() {
         File cncFile = new File(aeronDir, CncFileDescriptor.CNC_FILE);
         if (!cncFile.exists()) {
             LOGGER.debug("CnC file not found: {}", cncFile.getAbsolutePath());
-            return List.of();
+            return CncSnapshot.unavailable();
         }
 
         try {
             MappedByteBuffer cncByteBuffer = IoUtil.mapExistingFile(cncFile, "cnc");
             try {
                 DirectBuffer cncMetaData = CncFileDescriptor.createMetaDataBuffer(cncByteBuffer);
-
                 int cncVersion = cncMetaData.getInt(CncFileDescriptor.cncVersionOffset(0));
+                if (cncVersion == 0) {
+                    return new CncSnapshot(true, false, List.of(), ClusterMetrics.getDefaultInstance());
+                }
                 if (CncFileDescriptor.CNC_VERSION != cncVersion) {
                     LOGGER.warn("CnC version mismatch: expected={}, actual={}", CncFileDescriptor.CNC_VERSION, cncVersion);
-                    return List.of();
+                    return CncSnapshot.inactive();
                 }
 
-                List<AeronCounter> counters = new ArrayList<>();
+                // Check driver heartbeat
+                ManyToOneRingBuffer toDriverBuffer = new ManyToOneRingBuffer(
+                        CncFileDescriptor.createToDriverBuffer(cncByteBuffer, cncMetaData));
+                long heartbeatTime = toDriverBuffer.consumerHeartbeatTime();
+                long now = System.currentTimeMillis();
+                long heartbeatAgeMs = now - heartbeatTime;
+                boolean driverActive = heartbeatAgeMs >= 0 && heartbeatAgeMs < DRIVER_TIMEOUT_MS;
+
+                // Read all counters + cluster metrics in one pass
                 CountersReader countersReader = createCountersReader(cncByteBuffer, cncMetaData);
+                List<AeronCounter> counters = new ArrayList<>();
+                ClusterMetrics.Builder clusterBuilder = ClusterMetrics.newBuilder();
 
                 countersReader.forEach((counterId, typeId, keyBuffer, label) -> {
                     long value = countersReader.getCounterValue(counterId);
@@ -79,73 +120,36 @@ public class CncReader {
                             .setLabel(label)
                             .setValue(value)
                             .build());
-                });
-                return counters;
-            } finally {
-                IoUtil.unmap(cncByteBuffer);
-            }
-        } catch (Exception e) {
-            LOGGER.debug("Failed to read CnC counters: {}", e.getMessage());
-            return List.of();
-        }
-    }
 
-    /**
-     * Extracts cluster-specific metrics (role, commit position, election state, client count)
-     * from the Aeron CnC file.
-     *
-     * @return cluster metrics, or default (empty) metrics if the CnC file does not exist or has a version mismatch
-     */
-    public ClusterMetrics readClusterMetrics() {
-        ClusterMetrics.Builder builder = ClusterMetrics.newBuilder();
-        File cncFile = new File(aeronDir, CncFileDescriptor.CNC_FILE);
-        if (!cncFile.exists()) {
-            return builder.build();
-        }
-
-        try {
-            MappedByteBuffer cncByteBuffer = IoUtil.mapExistingFile(cncFile, "cnc");
-            try {
-                DirectBuffer cncMetaData = CncFileDescriptor.createMetaDataBuffer(cncByteBuffer);
-
-                int cncVersion = cncMetaData.getInt(CncFileDescriptor.cncVersionOffset(0));
-                if (CncFileDescriptor.CNC_VERSION != cncVersion) {
-                    LOGGER.warn("CnC version mismatch: expected={}, actual={}", CncFileDescriptor.CNC_VERSION, cncVersion);
-                    return builder.build();
-                }
-
-                CountersReader countersReader = createCountersReader(cncByteBuffer, cncMetaData);
-
-                countersReader.forEach((counterId, typeId, keyBuffer, label) -> {
-                    long value = countersReader.getCounterValue(counterId);
                     switch (typeId) {
                         case CLUSTER_NODE_ROLE_TYPE_ID:
-                            builder.setNodeRole(roleToString(value));
+                            clusterBuilder.setNodeRole(roleToString(value));
                             break;
                         case COMMIT_POSITION_TYPE_ID:
-                            builder.setCommitPosition(value);
+                            clusterBuilder.setCommitPosition(value);
                             break;
                         case ELECTION_STATE_TYPE_ID:
-                            builder.setElectionState(String.valueOf(value));
+                            clusterBuilder.setElectionState(String.valueOf(value));
                             break;
                         case CLUSTER_TIMED_OUT_CLIENT_COUNT_TYPE_ID:
-                            builder.setConnectedClientCount((int) value);
+                            clusterBuilder.setConnectedClientCount((int) value);
                             break;
                         case LEADERSHIP_TERM_ID_TYPE_ID:
-                            builder.setLeaderMemberId((int) value);
+                            clusterBuilder.setLeaderMemberId((int) value);
                             break;
                         default:
                             break;
                     }
                 });
+
+                return new CncSnapshot(true, driverActive, counters, clusterBuilder.build());
             } finally {
                 IoUtil.unmap(cncByteBuffer);
             }
         } catch (Exception e) {
-            LOGGER.debug("Failed to read CnC cluster metrics: {}", e.getMessage());
+            LOGGER.debug("Failed to read CnC: {}", e.getMessage());
+            return CncSnapshot.unavailable();
         }
-
-        return builder.build();
     }
 
     private static CountersReader createCountersReader(MappedByteBuffer cncByteBuffer, DirectBuffer cncMetaData) {
@@ -154,10 +158,6 @@ public class CncReader {
         return new CountersReader(countersMetaDataBuffer, countersValuesBuffer);
     }
 
-    /**
-     * Converts the numeric cluster role value to a human-readable string.
-     * Values correspond to io.aeron.cluster.service.Cluster.Role ordinals.
-     */
     private static String roleToString(long roleValue) {
         switch ((int) roleValue) {
             case 0: return "FOLLOWER";

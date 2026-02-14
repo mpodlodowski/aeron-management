@@ -23,7 +23,9 @@ public class MetricsCollector {
     }
 
     public MetricsReport collect() {
-        ClusterMetrics clusterMetrics = cncReader.readClusterMetrics();
+        CncReader.CncSnapshot cnc = cncReader.read();
+
+        ClusterMetrics clusterMetrics = cnc.clusterMetrics;
         if ("backup".equals(agentMode)) {
             clusterMetrics = clusterMetrics.toBuilder()
                     .setNodeRole("BACKUP")
@@ -33,8 +35,10 @@ public class MetricsCollector {
         return MetricsReport.newBuilder()
                 .setNodeId(nodeId)
                 .setTimestamp(System.currentTimeMillis())
+                .setCncAccessible(cnc.cncAccessible)
+                .setNodeReachable(cnc.driverActive)
                 .setClusterMetrics(clusterMetrics)
-                .addAllCounters(cncReader.readCounters())
+                .addAllCounters(cnc.counters)
                 .addAllRecordings(archiveCollector.collectRecordings())
                 .setSystemMetrics(collectSystemMetrics())
                 .build();

@@ -113,15 +113,15 @@ public class ClusterStateAggregator {
     }
 
     private void detectNodeReachability(int nodeId, MetricsReport report) {
-        boolean hasCounters = report.getCountersCount() > 0;
+        boolean isReachable = report.getNodeReachable();
         boolean wasReachable = reachableNodes.contains(nodeId);
 
-        if (hasCounters && !wasReachable) {
+        if (isReachable && !wasReachable) {
             reachableNodes.add(nodeId);
             emitAlert("NODE_UP", nodeId, "node is reachable");
-        } else if (!hasCounters && wasReachable) {
+        } else if (!isReachable && wasReachable) {
             reachableNodes.remove(nodeId);
-            emitAlert("NODE_DOWN", nodeId, "node is unreachable (CnC unavailable)");
+            emitAlert("NODE_DOWN", nodeId, "node is unreachable (driver heartbeat stopped)");
         }
     }
 
@@ -195,6 +195,7 @@ public class ClusterStateAggregator {
         result.put("nodeId", report.getNodeId());
         result.put("timestamp", report.getTimestamp());
         result.put("agentConnected", connectedNodes.contains(report.getNodeId()));
+        result.put("cncAccessible", report.getCncAccessible());
         result.put("nodeReachable", reachableNodes.contains(report.getNodeId()));
         String agentMode = nodeAgentModes.get(report.getNodeId());
         if (agentMode != null) {

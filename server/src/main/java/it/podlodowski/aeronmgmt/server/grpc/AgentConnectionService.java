@@ -22,6 +22,7 @@ public class AgentConnectionService extends AgentServiceGrpc.AgentServiceImplBas
     public StreamObserver<AgentMessage> connect(StreamObserver<ServerMessage> responseObserver) {
         return new StreamObserver<>() {
             private volatile int nodeId = -1;
+            private volatile String agentId = "unknown";
 
             @Override
             public void onNext(AgentMessage message) {
@@ -35,13 +36,13 @@ public class AgentConnectionService extends AgentServiceGrpc.AgentServiceImplBas
 
             @Override
             public void onError(Throwable t) {
-                LOGGER.error("Agent stream error (nodeId={}): {}", nodeId, t.getMessage());
+                LOGGER.error("Agent stream error (agentId={}, nodeId={}): {}", agentId, nodeId, t.getMessage());
                 handleDisconnect();
             }
 
             @Override
             public void onCompleted() {
-                LOGGER.info("Agent stream completed (nodeId={})", nodeId);
+                LOGGER.info("Agent stream completed (agentId={}, nodeId={})", agentId, nodeId);
                 handleDisconnect();
                 responseObserver.onCompleted();
             }
@@ -49,6 +50,7 @@ public class AgentConnectionService extends AgentServiceGrpc.AgentServiceImplBas
             private void handleRegistration(AgentRegistration registration,
                                              StreamObserver<ServerMessage> observer) {
                 nodeId = registration.getNodeId();
+                agentId = registration.getAgentId();
                 registry.register(
                         registration.getNodeId(),
                         registration.getAgentMode(),
@@ -64,7 +66,8 @@ public class AgentConnectionService extends AgentServiceGrpc.AgentServiceImplBas
                                 .build())
                         .build();
                 observer.onNext(ack);
-                LOGGER.info("Sent ack to node {}", nodeId);
+                LOGGER.info("Agent registered: agentId={}, nodeId={}, mode={}",
+                        agentId, nodeId, registration.getAgentMode());
             }
 
             private void handleMetrics(MetricsReport report) {

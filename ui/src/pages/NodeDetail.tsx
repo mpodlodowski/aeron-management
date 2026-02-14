@@ -103,15 +103,15 @@ export default function NodeDetail() {
       <div className="grid grid-cols-3 md:grid-cols-4 lg:grid-cols-6 gap-3">
         {isBackup ? (<>
           <SummaryCard
+            label="Live Log Position"
+            value={(counterByType(c, COUNTER_TYPE.BACKUP_LIVE_LOG_POSITION)?.value ?? 0).toLocaleString()}
+            tooltip="Current position in the live log being replicated from the cluster leader"
+          />
+          <SummaryCard
             label="Backup State"
             value={backupStateName(counterByType(c, COUNTER_TYPE.BACKUP_STATE)?.value ?? -1)}
             alert={(counterByType(c, COUNTER_TYPE.BACKUP_STATE)?.value ?? -1) !== 5}
             tooltip="ClusterBackup state. BACKING_UP (5) is the normal operational state indicating active replication"
-          />
-          <SummaryCard
-            label="Live Log Position"
-            value={(counterByType(c, COUNTER_TYPE.BACKUP_LIVE_LOG_POSITION)?.value ?? 0).toLocaleString()}
-            tooltip="Current position in the live log being replicated from the cluster leader"
           />
           <SummaryCard
             label="Backup Errors"

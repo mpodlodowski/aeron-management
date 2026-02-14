@@ -16,11 +16,13 @@ function PageTitle() {
     const id = Number(match[1])
     const metrics = nodes.get(id)
     const agentDown = metrics?.agentConnected === false
-    const nodeDown = !agentDown && metrics?.nodeReachable === false
+    const noCnc = !agentDown && metrics?.cncAccessible === false
+    const nodeDown = !agentDown && !noCnc && metrics?.nodeReachable === false
     const isBackup = metrics?.agentMode === 'backup'
     const name = isBackup ? 'Backup' : `Node ${id}`
 
     if (agentDown) return <>{name} <RoleBadge role="OFFLINE" /></>
+    if (noCnc) return <>{name} <RoleBadge role="DETACHED" /></>
     if (nodeDown) return <>{name} <RoleBadge role="DOWN" /></>
 
     const role = isBackup ? 'BACKUP' : (metrics?.clusterMetrics?.nodeRole ?? 'UNKNOWN')
@@ -32,6 +34,7 @@ function PageTitle() {
 
 function RoleBadge({ role }: { role: string }) {
   const color = role === 'OFFLINE' ? 'bg-gray-500' :
+    role === 'DETACHED' ? 'bg-yellow-500' :
     role === 'DOWN' ? 'bg-red-500' :
     role === 'BACKUP' ? 'bg-purple-500' :
     role === 'LEADER' ? 'bg-green-500' :

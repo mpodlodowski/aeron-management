@@ -16,14 +16,16 @@ public class GrpcAgentClient {
     private static final long RECONNECT_DELAY_MS = 5000;
 
     private final AgentConfig config;
+    private final ClusterMarkFileReader identity;
     private final AdminCommandExecutor commandExecutor;
     private final AtomicBoolean connected = new AtomicBoolean(false);
 
     private ManagedChannel channel;
     private volatile StreamObserver<AgentMessage> requestObserver;
 
-    public GrpcAgentClient(AgentConfig config, AdminCommandExecutor commandExecutor) {
+    public GrpcAgentClient(AgentConfig config, ClusterMarkFileReader identity, AdminCommandExecutor commandExecutor) {
         this.config = config;
+        this.identity = identity;
         this.commandExecutor = commandExecutor;
     }
 
@@ -85,8 +87,9 @@ public class GrpcAgentClient {
         // Send registration
         requestObserver.onNext(AgentMessage.newBuilder()
                 .setRegistration(AgentRegistration.newBuilder()
-                        .setNodeId(config.nodeId)
-                        .setAgentMode(config.agentMode)
+                        .setNodeId(identity.nodeId())
+                        .setAgentMode(identity.agentMode())
+                        .setAgentId(config.agentId)
                         .setHostname(getHostname())
                         .build())
                 .build());

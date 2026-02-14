@@ -23,6 +23,7 @@ message AgentRegistration {
   int32 node_id = 1;
   string agent_mode = 2;  // "cluster" or "backup"
   string hostname = 3;
+  string agent_id = 4;    // unique agent identifier (random UUID or configured)
 }
 
 message MetricsReport {
@@ -32,6 +33,8 @@ message MetricsReport {
   repeated AeronCounter counters = 4;
   repeated ArchiveRecording recordings = 5;
   SystemMetrics system_metrics = 6;
+  bool node_reachable = 7;           // true if the media driver heartbeat is active
+  bool cnc_accessible = 8;           // true if the CnC file exists and is readable
 }
 
 message ClusterMetrics {

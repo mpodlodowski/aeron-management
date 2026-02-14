@@ -37,6 +37,7 @@ export interface MetricsReport {
   nodeId: number
   timestamp: number
   agentConnected?: boolean
+  cncAccessible?: boolean
   nodeReachable?: boolean
   agentMode?: string
   clusterMetrics: ClusterMetrics
