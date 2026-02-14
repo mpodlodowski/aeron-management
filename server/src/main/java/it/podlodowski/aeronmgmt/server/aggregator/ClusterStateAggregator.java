@@ -77,7 +77,6 @@ public class ClusterStateAggregator {
     public void onAgentDisconnected(int nodeId) {
         LOGGER.info("Agent disconnected: nodeId={}", nodeId);
         connectedNodes.remove(nodeId);
-        nodeAgentModes.remove(nodeId);
         emitAlert("AGENT_DISCONNECTED", nodeId, "disconnected");
         pushToWebSocket("/topic/cluster", buildClusterOverview());
     }

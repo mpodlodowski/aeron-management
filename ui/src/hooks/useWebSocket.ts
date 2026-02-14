@@ -22,8 +22,10 @@ export function useWebSocket() {
           addAlert(JSON.parse(message.body))
         })
 
-        for (let i = 0; i < 3; i++) {
-          client.subscribe(`/topic/nodes/${i}`, (message) => {
+        // Subscribe to per-node topics for all known node IDs
+        // Covers cluster nodes (0,1,2) and backup (99)
+        for (const id of [0, 1, 2, 99]) {
+          client.subscribe(`/topic/nodes/${id}`, (message) => {
             updateNode(JSON.parse(message.body))
           })
         }
