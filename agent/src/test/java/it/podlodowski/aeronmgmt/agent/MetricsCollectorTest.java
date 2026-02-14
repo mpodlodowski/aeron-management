@@ -10,7 +10,7 @@ class MetricsCollectorTest {
     @Test
     void backupModeInjectsBackupRole() {
         CncReader cncReader = new CncReader("/tmp/nonexistent-aeron-dir");
-        ArchiveMetricsCollector archiveCollector = new ArchiveMetricsCollector("/tmp/nonexistent-aeron-dir");
+        ArchiveMetricsCollector archiveCollector = new ArchiveMetricsCollector("/tmp/nonexistent-aeron-dir", false);
         MetricsCollector collector = new MetricsCollector(cncReader, archiveCollector, 99, "backup");
 
         MetricsReport report = collector.collect();
@@ -22,7 +22,7 @@ class MetricsCollectorTest {
     @Test
     void clusterModeDoesNotOverrideRole() {
         CncReader cncReader = new CncReader("/tmp/nonexistent-aeron-dir");
-        ArchiveMetricsCollector archiveCollector = new ArchiveMetricsCollector("/tmp/nonexistent-aeron-dir");
+        ArchiveMetricsCollector archiveCollector = new ArchiveMetricsCollector("/tmp/nonexistent-aeron-dir", false);
         MetricsCollector collector = new MetricsCollector(cncReader, archiveCollector, 0, "cluster");
 
         MetricsReport report = collector.collect();

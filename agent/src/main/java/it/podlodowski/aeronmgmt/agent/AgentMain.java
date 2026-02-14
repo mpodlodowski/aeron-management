@@ -17,7 +17,7 @@ public class AgentMain {
         LOGGER.info("Aeron dir: {}, Cluster dir: {}", config.aeronDir, config.clusterDir);
 
         CncReader cncReader = new CncReader(config.aeronDir);
-        ArchiveMetricsCollector archiveCollector = new ArchiveMetricsCollector(config.aeronDir);
+        ArchiveMetricsCollector archiveCollector = new ArchiveMetricsCollector(config.aeronDir, "backup".equals(config.agentMode));
         MetricsCollector metricsCollector = new MetricsCollector(cncReader, archiveCollector, config.nodeId, config.agentMode);
         AdminCommandExecutor commandExecutor = new AdminCommandExecutor(config.clusterDir);
         GrpcAgentClient grpcClient = new GrpcAgentClient(config, commandExecutor);

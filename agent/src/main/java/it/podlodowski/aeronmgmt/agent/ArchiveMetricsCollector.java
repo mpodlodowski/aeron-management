@@ -31,12 +31,14 @@ public class ArchiveMetricsCollector {
     private static final long REFRESH_INTERVAL_MS = TimeUnit.SECONDS.toMillis(10);
 
     private final String aeronDir;
+    private final boolean enabled;
 
     private volatile List<ArchiveRecording> cachedRecordings = Collections.emptyList();
     private volatile long lastRefreshTimestamp = 0;
 
-    public ArchiveMetricsCollector(String aeronDir) {
+    public ArchiveMetricsCollector(String aeronDir, boolean enabled) {
         this.aeronDir = aeronDir;
+        this.enabled = enabled;
     }
 
     /**
@@ -46,6 +48,9 @@ public class ArchiveMetricsCollector {
      * @return list of archive recordings, or empty list if the archive is unavailable
      */
     public List<ArchiveRecording> collectRecordings() {
+        if (!enabled) {
+            return Collections.emptyList();
+        }
         long now = System.currentTimeMillis();
         if (now - lastRefreshTimestamp < REFRESH_INTERVAL_MS) {
             return cachedRecordings;
@@ -61,7 +66,12 @@ public class ArchiveMetricsCollector {
 
         try (Aeron aeron = Aeron.connect(new Aeron.Context().aeronDirectoryName(aeronDir));
              AeronArchive archive = AeronArchive.connect(
-                     new AeronArchive.Context().aeron(aeron).ownsAeronClient(false))) {
+                     new AeronArchive.Context()
+                             .aeron(aeron)
+                             .ownsAeronClient(false)
+                             .controlRequestChannel(AeronArchive.Configuration.localControlChannel())
+                             .controlResponseChannel(AeronArchive.Configuration.localControlChannel())
+                             .controlRequestStreamId(AeronArchive.Configuration.localControlStreamId()))) {
 
             RecordingDescriptorConsumer consumer = (controlSessionId, correlationId,
                     recordingId, startTimestamp, stopTimestamp, startPosition, stopPosition,
@@ -82,7 +92,7 @@ public class ArchiveMetricsCollector {
             LOGGER.debug("Fetched {} archive recordings", count);
 
         } catch (Exception e) {
-            LOGGER.debug("Archive not available, returning empty recordings list: {}", e.getMessage());
+            LOGGER.debug("Archive not available: {}", e.getMessage());
             return Collections.emptyList();
         }
 
