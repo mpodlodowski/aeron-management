@@ -4,6 +4,7 @@ import { MetricsReport, ClusterOverview, ClusterStats, Alert } from '../types'
 interface ClusterState {
   nodes: Map<number, MetricsReport>
   leaderNodeId: number | null
+  clusterState: string | null
   clusterStats: ClusterStats | null
   alerts: Alert[]
   connected: boolean
@@ -18,6 +19,7 @@ interface ClusterState {
 export const useClusterStore = create<ClusterState>((set) => ({
   nodes: new Map(),
   leaderNodeId: null,
+  clusterState: null,
   clusterStats: null,
   alerts: [],
   connected: false,
@@ -38,6 +40,7 @@ export const useClusterStore = create<ClusterState>((set) => ({
       return {
         nodes,
         leaderNodeId: overview.leaderNodeId ?? null,
+        clusterState: overview.clusterState ?? null,
         clusterStats: overview.clusterStats ?? null,
       }
     }),

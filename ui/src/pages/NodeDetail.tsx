@@ -116,15 +116,9 @@ export default function NodeDetail() {
   const bytesMapped = counterByLabel(c, 'Bytes currently mapped')?.value ?? 0
   const naksRecv = counterByLabel(c, 'NAKs received')?.value ?? 0
 
-  const isLeader = clusterMetrics?.nodeRole === 'LEADER'
   const actions = [
-    { id: 'SNAPSHOT', label: 'Snapshot', endpoint: 'snapshot', color: 'bg-blue-600 hover:bg-blue-500', leaderOnly: true, tooltip: 'Trigger a cluster snapshot to compact the log and create a recovery point' },
-    { id: 'SUSPEND', label: 'Suspend', endpoint: 'suspend', color: 'bg-yellow-600 hover:bg-yellow-500', leaderOnly: true, tooltip: 'Suspend cluster log processing. The cluster will stop accepting new commands until resumed' },
-    { id: 'RESUME', label: 'Resume', endpoint: 'resume', color: 'bg-green-600 hover:bg-green-500', leaderOnly: true, tooltip: 'Resume cluster log processing after a suspend' },
-    { id: 'SHUTDOWN', label: 'Shutdown', endpoint: 'shutdown', color: 'bg-red-600 hover:bg-red-500', leaderOnly: true, tooltip: 'Gracefully shut down the cluster. Takes a snapshot before stopping all nodes' },
-    { id: 'ABORT', label: 'Abort', endpoint: 'abort', color: 'bg-red-700 hover:bg-red-600', leaderOnly: true, tooltip: 'Immediately abort the cluster without taking a snapshot. Use only as a last resort' },
-    { id: 'INVALIDATE_SNAPSHOT', label: 'Invalidate Snapshot', endpoint: 'invalidate-snapshot', color: 'bg-orange-600 hover:bg-orange-500', leaderOnly: false, tooltip: 'Mark the latest snapshot as invalid so the node recovers from the log on next restart' },
-  ].filter(a => !a.leaderOnly || isLeader)
+    { id: 'INVALIDATE_SNAPSHOT', label: 'Invalidate Snapshot', endpoint: 'invalidate-snapshot', color: 'bg-orange-600 hover:bg-orange-500', tooltip: 'Mark the latest snapshot as invalid so the node recovers from the log on next restart' },
+  ]
 
   const diagnostics = [
     { id: 'DESCRIBE', label: 'Describe', endpoint: 'describe', tooltip: 'Show cluster node configuration and current state' },
@@ -174,6 +168,12 @@ export default function NodeDetail() {
             tooltip="Total bytes of memory-mapped files used by the Aeron media driver (log buffers, CnC, etc.)"
           />
         </>) : (<>
+          <SummaryCard
+            label="Module State"
+            value={clusterMetrics?.consensusModuleState || '\u2014'}
+            alert={clusterMetrics?.consensusModuleState === 'SUSPENDED'}
+            tooltip="Consensus module state: ACTIVE is normal, SUSPENDED means log processing is paused"
+          />
           <SummaryCard
             label="Commit Position"
             value={clusterMetrics?.commitPosition?.toLocaleString() ?? '\u2014'}

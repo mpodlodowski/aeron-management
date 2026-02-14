@@ -45,6 +45,7 @@ message ClusterMetrics {
   int32 leader_member_id = 5;
   int32 connected_client_count = 6;
   string election_state = 7;
+  string consensus_module_state = 8;  // INIT, ACTIVE, SUSPENDED, SNAPSHOT, QUITTING, TERMINATING, CLOSED
 }
 
 message AeronCounter {

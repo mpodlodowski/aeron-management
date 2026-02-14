@@ -122,6 +122,9 @@ public class CncReader {
                             .build());
 
                     switch (typeId) {
+                        case CONSENSUS_MODULE_STATE_TYPE_ID:
+                            clusterBuilder.setConsensusModuleState(consensusModuleStateToString(value));
+                            break;
                         case CLUSTER_NODE_ROLE_TYPE_ID:
                             clusterBuilder.setNodeRole(roleToString(value));
                             break;
@@ -164,6 +167,19 @@ public class CncReader {
             case 1: return "CANDIDATE";
             case 2: return "LEADER";
             default: return "UNKNOWN(" + roleValue + ")";
+        }
+    }
+
+    private static String consensusModuleStateToString(long stateValue) {
+        switch ((int) stateValue) {
+            case 0: return "INIT";
+            case 1: return "ACTIVE";
+            case 2: return "SUSPENDED";
+            case 3: return "SNAPSHOT";
+            case 4: return "QUITTING";
+            case 5: return "TERMINATING";
+            case 6: return "CLOSED";
+            default: return "UNKNOWN(" + stateValue + ")";
         }
     }
 }

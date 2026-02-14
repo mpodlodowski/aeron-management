@@ -5,6 +5,7 @@ import it.podlodowski.aeronmgmt.common.proto.MetricsReport;
 import it.podlodowski.aeronmgmt.server.aggregator.ClusterStateAggregator;
 import it.podlodowski.aeronmgmt.server.command.CommandRouter;
 import org.springframework.web.bind.annotation.GetMapping;
+import org.springframework.web.bind.annotation.PostMapping;
 import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RequestParam;
 import org.springframework.web.bind.annotation.RestController;
@@ -44,6 +45,46 @@ public class ClusterController {
             MetricsReport report = entry.getValue();
             if (report.hasClusterMetrics() && "LEADER".equals(report.getClusterMetrics().getNodeRole())) {
                 return commandRouter.sendCommand(entry.getKey(), "LIST_MEMBERS_STRUCTURED");
+            }
+        }
+        Map<String, Object> error = new LinkedHashMap<>();
+        error.put("success", false);
+        error.put("message", "No leader node available");
+        return error;
+    }
+
+    // --- Cluster-level admin actions (auto-routed to leader) ---
+
+    @PostMapping("/snapshot")
+    public Map<String, Object> snapshot() {
+        return sendToLeader("SNAPSHOT");
+    }
+
+    @PostMapping("/suspend")
+    public Map<String, Object> suspend() {
+        return sendToLeader("SUSPEND");
+    }
+
+    @PostMapping("/resume")
+    public Map<String, Object> resume() {
+        return sendToLeader("RESUME");
+    }
+
+    @PostMapping("/shutdown")
+    public Map<String, Object> shutdown() {
+        return sendToLeader("SHUTDOWN");
+    }
+
+    @PostMapping("/abort")
+    public Map<String, Object> abort() {
+        return sendToLeader("ABORT");
+    }
+
+    private Map<String, Object> sendToLeader(String command) {
+        for (Map.Entry<Integer, MetricsReport> entry : aggregator.getLatestMetrics().entrySet()) {
+            MetricsReport report = entry.getValue();
+            if (report.hasClusterMetrics() && "LEADER".equals(report.getClusterMetrics().getNodeRole())) {
+                return commandRouter.sendCommand(entry.getKey(), command);
             }
         }
         Map<String, Object> error = new LinkedHashMap<>();

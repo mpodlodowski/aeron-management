@@ -130,6 +130,13 @@ public class ClusterStateAggregator {
             }
         }
 
+        // Consensus module state change (e.g. ACTIVE -> SUSPENDED)
+        if (!prev.getConsensusModuleState().equals(curr.getConsensusModuleState())
+                && !curr.getConsensusModuleState().isEmpty()) {
+            emitAlert("MODULE_STATE_CHANGE", nodeId,
+                    "consensus module: " + prev.getConsensusModuleState() + " \u2192 " + curr.getConsensusModuleState());
+        }
+
         // Election state change (anything != CLOSED means election in progress)
         if (!prev.getElectionState().equals(curr.getElectionState())
                 && !"17".equals(curr.getElectionState())) {
@@ -193,6 +200,7 @@ public class ClusterStateAggregator {
         Map<String, Map<String, Object>> nodes = new LinkedHashMap<>();
 
         int leaderNodeId = -1;
+        String clusterState = null;
         long totalErrors = 0;
         long totalSnapshots = 0;
         long totalElections = 0;
@@ -217,6 +225,10 @@ public class ClusterStateAggregator {
                 leaderNodeId = report.getNodeId();
                 commitPosition = report.getClusterMetrics().getCommitPosition();
                 connectedClients = report.getClusterMetrics().getConnectedClientCount();
+                String moduleState = report.getClusterMetrics().getConsensusModuleState();
+                if (!moduleState.isEmpty()) {
+                    clusterState = moduleState;
+                }
             }
 
             nodes.put(String.valueOf(report.getNodeId()), convertMetricsToMap(report));
@@ -275,6 +287,7 @@ public class ClusterStateAggregator {
         overview.put("nodeCount", nodes.size());
         overview.put("clusterNodeCount", clusterNodeCount);
         overview.put("leaderNodeId", leaderNodeId);
+        overview.put("clusterState", clusterState);
         overview.put("nodes", nodes);
 
         Map<String, Object> clusterStats = new LinkedHashMap<>();
@@ -321,6 +334,7 @@ public class ClusterStateAggregator {
             cluster.put("leaderMemberId", cm.getLeaderMemberId());
             cluster.put("connectedClientCount", cm.getConnectedClientCount());
             cluster.put("electionState", cm.getElectionState());
+            cluster.put("consensusModuleState", cm.getConsensusModuleState());
             result.put("clusterMetrics", cluster);
         }
 

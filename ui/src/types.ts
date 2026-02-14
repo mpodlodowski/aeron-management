@@ -6,6 +6,7 @@ export interface ClusterMetrics {
   leaderMemberId: number
   connectedClientCount: number
   electionState: string
+  consensusModuleState: string
 }
 
 export interface AeronCounter {
@@ -100,6 +101,7 @@ export interface ClusterOverview {
   nodes: Record<string, MetricsReport>
   leaderNodeId?: number
   clusterNodeCount?: number
+  clusterState?: string
   clusterStats?: ClusterStats
   timestamp: number
 }
