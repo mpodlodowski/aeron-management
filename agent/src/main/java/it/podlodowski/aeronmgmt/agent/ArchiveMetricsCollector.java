@@ -3,6 +3,7 @@ package it.podlodowski.aeronmgmt.agent;
 import io.aeron.archive.codecs.CatalogHeaderDecoder;
 import io.aeron.archive.codecs.RecordingDescriptorDecoder;
 import io.aeron.archive.codecs.RecordingDescriptorHeaderDecoder;
+import io.aeron.archive.codecs.RecordingState;
 import it.podlodowski.aeronmgmt.common.proto.ArchiveRecording;
 import org.agrona.IoUtil;
 import org.agrona.concurrent.UnsafeBuffer;
@@ -35,6 +36,10 @@ public class ArchiveMetricsCollector {
     public ArchiveMetricsCollector(String clusterDir) {
         File cluster = new File(clusterDir);
         this.archiveDir = new File(cluster.getParentFile(), "archive");
+    }
+
+    public File getArchiveDir() {
+        return archiveDir;
     }
 
     public List<ArchiveRecording> collectRecordings() {
@@ -86,7 +91,8 @@ public class ArchiveMetricsCollector {
                         RecordingDescriptorDecoder.BLOCK_LENGTH,
                         RecordingDescriptorDecoder.SCHEMA_VERSION);
 
-                if (descriptorDecoder.recordingId() >= 0) {
+                RecordingState state = recordingHeaderDecoder.state();
+                if (descriptorDecoder.recordingId() >= 0 && state != RecordingState.NULL_VAL) {
                     recordings.add(ArchiveRecording.newBuilder()
                             .setRecordingId(descriptorDecoder.recordingId())
                             .setStreamId(descriptorDecoder.streamId())
@@ -95,6 +101,7 @@ public class ArchiveMetricsCollector {
                             .setStopPosition(descriptorDecoder.stopPosition())
                             .setStartTimestamp(descriptorDecoder.startTimestamp())
                             .setStopTimestamp(descriptorDecoder.stopTimestamp())
+                            .setState(state.name())
                             .build());
                 }
 

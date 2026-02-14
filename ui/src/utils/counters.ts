@@ -41,7 +41,7 @@ export function totalErrors(counters: AeronCounter[]): number {
 }
 
 export function formatBytes(bytes: number): string {
-  if (bytes < 1024) return `${bytes} B`
+  if (bytes < 1024) return `${Math.round(bytes)} B`
   if (bytes < 1024 * 1024) return `${(bytes / 1024).toFixed(1)} KB`
   if (bytes < 1024 * 1024 * 1024) return `${(bytes / (1024 * 1024)).toFixed(1)} MB`
   return `${(bytes / (1024 * 1024 * 1024)).toFixed(1)} GB`
@@ -49,4 +49,29 @@ export function formatBytes(bytes: number): string {
 
 export function formatNsAsMs(ns: number): string {
   return `${(ns / 1_000_000).toFixed(1)} ms`
+}
+
+export function formatUptime(ms: number): string {
+  const seconds = Math.floor(ms / 1000)
+  const days = Math.floor(seconds / 86400)
+  const hours = Math.floor((seconds % 86400) / 3600)
+  const minutes = Math.floor((seconds % 3600) / 60)
+  if (days > 0) return `${days}d ${hours}h`
+  if (hours > 0) return `${hours}h ${minutes}m`
+  return `${minutes}m`
+}
+
+export function formatDuration(seconds: number): string {
+  if (seconds <= 0) return 'Full'
+  if (seconds < 60) return `${Math.round(seconds)}s`
+  if (seconds < 3600) return `${Math.round(seconds / 60)}m`
+  if (seconds < 86400) return `${(seconds / 3600).toFixed(1)}h`
+  if (seconds < 604800) return `${(seconds / 86400).toFixed(1)}d`
+  return `${(seconds / 604800).toFixed(1)}w`
+}
+
+export function formatGrowthRate(bytesPerHour: number): string {
+  if (bytesPerHour === 0) return 'stable'
+  const sign = bytesPerHour > 0 ? '+' : ''
+  return `${sign}${formatBytes(Math.abs(bytesPerHour))}/hr`
 }

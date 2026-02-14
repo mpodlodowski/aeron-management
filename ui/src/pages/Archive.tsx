@@ -1,14 +1,8 @@
-import { useEffect, useState, useMemo } from 'react'
+import { useEffect, useState, useMemo, useCallback } from 'react'
 import { useClusterStore } from '../stores/clusterStore'
 import { useWebSocket } from '../hooks/useWebSocket'
-import { ArchiveRecording, ClusterOverview } from '../types'
-
-type RecordingType = 'LOG' | 'SNAPSHOT' | 'OTHER'
-
-interface RecordingRow extends ArchiveRecording {
-  nodeId: number
-  type: RecordingType
-}
+import { ClusterOverview, RecordingRow, RecordingType, DiskGrowthStats } from '../types'
+import { formatBytes, formatGrowthRate, formatDuration } from '../utils/counters'
 
 interface ActionResult {
   action: string
@@ -19,15 +13,6 @@ interface ActionResult {
 
 function nodeName(nodeId: number, agentMode?: string) {
   return agentMode === 'backup' ? 'Backup' : `Node ${nodeId}`
-}
-
-function recordingType(channel: string): RecordingType {
-  const match = channel.match(/\balias=(\w+)/)
-  if (!match) return 'OTHER'
-  const alias = match[1].toLowerCase()
-  if (alias === 'log') return 'LOG'
-  if (alias === 'snapshot') return 'SNAPSHOT'
-  return 'OTHER'
 }
 
 const typeBadgeClass: Record<RecordingType, string> = {
@@ -59,6 +44,11 @@ export default function Archive() {
   const [page, setPage] = useState(0)
   const pageSize = 100
 
+  const [recordings, setRecordings] = useState<RecordingRow[]>([])
+  const [totalElements, setTotalElements] = useState(0)
+  const [totalPages, setTotalPages] = useState(0)
+  const [fetchLoading, setFetchLoading] = useState(false)
+
   useEffect(() => {
     fetch('/api/cluster')
       .then((res) => res.json())
@@ -66,28 +56,33 @@ export default function Archive() {
       .catch(() => {})
   }, [updateCluster])
 
-  const allRecordings = useMemo(() => {
-    const rows: RecordingRow[] = []
-    for (const [nodeId, metrics] of nodes) {
-      if (metrics.recordings) {
-        for (const rec of metrics.recordings) {
-          rows.push({ ...rec, nodeId, type: recordingType(rec.channel) })
-        }
-      }
-    }
-    return rows.sort((a, b) => a.recordingId - b.recordingId)
-  }, [nodes])
+  const fetchRecordings = useCallback(() => {
+    const params = new URLSearchParams()
+    if (filterNode !== null) params.set('nodeId', String(filterNode))
+    if (filterType !== null) params.set('type', filterType)
+    params.set('page', String(page))
+    params.set('size', String(pageSize))
 
-  const filtered = useMemo(() => {
-    let rows = allRecordings
-    if (filterNode !== null) rows = rows.filter((r) => r.nodeId === filterNode)
-    if (filterType !== null) rows = rows.filter((r) => r.type === filterType)
+    setFetchLoading(true)
+    fetch(`/api/cluster/recordings?${params}`)
+      .then((res) => res.json())
+      .then((data) => {
+        setRecordings(data.content)
+        setTotalElements(data.totalElements)
+        setTotalPages(data.totalPages)
+      })
+      .catch(() => {})
+      .finally(() => setFetchLoading(false))
+  }, [filterNode, filterType, page, pageSize])
+
+  useEffect(() => {
+    fetchRecordings()
+  }, [fetchRecordings])
+
+  // Reset page when filters change
+  useEffect(() => {
     setPage(0)
-    return rows
-  }, [allRecordings, filterNode, filterType])
-
-  const totalPages = Math.ceil(filtered.length / pageSize)
-  const paged = filtered.slice(page * pageSize, (page + 1) * pageSize)
+  }, [filterNode, filterType])
 
   const nodeIds = useMemo(
     () => Array.from(nodes.keys()).sort((a, b) => a - b),
@@ -106,6 +101,7 @@ export default function Archive() {
         message: data.message ?? (data.success !== false ? 'Action completed' : 'Action failed'),
         output: data.output,
       })
+      fetchRecordings()
     } catch (err) {
       setActionResult({
         action: label,
@@ -121,11 +117,74 @@ export default function Archive() {
     setConfirmAction({ label, fn })
   }
 
+  const diskStats = useMemo(() => {
+    const stats: { nodeId: number; name: string; recordings: number; used: number; total: number; growth?: DiskGrowthStats }[] = []
+    for (const [nodeId, metrics] of nodes) {
+      const sys = metrics.systemMetrics
+      if (sys && sys.archiveDiskTotalBytes > 0) {
+        stats.push({
+          nodeId,
+          name: nodeName(nodeId, metrics.agentMode),
+          recordings: metrics.recordingsTotalBytes ?? 0,
+          used: sys.archiveDiskUsedBytes,
+          total: sys.archiveDiskTotalBytes,
+          growth: metrics.diskGrowth,
+        })
+      }
+    }
+    return stats.sort((a, b) => a.nodeId - b.nodeId)
+  }, [nodes])
+
   return (
     <div className="space-y-6">
+      {/* Disk Usage Summary */}
+      {diskStats.length > 0 && (
+        <div className="flex flex-wrap gap-4">
+          {diskStats.map((d) => {
+            const recPct = (d.recordings / d.total) * 100
+            const otherPct = (Math.max(0, d.used - d.recordings) / d.total) * 100
+            const usedPct = Math.round((d.used / d.total) * 100)
+            const rate = d.growth?.growthRate1h ?? d.growth?.growthRate5m ?? null
+            const ttf = d.growth?.timeToFullSeconds ?? null
+            return (
+              <div key={d.nodeId} className="flex-1 min-w-[240px] rounded-lg border border-gray-800 bg-gray-900 p-3">
+                <div className="flex items-center justify-between mb-1.5">
+                  <span className="text-xs font-medium text-gray-300">{d.name}</span>
+                  <div className="flex items-center gap-2">
+                    {rate !== null && rate !== 0 && (
+                      <span className={`text-xs ${rate > 0 ? 'text-yellow-400' : 'text-green-400'}`}>
+                        {formatGrowthRate(rate)}
+                      </span>
+                    )}
+                    <span className="text-xs text-gray-400">{usedPct}% used</span>
+                  </div>
+                </div>
+                <div className="flex h-2 rounded-full bg-gray-800 overflow-hidden">
+                  <div className="bg-blue-500" style={{ width: `${recPct}%` }} title={`Recordings: ${formatBytes(d.recordings)}`} />
+                  <div className={usedPct > 90 ? 'bg-red-500' : usedPct > 75 ? 'bg-yellow-500' : 'bg-amber-700'} style={{ width: `${otherPct}%` }} title={`Other: ${formatBytes(d.used - d.recordings)}`} />
+                </div>
+                <div className="mt-1.5 flex gap-3 text-xs text-gray-500">
+                  <span><span className="inline-block w-2 h-2 rounded-full bg-blue-500 mr-1" />Recordings {formatBytes(d.recordings)}</span>
+                  <span><span className={`inline-block w-2 h-2 rounded-full ${usedPct > 90 ? 'bg-red-500' : usedPct > 75 ? 'bg-yellow-500' : 'bg-amber-700'} mr-1`} />Other {formatBytes(Math.max(0, d.used - d.recordings))}</span>
+                  <span className="ml-auto flex gap-3">
+                    {ttf !== null && (
+                      <span className={`${ttf < 3600 ? 'text-red-400' : ttf < 86400 ? 'text-yellow-400' : 'text-gray-500'}`}>
+                        Full in {formatDuration(ttf)}
+                      </span>
+                    )}
+                    <span>{formatBytes(d.total - d.used)} free</span>
+                  </span>
+                </div>
+              </div>
+            )
+          })}
+        </div>
+      )}
+
       {/* Filters */}
       <div className="space-y-2">
-        <div className="flex flex-wrap gap-2">
+        <div className="flex items-center gap-2">
+          <span className="text-xs font-medium text-gray-500 w-10">Node</span>
           {nodeIds.map((id) => (
             <button
               key={id}
@@ -140,7 +199,8 @@ export default function Archive() {
             </button>
           ))}
         </div>
-        <div className="flex flex-wrap gap-2">
+        <div className="flex items-center gap-2">
+          <span className="text-xs font-medium text-gray-500 w-10">Type</span>
           {RECORDING_TYPES.map((t) => (
             <button
               key={t}
@@ -163,6 +223,7 @@ export default function Archive() {
           <button
             disabled={loading !== null}
             onClick={() => executeAction('Verify Archive', filterNode, 'archive/verify', 'GET')}
+            title="Check archive integrity by verifying the catalog and all recording segment files"
             className="rounded-md bg-gray-800 px-3 py-1.5 text-xs font-medium text-gray-300 hover:bg-gray-700 disabled:opacity-50"
           >
             {loading === 'Verify Archive' ? 'Verifying...' : 'Verify Archive'}
@@ -170,6 +231,7 @@ export default function Archive() {
           <button
             disabled={loading !== null}
             onClick={() => withConfirm('Compact Archive', () => executeAction('Compact Archive', filterNode, 'archive/compact'))}
+            title="Remove deleted and invalidated recording segments to reclaim disk space"
             className="rounded-md bg-gray-800 px-3 py-1.5 text-xs font-medium text-gray-300 hover:bg-gray-700 disabled:opacity-50"
           >
             Compact
@@ -177,6 +239,7 @@ export default function Archive() {
           <button
             disabled={loading !== null}
             onClick={() => withConfirm('Delete Orphaned Segments', () => executeAction('Delete Orphaned', filterNode, 'archive/delete-orphaned'))}
+            title="Delete segment files on disk that are not referenced by any recording in the catalog"
             className="rounded-md bg-gray-800 px-3 py-1.5 text-xs font-medium text-gray-300 hover:bg-gray-700 disabled:opacity-50"
           >
             Delete Orphaned
@@ -235,8 +298,7 @@ export default function Archive() {
       {/* Summary + Pagination */}
       <div className="flex items-center justify-between">
         <span className="text-xs text-gray-400">
-          {filtered.length.toLocaleString()} recordings
-          {filtered.length !== allRecordings.length && ` (of ${allRecordings.length.toLocaleString()})`}
+          {fetchLoading ? 'Loading...' : `${totalElements.toLocaleString()} recordings`}
         </span>
         {totalPages > 1 && (
           <div className="flex items-center gap-2">
@@ -288,6 +350,9 @@ export default function Archive() {
                 Stop Pos
               </th>
               <th className="px-4 py-3 text-left text-xs font-medium text-gray-400 uppercase tracking-wider">
+                Size
+              </th>
+              <th className="px-4 py-3 text-left text-xs font-medium text-gray-400 uppercase tracking-wider">
                 Started
               </th>
               <th className="px-4 py-3 text-left text-xs font-medium text-gray-400 uppercase tracking-wider">
@@ -302,17 +367,21 @@ export default function Archive() {
             </tr>
           </thead>
           <tbody className="divide-y divide-gray-800">
-            {paged.length === 0 ? (
+            {recordings.length === 0 ? (
               <tr>
-                <td colSpan={11} className="px-4 py-8 text-center text-gray-500">
-                  No recordings available
+                <td colSpan={12} className="px-4 py-8 text-center text-gray-500">
+                  {fetchLoading ? 'Loading recordings...' : 'No recordings available'}
                 </td>
               </tr>
             ) : (
-              paged.map((rec) => {
+              recordings.map((rec) => {
                 const isActive = rec.stopPosition === -1 || rec.stopTimestamp === 0
+                const size = isActive ? rec.stopPosition : rec.stopPosition - rec.startPosition
+                const isInvalid = rec.state === 'INVALID'
+                const isDeleted = rec.state === 'DELETED'
+                const rowClass = isInvalid || isDeleted ? 'hover:bg-gray-800/50 opacity-60' : 'hover:bg-gray-800/50'
                 return (
-                  <tr key={`${rec.nodeId}-${rec.recordingId}`} className="hover:bg-gray-800/50">
+                  <tr key={`${rec.nodeId}-${rec.recordingId}`} className={rowClass}>
                     <td className="px-4 py-2 text-gray-200">{nodeName(rec.nodeId, nodes.get(rec.nodeId)?.agentMode)}</td>
                     <td className="px-4 py-2 font-mono text-gray-200">
                       {rec.recordingId}
@@ -334,6 +403,9 @@ export default function Archive() {
                     <td className="px-4 py-2 font-mono text-gray-400">
                       {isActive ? '\u2014' : rec.stopPosition.toLocaleString()}
                     </td>
+                    <td className="px-4 py-2 font-mono text-gray-400">
+                      {size > 0 ? formatBytes(size) : '\u2014'}
+                    </td>
                     <td className="px-4 py-2 text-gray-400 whitespace-nowrap">
                       {formatTimestamp(rec.startTimestamp)}
                     </td>
@@ -341,15 +413,25 @@ export default function Archive() {
                       {formatTimestamp(rec.stopTimestamp)}
                     </td>
                     <td className="px-4 py-2">
-                      <span
-                        className={`inline-flex rounded-full px-2 py-0.5 text-xs font-medium ${
-                          isActive
-                            ? 'bg-green-900/50 text-green-300'
-                            : 'bg-gray-700 text-gray-300'
-                        }`}
-                      >
-                        {isActive ? 'ACTIVE' : 'STOPPED'}
-                      </span>
+                      <div className="flex gap-1">
+                        {isInvalid ? (
+                          <span className="inline-flex rounded-full px-2 py-0.5 text-xs font-medium bg-red-900/50 text-red-300">
+                            INVALID
+                          </span>
+                        ) : isDeleted ? (
+                          <span className="inline-flex rounded-full px-2 py-0.5 text-xs font-medium bg-red-900/50 text-red-400">
+                            DELETED
+                          </span>
+                        ) : isActive ? (
+                          <span className="inline-flex rounded-full px-2 py-0.5 text-xs font-medium bg-green-900/50 text-green-300">
+                            ACTIVE
+                          </span>
+                        ) : (
+                          <span className="inline-flex rounded-full px-2 py-0.5 text-xs font-medium bg-gray-700 text-gray-300">
+                            STOPPED
+                          </span>
+                        )}
+                      </div>
                     </td>
                     <td className="px-4 py-2">
                       <div className="flex gap-1">
@@ -361,7 +443,8 @@ export default function Archive() {
                             `archive/recordings/${rec.recordingId}/describe`,
                             'GET',
                           )}
-                          className="rounded px-2 py-0.5 text-xs text-gray-400 hover:bg-gray-700 hover:text-gray-200 disabled:opacity-50"
+                          title="Show recording metadata: channel, stream, positions, and segment file details"
+                          className="rounded px-2 py-0.5 text-xs font-medium text-white transition-colors disabled:opacity-50 disabled:cursor-not-allowed bg-gray-600 hover:bg-gray-500"
                         >
                           Describe
                         </button>
@@ -373,7 +456,8 @@ export default function Archive() {
                             `archive/recordings/${rec.recordingId}/verify`,
                             'GET',
                           )}
-                          className="rounded px-2 py-0.5 text-xs text-gray-400 hover:bg-gray-700 hover:text-gray-200 disabled:opacity-50"
+                          title="Verify this recording's segment files are intact and checksums are valid"
+                          className="rounded px-2 py-0.5 text-xs font-medium text-white transition-colors disabled:opacity-50 disabled:cursor-not-allowed bg-gray-600 hover:bg-gray-500"
                         >
                           Verify
                         </button>
@@ -387,23 +471,25 @@ export default function Archive() {
                               `archive/recordings/${rec.recordingId}/mark-invalid`,
                             ),
                           )}
-                          className="rounded px-2 py-0.5 text-xs text-gray-400 hover:bg-gray-700 hover:text-gray-200 disabled:opacity-50"
+                          title="Mark this recording as invalid in the catalog. It will be skipped during recovery and eligible for compaction"
+                          className="rounded px-2 py-0.5 text-xs font-medium text-white transition-colors disabled:opacity-50 disabled:cursor-not-allowed bg-orange-600 hover:bg-orange-500"
                         >
                           Invalidate
                         </button>
                         <button
                           disabled={loading !== null}
                           onClick={() => withConfirm(
-                            `Delete recording ${rec.recordingId}`,
+                            `Mark recording ${rec.recordingId} valid`,
                             () => executeAction(
-                              `Delete #${rec.recordingId}`,
+                              `Mark Valid #${rec.recordingId}`,
                               rec.nodeId,
-                              `archive/recordings/${rec.recordingId}/delete`,
+                              `archive/recordings/${rec.recordingId}/mark-valid`,
                             ),
                           )}
-                          className="rounded px-2 py-0.5 text-xs text-red-400 hover:bg-red-900/30 hover:text-red-300 disabled:opacity-50"
+                          title="Restore a previously invalidated recording back to valid state in the catalog"
+                          className="rounded px-2 py-0.5 text-xs font-medium text-white transition-colors disabled:opacity-50 disabled:cursor-not-allowed bg-green-600 hover:bg-green-500"
                         >
-                          Delete
+                          Validate
                         </button>
                       </div>
                     </td>

@@ -7,9 +7,16 @@ import it.podlodowski.aeronmgmt.common.proto.CommandResult;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
+import io.aeron.cluster.ClusterMember;
+import io.aeron.cluster.ClusterMembership;
+
 import java.io.ByteArrayOutputStream;
 import java.io.File;
 import java.io.PrintStream;
+import java.util.ArrayList;
+import java.util.LinkedHashMap;
+import java.util.List;
+import java.util.Map;
 import java.util.Set;
 
 /**
@@ -144,8 +151,54 @@ public class AdminCommandExecutor {
                 return true;
             }
 
+            case "LIST_MEMBERS_STRUCTURED": {
+                ClusterMembership membership = new ClusterMembership();
+                boolean ok = ClusterTool.listMembers(membership, clusterDir, 5000);
+                if (ok) {
+                    out.print(serializeMembership(membership));
+                }
+                return ok;
+            }
+
             default:
                 throw new IllegalArgumentException("Unknown command type: " + command.getType());
         }
+    }
+
+    private String serializeMembership(ClusterMembership membership) {
+        StringBuilder sb = new StringBuilder();
+        sb.append("{");
+        sb.append("\"memberId\":").append(membership.memberId);
+        sb.append(",\"leaderMemberId\":").append(membership.leaderMemberId);
+        sb.append(",\"currentTimeNs\":").append(membership.currentTimeNs);
+        sb.append(",\"activeMembers\":[");
+        appendMembers(sb, membership.activeMembers);
+        sb.append("],\"passiveMembers\":[");
+        appendMembers(sb, membership.passiveMembers);
+        sb.append("]}");
+        return sb.toString();
+    }
+
+    private void appendMembers(StringBuilder sb, List<ClusterMember> members) {
+        if (members == null) return;
+        for (int i = 0; i < members.size(); i++) {
+            if (i > 0) sb.append(",");
+            ClusterMember m = members.get(i);
+            sb.append("{");
+            sb.append("\"id\":").append(m.id());
+            sb.append(",\"isLeader\":").append(m.isLeader());
+            sb.append(",\"leadershipTermId\":").append(m.leadershipTermId());
+            sb.append(",\"logPosition\":").append(m.logPosition());
+            sb.append(",\"ingressEndpoint\":\"").append(escape(m.ingressEndpoint())).append("\"");
+            sb.append(",\"consensusEndpoint\":\"").append(escape(m.consensusEndpoint())).append("\"");
+            sb.append(",\"logEndpoint\":\"").append(escape(m.logEndpoint())).append("\"");
+            sb.append(",\"catchupEndpoint\":\"").append(escape(m.catchupEndpoint())).append("\"");
+            sb.append(",\"archiveEndpoint\":\"").append(escape(m.archiveEndpoint())).append("\"");
+            sb.append("}");
+        }
+    }
+
+    private static String escape(String s) {
+        return s == null ? "" : s.replace("\\", "\\\\").replace("\"", "\\\"");
     }
 }

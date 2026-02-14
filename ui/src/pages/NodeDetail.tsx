@@ -3,8 +3,47 @@ import { useParams } from 'react-router-dom'
 import { useClusterStore } from '../stores/clusterStore'
 import { useWebSocket } from '../hooks/useWebSocket'
 import CounterTable from '../components/CounterTable'
-import { MetricsReport } from '../types'
-import { totalErrors, counterByType, counterByLabel, formatBytes, formatNsAsMs, backupStateName, COUNTER_TYPE } from '../utils/counters'
+import { MetricsReport, DiskGrowthStats } from '../types'
+import { totalErrors, counterByType, counterByLabel, formatBytes, formatNsAsMs, backupStateName, formatDuration, formatGrowthRate, COUNTER_TYPE } from '../utils/counters'
+
+function DiskUsageBar({ recordings, used, total, growth }: { recordings: number; used: number; total: number; growth?: DiskGrowthStats }) {
+  const recPct = (recordings / total) * 100
+  const otherPct = (Math.max(0, used - recordings) / total) * 100
+  const usedPct = Math.round((used / total) * 100)
+  const rate = growth?.growthRate1h ?? growth?.growthRate5m ?? null
+  const ttf = growth?.timeToFullSeconds ?? null
+  return (
+    <div className="rounded-lg border border-gray-800 bg-gray-900 p-3">
+      <div className="flex items-center justify-between mb-1.5">
+        <span className="text-xs font-medium text-gray-300">Archive Disk</span>
+        <div className="flex items-center gap-2">
+          {rate !== null && rate !== 0 && (
+            <span className={`text-xs ${rate > 0 ? 'text-yellow-400' : 'text-green-400'}`}>
+              {formatGrowthRate(rate)}
+            </span>
+          )}
+          <span className="text-xs text-gray-400">{usedPct}% used</span>
+        </div>
+      </div>
+      <div className="flex h-2 rounded-full bg-gray-800 overflow-hidden">
+        <div className="bg-blue-500" style={{ width: `${recPct}%` }} title={`Recordings: ${formatBytes(recordings)}`} />
+        <div className={usedPct > 90 ? 'bg-red-500' : usedPct > 75 ? 'bg-yellow-500' : 'bg-amber-700'} style={{ width: `${otherPct}%` }} title={`Other: ${formatBytes(used - recordings)}`} />
+      </div>
+      <div className="mt-1.5 flex gap-3 text-xs text-gray-500">
+        <span><span className="inline-block w-2 h-2 rounded-full bg-blue-500 mr-1" />Recordings {formatBytes(recordings)}</span>
+        <span><span className={`inline-block w-2 h-2 rounded-full ${usedPct > 90 ? 'bg-red-500' : usedPct > 75 ? 'bg-yellow-500' : 'bg-amber-700'} mr-1`} />Other {formatBytes(Math.max(0, used - recordings))}</span>
+        <span className="ml-auto flex gap-3">
+          {ttf !== null && (
+            <span className={`${ttf < 3600 ? 'text-red-400' : ttf < 86400 ? 'text-yellow-400' : 'text-gray-500'}`}>
+              Full in {formatDuration(ttf)}
+            </span>
+          )}
+          <span>{formatBytes(total - used)} free</span>
+        </span>
+      </div>
+    </div>
+  )
+}
 
 interface ActionResult {
   action: string
@@ -72,30 +111,29 @@ export default function NodeDetail() {
   const snapshots = counterByType(c, COUNTER_TYPE.SNAPSHOT_COUNT)?.value ?? 0
   const electionCount = counterByType(c, COUNTER_TYPE.ELECTION_COUNT)?.value ?? 0
   const maxCycleNs = counterByType(c, COUNTER_TYPE.MAX_CYCLE_TIME_NS)?.value ?? 0
-  const bytesSent = counterByLabel(c, 'Bytes sent')?.value ?? 0
-  const bytesRecv = counterByLabel(c, 'Bytes received')?.value ?? 0
+  const sentPerSec = metrics.bytesSentPerSec ?? 0
+  const recvPerSec = metrics.bytesRecvPerSec ?? 0
   const bytesMapped = counterByLabel(c, 'Bytes currently mapped')?.value ?? 0
   const naksRecv = counterByLabel(c, 'NAKs received')?.value ?? 0
 
   const isLeader = clusterMetrics?.nodeRole === 'LEADER'
   const actions = [
-    { id: 'SNAPSHOT', label: 'Snapshot', endpoint: 'snapshot', color: 'bg-blue-600 hover:bg-blue-500', leaderOnly: true },
-    { id: 'SUSPEND', label: 'Suspend', endpoint: 'suspend', color: 'bg-yellow-600 hover:bg-yellow-500', leaderOnly: true },
-    { id: 'RESUME', label: 'Resume', endpoint: 'resume', color: 'bg-green-600 hover:bg-green-500', leaderOnly: true },
-    { id: 'SHUTDOWN', label: 'Shutdown', endpoint: 'shutdown', color: 'bg-red-600 hover:bg-red-500', leaderOnly: true },
-    { id: 'ABORT', label: 'Abort', endpoint: 'abort', color: 'bg-red-700 hover:bg-red-600', leaderOnly: true },
-    { id: 'INVALIDATE_SNAPSHOT', label: 'Invalidate Snapshot', endpoint: 'invalidate-snapshot', color: 'bg-orange-600 hover:bg-orange-500', leaderOnly: false },
+    { id: 'SNAPSHOT', label: 'Snapshot', endpoint: 'snapshot', color: 'bg-blue-600 hover:bg-blue-500', leaderOnly: true, tooltip: 'Trigger a cluster snapshot to compact the log and create a recovery point' },
+    { id: 'SUSPEND', label: 'Suspend', endpoint: 'suspend', color: 'bg-yellow-600 hover:bg-yellow-500', leaderOnly: true, tooltip: 'Suspend cluster log processing. The cluster will stop accepting new commands until resumed' },
+    { id: 'RESUME', label: 'Resume', endpoint: 'resume', color: 'bg-green-600 hover:bg-green-500', leaderOnly: true, tooltip: 'Resume cluster log processing after a suspend' },
+    { id: 'SHUTDOWN', label: 'Shutdown', endpoint: 'shutdown', color: 'bg-red-600 hover:bg-red-500', leaderOnly: true, tooltip: 'Gracefully shut down the cluster. Takes a snapshot before stopping all nodes' },
+    { id: 'ABORT', label: 'Abort', endpoint: 'abort', color: 'bg-red-700 hover:bg-red-600', leaderOnly: true, tooltip: 'Immediately abort the cluster without taking a snapshot. Use only as a last resort' },
+    { id: 'INVALIDATE_SNAPSHOT', label: 'Invalidate Snapshot', endpoint: 'invalidate-snapshot', color: 'bg-orange-600 hover:bg-orange-500', leaderOnly: false, tooltip: 'Mark the latest snapshot as invalid so the node recovers from the log on next restart' },
   ].filter(a => !a.leaderOnly || isLeader)
 
   const diagnostics = [
-    { id: 'DESCRIBE', label: 'Describe', endpoint: 'describe' },
-    { id: 'PID', label: 'PID', endpoint: 'pid' },
-    { id: 'RECOVERY_PLAN', label: 'Recovery Plan', endpoint: 'recovery-plan' },
-    { id: 'RECORDING_LOG', label: 'Recording Log', endpoint: 'recording-log' },
-    { id: 'ERRORS', label: 'Errors', endpoint: 'errors' },
-    { id: 'LIST_MEMBERS', label: 'List Members', endpoint: 'list-members' },
-    { id: 'IS_LEADER', label: 'Is Leader', endpoint: 'is-leader' },
-    { id: 'DESCRIBE_SNAPSHOT', label: 'Describe Snapshot', endpoint: 'describe-snapshot' },
+    { id: 'DESCRIBE', label: 'Describe', endpoint: 'describe', tooltip: 'Show cluster node configuration and current state' },
+    { id: 'PID', label: 'PID', endpoint: 'pid', tooltip: 'Get the process ID of the cluster node' },
+    { id: 'RECORDING_LOG', label: 'Recording Log', endpoint: 'recording-log', tooltip: 'List the cluster recording log entries (snapshots and log recordings used for consensus)' },
+    { id: 'ERRORS', label: 'Errors', endpoint: 'errors', tooltip: 'Show the distinct error log from the cluster media driver' },
+    { id: 'LIST_MEMBERS', label: 'List Members', endpoint: 'list-members', tooltip: 'List all cluster members with their endpoints and log positions' },
+    { id: 'IS_LEADER', label: 'Is Leader', endpoint: 'is-leader', tooltip: 'Check whether this node is currently the cluster leader' },
+    { id: 'DESCRIBE_SNAPSHOT', label: 'Describe Snapshot', endpoint: 'describe-snapshot', tooltip: 'Show metadata of the latest snapshot recording' },
   ]
 
   return (
@@ -122,18 +160,13 @@ export default function NodeDetail() {
           />
           <SummaryCard
             label="Recordings"
-            value={String(metrics.recordings?.length ?? 0)}
+            value={String(metrics.recordingCount ?? 0)}
             tooltip="Number of archive recordings on the backup node"
           />
           <SummaryCard
-            label="Bytes Sent"
-            value={formatBytes(bytesSent)}
-            tooltip="Total bytes sent by the Aeron media driver on this node"
-          />
-          <SummaryCard
-            label="Bytes Received"
-            value={formatBytes(bytesRecv)}
-            tooltip="Total bytes received by the Aeron media driver on this node"
+            label="Traffic"
+            value={`\u2191${formatBytes(sentPerSec)}/s \u2193${formatBytes(recvPerSec)}/s`}
+            tooltip="Current network throughput (bytes/sec) of the Aeron media driver on this node"
           />
           <SummaryCard
             label="Mapped Memory"
@@ -157,10 +190,15 @@ export default function NodeDetail() {
             tooltip="Current leadership term ID. Increments each time a new leader is elected"
           />
           <SummaryCard
+            label="Recordings"
+            value={String(metrics.recordingCount ?? 0)}
+            tooltip="Number of archive recordings on this node"
+          />
+          <SummaryCard
             label="Errors"
             value={String(errors)}
             alert={errors > 0}
-            tooltip="Total cluster + container errors. Non-zero indicates issues that may need investigation"
+            tooltip="Lifetime cluster + container errors (resets on process restart). Non-zero indicates issues that may need investigation"
           />
           <SummaryCard
             label="Snapshots"
@@ -184,27 +222,27 @@ export default function NodeDetail() {
             tooltip="Negative acknowledgements received, indicating packet loss requiring retransmission"
           />
           <SummaryCard
-            label="Bytes Sent"
-            value={formatBytes(bytesSent)}
-            tooltip="Total bytes sent by the Aeron media driver on this node"
-          />
-          <SummaryCard
-            label="Bytes Received"
-            value={formatBytes(bytesRecv)}
-            tooltip="Total bytes received by the Aeron media driver on this node"
+            label="Traffic"
+            value={`\u2191${formatBytes(sentPerSec)}/s \u2193${formatBytes(recvPerSec)}/s`}
+            tooltip="Current network throughput (bytes/sec) of the Aeron media driver on this node"
           />
           <SummaryCard
             label="Mapped Memory"
             value={formatBytes(bytesMapped)}
             tooltip="Total bytes of memory-mapped files used by the Aeron media driver (log buffers, CnC, etc.)"
           />
-          <SummaryCard
-            label="Clients"
-            value={String(clusterMetrics?.connectedClientCount ?? 0)}
-            tooltip="Number of client sessions currently connected to this cluster node"
-          />
         </>)}
       </div>
+
+      {/* Disk Usage */}
+      {metrics.systemMetrics && metrics.systemMetrics.archiveDiskTotalBytes > 0 && (
+        <DiskUsageBar
+          recordings={metrics.recordingsTotalBytes ?? 0}
+          used={metrics.systemMetrics.archiveDiskUsedBytes}
+          total={metrics.systemMetrics.archiveDiskTotalBytes}
+          growth={metrics.diskGrowth}
+        />
+      )}
 
       {/* Admin Actions & Diagnostics */}
       {!isBackup && (
@@ -217,6 +255,7 @@ export default function NodeDetail() {
                   key={action.id}
                   onClick={() => executeAction(action.id, action.endpoint)}
                   disabled={loading !== null}
+                  title={action.tooltip}
                   className={`rounded px-2.5 py-1 text-xs font-medium text-white transition-colors disabled:opacity-50 disabled:cursor-not-allowed ${action.color}`}
                 >
                   {loading === action.id ? '...' : action.label}
@@ -232,6 +271,7 @@ export default function NodeDetail() {
                   key={diag.id}
                   onClick={() => executeAction(diag.id, diag.endpoint, 'GET')}
                   disabled={loading !== null}
+                  title={diag.tooltip}
                   className="rounded px-2.5 py-1 text-xs font-medium text-white transition-colors disabled:opacity-50 disabled:cursor-not-allowed bg-gray-600 hover:bg-gray-500"
                 >
                   {loading === diag.id ? '...' : diag.label}

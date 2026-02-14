@@ -62,6 +62,7 @@ message ArchiveRecording {
   int64 stop_position = 5;     // -1 if active
   int64 start_timestamp = 6;
   int64 stop_timestamp = 7;    // -1 if active
+  string state = 8;            // VALID, INVALID, or DELETED
 }
 
 message SystemMetrics {
@@ -70,6 +71,9 @@ message SystemMetrics {
   double cpu_usage = 3;
   int64 gc_count = 4;
   int64 gc_time_ms = 5;
+  int64 archive_disk_used_bytes = 6;
+  int64 archive_disk_available_bytes = 7;
+  int64 archive_disk_total_bytes = 8;
 }
 
 message CommandResult {

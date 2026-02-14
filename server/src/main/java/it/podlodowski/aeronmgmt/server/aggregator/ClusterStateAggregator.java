@@ -1,5 +1,7 @@
 package it.podlodowski.aeronmgmt.server.aggregator;
 
+import it.podlodowski.aeronmgmt.common.proto.AeronCounter;
+import it.podlodowski.aeronmgmt.common.proto.ArchiveRecording;
 import it.podlodowski.aeronmgmt.common.proto.ClusterMetrics;
 import it.podlodowski.aeronmgmt.common.proto.CommandResult;
 import it.podlodowski.aeronmgmt.common.proto.MetricsReport;
@@ -24,6 +26,7 @@ public class ClusterStateAggregator {
     private static final Logger LOGGER = LoggerFactory.getLogger(ClusterStateAggregator.class);
 
     private final SimpMessagingTemplate messagingTemplate;
+    private final DiskUsageTracker diskUsageTracker;
     private final long windowDurationMs;
 
     private static final int MAX_EVENTS = 200;
@@ -32,6 +35,7 @@ public class ClusterStateAggregator {
     private final ConcurrentHashMap<Integer, MetricsReport> latestMetrics = new ConcurrentHashMap<>();
     private final ConcurrentHashMap<String, CompletableFuture<CommandResult>> pendingCommands = new ConcurrentHashMap<>();
     private final ConcurrentHashMap<Integer, String> nodeAgentModes = new ConcurrentHashMap<>();
+    private final ConcurrentHashMap<Integer, double[]> trafficRates = new ConcurrentHashMap<>();
     private final Set<Integer> connectedNodes = ConcurrentHashMap.newKeySet();
     private final Set<Integer> reachableNodes = ConcurrentHashMap.newKeySet();
     private final LinkedList<Map<String, Object>> recentEvents = new LinkedList<>();
@@ -39,8 +43,10 @@ public class ClusterStateAggregator {
     @Autowired
     public ClusterStateAggregator(
             @Autowired(required = false) SimpMessagingTemplate messagingTemplate,
+            DiskUsageTracker diskUsageTracker,
             @Value("${management.metrics.history-seconds:300}") int historySeconds) {
         this.messagingTemplate = messagingTemplate;
+        this.diskUsageTracker = diskUsageTracker;
         this.windowDurationMs = historySeconds * 1000L;
     }
 
@@ -50,6 +56,24 @@ public class ClusterStateAggregator {
         MetricsReport previous = latestMetrics.put(nodeId, report);
         metricsWindows.computeIfAbsent(nodeId, id -> new MetricsWindow(windowDurationMs))
                 .add(report);
+
+        if (report.hasSystemMetrics() && report.getSystemMetrics().getArchiveDiskTotalBytes() > 0) {
+            diskUsageTracker.record(nodeId, report.getTimestamp(), computeRecordingsTotalBytes(report));
+        }
+
+        if (previous != null) {
+            long dtMs = report.getTimestamp() - previous.getTimestamp();
+            if (dtMs > 0) {
+                long prevSent = counterValueByLabel(previous, "Bytes sent");
+                long currSent = counterValueByLabel(report, "Bytes sent");
+                long prevRecv = counterValueByLabel(previous, "Bytes received");
+                long currRecv = counterValueByLabel(report, "Bytes received");
+                double sentPerSec = (currSent - prevSent) * 1000.0 / dtMs;
+                double recvPerSec = (currRecv - prevRecv) * 1000.0 / dtMs;
+                trafficRates.put(nodeId, new double[]{
+                        Math.max(0, sentPerSec), Math.max(0, recvPerSec)});
+            }
+        }
 
         detectStateChanges(nodeId, previous, report);
         detectNodeReachability(nodeId, report);
@@ -169,22 +193,105 @@ public class ClusterStateAggregator {
         Map<String, Map<String, Object>> nodes = new LinkedHashMap<>();
 
         int leaderNodeId = -1;
+        long totalErrors = 0;
+        long totalSnapshots = 0;
+        long totalElections = 0;
+        long maxCycleTimeNs = 0;
+        long totalRecordings = 0;
+        long totalRecordingBytes = 0;
+        long totalDiskUsed = 0;
+        long totalDiskTotal = 0;
+        long commitPosition = -1;
+        int connectedClients = 0;
+        long leadershipTermId = -1;
+        long clusterStartMs = Long.MAX_VALUE;
+        String aeronVersion = null;
+        int clusterNodeCount = 0;
 
         for (Map.Entry<Integer, MetricsReport> entry : latestMetrics.entrySet()) {
             MetricsReport report = entry.getValue();
+            boolean isBackup = "backup".equals(nodeAgentModes.get(report.getNodeId()));
 
-            if (!"backup".equals(nodeAgentModes.get(report.getNodeId()))
-                    && report.hasClusterMetrics()
+            if (!isBackup && report.hasClusterMetrics()
                     && "LEADER".equals(report.getClusterMetrics().getNodeRole())) {
                 leaderNodeId = report.getNodeId();
+                commitPosition = report.getClusterMetrics().getCommitPosition();
+                connectedClients = report.getClusterMetrics().getConnectedClientCount();
             }
 
             nodes.put(String.valueOf(report.getNodeId()), convertMetricsToMap(report));
+
+            if (!isBackup) {
+                clusterNodeCount++;
+                for (AeronCounter counter : report.getCountersList()) {
+                    switch (counter.getTypeId()) {
+                        case 212: // Cluster Errors
+                        case 215: // Container Errors
+                            totalErrors += counter.getValue();
+                            break;
+                        case 205: // Snapshot count (same across nodes, take max)
+                            totalSnapshots = Math.max(totalSnapshots, counter.getValue());
+                            break;
+                        case 238: // Election count (same across nodes, take max)
+                            totalElections = Math.max(totalElections, counter.getValue());
+                            break;
+                        case 216: // Max cycle time (worst across nodes)
+                            maxCycleTimeNs = Math.max(maxCycleTimeNs, counter.getValue());
+                            break;
+                        case 239: // Leadership term id
+                            leadershipTermId = Math.max(leadershipTermId, counter.getValue());
+                            break;
+                    }
+                    if (aeronVersion == null && counter.getTypeId() == 212) {
+                        String label = counter.getLabel();
+                        int vi = label.indexOf("version=");
+                        if (vi >= 0) {
+                            int end = label.indexOf(' ', vi);
+                            aeronVersion = label.substring(vi + 8, end > vi ? end : label.length());
+                        }
+                    }
+                }
+            }
+
+            totalRecordings += report.getRecordingsCount();
+            totalRecordingBytes += computeRecordingsTotalBytes(report);
+
+            // Earliest LOG recording = cluster creation time
+            for (ArchiveRecording rec : report.getRecordingsList()) {
+                if (rec.getStartTimestamp() > 0 && rec.getStartTimestamp() < clusterStartMs) {
+                    String channel = rec.getChannel();
+                    if (channel.contains("alias=log") || channel.contains("alias=LOG")) {
+                        clusterStartMs = rec.getStartTimestamp();
+                    }
+                }
+            }
+
+            if (report.hasSystemMetrics()) {
+                totalDiskUsed += report.getSystemMetrics().getArchiveDiskUsedBytes();
+                totalDiskTotal += report.getSystemMetrics().getArchiveDiskTotalBytes();
+            }
         }
 
         overview.put("nodeCount", nodes.size());
+        overview.put("clusterNodeCount", clusterNodeCount);
         overview.put("leaderNodeId", leaderNodeId);
         overview.put("nodes", nodes);
+
+        Map<String, Object> clusterStats = new LinkedHashMap<>();
+        clusterStats.put("commitPosition", commitPosition >= 0 ? commitPosition : null);
+        clusterStats.put("connectedClients", connectedClients);
+        clusterStats.put("leadershipTermId", leadershipTermId >= 0 ? leadershipTermId : null);
+        clusterStats.put("totalErrors", totalErrors);
+        clusterStats.put("totalSnapshots", totalSnapshots);
+        clusterStats.put("totalElections", totalElections);
+        clusterStats.put("maxCycleTimeNs", maxCycleTimeNs);
+        clusterStats.put("totalRecordings", totalRecordings);
+        clusterStats.put("totalRecordingBytes", totalRecordingBytes);
+        clusterStats.put("totalDiskUsed", totalDiskUsed);
+        clusterStats.put("totalDiskTotal", totalDiskTotal);
+        clusterStats.put("clusterStartMs", clusterStartMs < Long.MAX_VALUE ? clusterStartMs : null);
+        clusterStats.put("aeronVersion", aeronVersion);
+        overview.put("clusterStats", clusterStats);
 
         return overview;
     }
@@ -228,19 +335,23 @@ public class ClusterStateAggregator {
         }
         result.put("counters", counters);
 
-        List<Map<String, Object>> recordings = new ArrayList<>();
-        for (var rec : report.getRecordingsList()) {
-            Map<String, Object> r = new LinkedHashMap<>();
-            r.put("recordingId", rec.getRecordingId());
-            r.put("streamId", rec.getStreamId());
-            r.put("channel", rec.getChannel());
-            r.put("startPosition", rec.getStartPosition());
-            r.put("stopPosition", rec.getStopPosition());
-            r.put("startTimestamp", rec.getStartTimestamp());
-            r.put("stopTimestamp", rec.getStopTimestamp());
-            recordings.add(r);
+        double[] rates = trafficRates.get(report.getNodeId());
+        if (rates != null) {
+            result.put("bytesSentPerSec", rates[0]);
+            result.put("bytesRecvPerSec", rates[1]);
         }
-        result.put("recordings", recordings);
+
+        result.put("recordingCount", report.getRecordingsCount());
+
+        long recordingsTotalBytes = 0;
+        for (var rec : report.getRecordingsList()) {
+            long stop = rec.getStopPosition();
+            long start = rec.getStartPosition();
+            if (stop > start) {
+                recordingsTotalBytes += stop - start;
+            }
+        }
+        result.put("recordingsTotalBytes", recordingsTotalBytes);
 
         if (report.hasSystemMetrics()) {
             Map<String, Object> sys = new LinkedHashMap<>();
@@ -249,10 +360,41 @@ public class ClusterStateAggregator {
             sys.put("cpuUsage", report.getSystemMetrics().getCpuUsage());
             sys.put("gcCount", report.getSystemMetrics().getGcCount());
             sys.put("gcTimeMs", report.getSystemMetrics().getGcTimeMs());
+            sys.put("archiveDiskUsedBytes", report.getSystemMetrics().getArchiveDiskUsedBytes());
+            sys.put("archiveDiskAvailableBytes", report.getSystemMetrics().getArchiveDiskAvailableBytes());
+            sys.put("archiveDiskTotalBytes", report.getSystemMetrics().getArchiveDiskTotalBytes());
             result.put("systemMetrics", sys);
+
+            if (report.getSystemMetrics().getArchiveDiskTotalBytes() > 0) {
+                result.put("diskGrowth", diskUsageTracker.getGrowthStats(
+                        report.getNodeId(),
+                        report.getSystemMetrics().getArchiveDiskTotalBytes(),
+                        report.getSystemMetrics().getArchiveDiskUsedBytes()));
+            }
         }
 
         return result;
+    }
+
+    private long counterValueByLabel(MetricsReport report, String labelPrefix) {
+        for (AeronCounter counter : report.getCountersList()) {
+            if (counter.getLabel().startsWith(labelPrefix)) {
+                return counter.getValue();
+            }
+        }
+        return 0;
+    }
+
+    private long computeRecordingsTotalBytes(MetricsReport report) {
+        long total = 0;
+        for (var rec : report.getRecordingsList()) {
+            long stop = rec.getStopPosition();
+            long start = rec.getStartPosition();
+            if (stop > start) {
+                total += stop - start;
+            }
+        }
+        return total;
     }
 
     private void pushToWebSocket(String destination, Object payload) {

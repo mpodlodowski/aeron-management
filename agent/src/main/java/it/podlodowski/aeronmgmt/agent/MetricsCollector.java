@@ -4,6 +4,7 @@ import it.podlodowski.aeronmgmt.common.proto.ClusterMetrics;
 import it.podlodowski.aeronmgmt.common.proto.MetricsReport;
 import it.podlodowski.aeronmgmt.common.proto.SystemMetrics;
 
+import java.io.File;
 import java.lang.management.GarbageCollectorMXBean;
 import java.lang.management.ManagementFactory;
 import java.lang.management.MemoryMXBean;
@@ -53,11 +54,18 @@ public class MetricsCollector {
             gcTime += gc.getCollectionTime();
         }
 
+        File archiveDir = archiveCollector.getArchiveDir();
+        long totalSpace = archiveDir.getTotalSpace();
+        long usableSpace = archiveDir.getUsableSpace();
+
         return SystemMetrics.newBuilder()
                 .setHeapUsedBytes(memory.getHeapMemoryUsage().getUsed())
                 .setHeapMaxBytes(memory.getHeapMemoryUsage().getMax())
                 .setGcCount(gcCount)
                 .setGcTimeMs(gcTime)
+                .setArchiveDiskTotalBytes(totalSpace)
+                .setArchiveDiskAvailableBytes(usableSpace)
+                .setArchiveDiskUsedBytes(totalSpace - usableSpace)
                 .build();
     }
 }

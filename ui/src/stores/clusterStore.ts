@@ -1,9 +1,10 @@
 import { create } from 'zustand'
-import { MetricsReport, ClusterOverview, Alert } from '../types'
+import { MetricsReport, ClusterOverview, ClusterStats, Alert } from '../types'
 
 interface ClusterState {
   nodes: Map<number, MetricsReport>
   leaderNodeId: number | null
+  clusterStats: ClusterStats | null
   alerts: Alert[]
   connected: boolean
 
@@ -17,6 +18,7 @@ interface ClusterState {
 export const useClusterStore = create<ClusterState>((set) => ({
   nodes: new Map(),
   leaderNodeId: null,
+  clusterStats: null,
   alerts: [],
   connected: false,
 
@@ -33,7 +35,11 @@ export const useClusterStore = create<ClusterState>((set) => ({
       for (const [key, value] of Object.entries(overview.nodes)) {
         nodes.set(Number(key), value)
       }
-      return { nodes, leaderNodeId: overview.leaderNodeId ?? null }
+      return {
+        nodes,
+        leaderNodeId: overview.leaderNodeId ?? null,
+        clusterStats: overview.clusterStats ?? null,
+      }
     }),
 
   addAlert: (alert) =>

@@ -1,6 +1,6 @@
 import { Link } from 'react-router-dom'
 import { MetricsReport } from '../types'
-import { totalErrors, counterByType, counterByLabel, formatBytes, backupStateName, COUNTER_TYPE } from '../utils/counters'
+import { totalErrors, counterByType, formatBytes, formatDuration, backupStateName, COUNTER_TYPE } from '../utils/counters'
 
 interface Props {
   metrics: MetricsReport
@@ -8,7 +8,7 @@ interface Props {
 }
 
 export default function NodeCard({ metrics, isLeader }: Props) {
-  const { clusterMetrics, counters } = metrics
+  const { clusterMetrics, counters, systemMetrics } = metrics
   const isBackup = metrics.agentMode === 'backup'
   const role = isBackup ? 'BACKUP' : (clusterMetrics?.nodeRole ?? 'UNKNOWN')
   const agentDown = metrics.agentConnected === false
@@ -17,8 +17,13 @@ export default function NodeCard({ metrics, isLeader }: Props) {
   const c = counters ?? []
 
   const errors = totalErrors(c)
-  const bytesSent = counterByLabel(c, 'Bytes sent')?.value ?? 0
-  const bytesRecv = counterByLabel(c, 'Bytes received')?.value ?? 0
+  const sentPerSec = metrics.bytesSentPerSec ?? 0
+  const recvPerSec = metrics.bytesRecvPerSec ?? 0
+  const diskPct = systemMetrics && systemMetrics.archiveDiskTotalBytes > 0
+    ? Math.round((systemMetrics.archiveDiskUsedBytes / systemMetrics.archiveDiskTotalBytes) * 100)
+    : -1
+  const diskColor = diskPct > 90 ? 'text-red-400 font-medium' : diskPct > 75 ? 'text-yellow-400 font-medium' : 'text-gray-200'
+  const ttf = metrics.diskGrowth?.timeToFullSeconds ?? null
 
   const statusColor = agentDown ? 'bg-gray-500' :
     noCnc ? 'bg-yellow-500' :
@@ -59,16 +64,16 @@ export default function NodeCard({ metrics, isLeader }: Props) {
       <div className="space-y-2 text-sm text-gray-400">
         {isBackup ? (<>
           <div className="flex justify-between">
-            <span>Live Log Position</span>
-            <span className="text-gray-200 font-mono">{(counterByType(c, COUNTER_TYPE.BACKUP_LIVE_LOG_POSITION)?.value ?? 0).toLocaleString()}</span>
-          </div>
-          <div className="flex justify-between">
-            <span>Backup State</span>
-            <span className="text-gray-200">{backupStateName(counterByType(c, COUNTER_TYPE.BACKUP_STATE)?.value ?? -1)}</span>
+            <span>State / Pos</span>
+            <span className="text-gray-200 text-xs">
+              {backupStateName(counterByType(c, COUNTER_TYPE.BACKUP_STATE)?.value ?? -1)}
+              {' '}
+              <span className="font-mono">{(counterByType(c, COUNTER_TYPE.BACKUP_LIVE_LOG_POSITION)?.value ?? 0).toLocaleString()}</span>
+            </span>
           </div>
           <div className="flex justify-between">
             <span>Recordings</span>
-            <span className="text-gray-200">{metrics.recordings?.length ?? 0}</span>
+            <span className="text-gray-200">{metrics.recordingCount ?? 0}</span>
           </div>
           <div className="flex justify-between">
             <span>Errors</span>
@@ -78,20 +83,29 @@ export default function NodeCard({ metrics, isLeader }: Props) {
           </div>
           <div className="flex justify-between">
             <span>Traffic</span>
-            <span className="text-gray-200 font-mono text-xs">&uarr;{formatBytes(bytesSent)} &darr;{formatBytes(bytesRecv)}</span>
+            <span className="text-gray-200 font-mono text-xs">&uarr;{formatBytes(sentPerSec)}/s &darr;{formatBytes(recvPerSec)}/s</span>
           </div>
+          {diskPct >= 0 && (
+            <div className="flex justify-between">
+              <span>Archive Disk</span>
+              <span className="flex items-center gap-2">
+                {ttf !== null && (
+                  <span className={`text-xs ${ttf < 3600 ? 'text-red-400' : ttf < 86400 ? 'text-yellow-400' : 'text-gray-500'}`}>
+                    full in {formatDuration(ttf)}
+                  </span>
+                )}
+                <span className={`${diskColor} font-mono text-xs`}>{formatBytes(systemMetrics.archiveDiskUsedBytes)} / {formatBytes(systemMetrics.archiveDiskTotalBytes)}</span>
+              </span>
+            </div>
+          )}
         </>) : (<>
           <div className="flex justify-between">
             <span>Commit Position</span>
             <span className="text-gray-200 font-mono">{clusterMetrics?.commitPosition?.toLocaleString() ?? '\u2014'}</span>
           </div>
           <div className="flex justify-between">
-            <span>Clients</span>
-            <span className="text-gray-200">{clusterMetrics?.connectedClientCount ?? 0}</span>
-          </div>
-          <div className="flex justify-between">
-            <span>Snapshots</span>
-            <span className="text-gray-200">{counterByType(c, COUNTER_TYPE.SNAPSHOT_COUNT)?.value ?? 0}</span>
+            <span>Recordings</span>
+            <span className="text-gray-200">{metrics.recordingCount ?? 0}</span>
           </div>
           <div className="flex justify-between">
             <span>Errors</span>
@@ -99,8 +113,21 @@ export default function NodeCard({ metrics, isLeader }: Props) {
           </div>
           <div className="flex justify-between">
             <span>Traffic</span>
-            <span className="text-gray-200 font-mono text-xs">&uarr;{formatBytes(bytesSent)} &darr;{formatBytes(bytesRecv)}</span>
+            <span className="text-gray-200 font-mono text-xs">&uarr;{formatBytes(sentPerSec)}/s &darr;{formatBytes(recvPerSec)}/s</span>
           </div>
+          {diskPct >= 0 && (
+            <div className="flex justify-between">
+              <span>Archive Disk</span>
+              <span className="flex items-center gap-2">
+                {ttf !== null && (
+                  <span className={`text-xs ${ttf < 3600 ? 'text-red-400' : ttf < 86400 ? 'text-yellow-400' : 'text-gray-500'}`}>
+                    full in {formatDuration(ttf)}
+                  </span>
+                )}
+                <span className={`${diskColor} font-mono text-xs`}>{formatBytes(systemMetrics.archiveDiskUsedBytes)} / {formatBytes(systemMetrics.archiveDiskTotalBytes)}</span>
+              </span>
+            </div>
+          )}
         </>)}
       </div>
     </Link>
