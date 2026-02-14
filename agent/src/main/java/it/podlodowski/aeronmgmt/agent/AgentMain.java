@@ -13,7 +13,7 @@ public class AgentMain {
 
     private static final Logger LOGGER = LoggerFactory.getLogger(AgentMain.class);
 
-    public static void main(String[] args) {
+    public static void main(String[] args) throws Exception {
         AgentConfig config = new AgentConfig();
         int maxCncFailures = Math.max(1, (int) (config.cncFailureTimeoutMs / config.metricsIntervalMs));
         LOGGER.info("Agent {} starting. Cluster dir: {}, cncFailureTimeout={}ms ({} cycles)",
