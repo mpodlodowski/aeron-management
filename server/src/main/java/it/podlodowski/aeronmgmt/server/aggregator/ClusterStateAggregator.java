@@ -31,6 +31,7 @@ public class ClusterStateAggregator {
     private final ConcurrentHashMap<Integer, MetricsWindow> metricsWindows = new ConcurrentHashMap<>();
     private final ConcurrentHashMap<Integer, MetricsReport> latestMetrics = new ConcurrentHashMap<>();
     private final ConcurrentHashMap<String, CompletableFuture<CommandResult>> pendingCommands = new ConcurrentHashMap<>();
+    private final ConcurrentHashMap<Integer, String> nodeAgentModes = new ConcurrentHashMap<>();
     private final Set<Integer> connectedNodes = ConcurrentHashMap.newKeySet();
     private final LinkedList<Map<String, Object>> recentEvents = new LinkedList<>();
 
@@ -65,9 +66,10 @@ public class ClusterStateAggregator {
         }
     }
 
-    public void onAgentConnected(int nodeId) {
-        LOGGER.info("Agent connected: nodeId={}", nodeId);
+    public void onAgentConnected(int nodeId, String agentMode) {
+        LOGGER.info("Agent connected: nodeId={}, mode={}", nodeId, agentMode);
         connectedNodes.add(nodeId);
+        nodeAgentModes.put(nodeId, agentMode);
         emitAlert("AGENT_CONNECTED", nodeId, "connected");
         pushToWebSocket("/topic/cluster", buildClusterOverview());
     }
@@ -75,12 +77,15 @@ public class ClusterStateAggregator {
     public void onAgentDisconnected(int nodeId) {
         LOGGER.info("Agent disconnected: nodeId={}", nodeId);
         connectedNodes.remove(nodeId);
-
+        nodeAgentModes.remove(nodeId);
         emitAlert("AGENT_DISCONNECTED", nodeId, "disconnected");
         pushToWebSocket("/topic/cluster", buildClusterOverview());
     }
 
     private void detectStateChanges(int nodeId, MetricsReport previous, MetricsReport current) {
+        if ("backup".equals(nodeAgentModes.get(nodeId))) {
+            return;
+        }
         if (previous == null || !previous.hasClusterMetrics() || !current.hasClusterMetrics()) {
             return;
         }
@@ -151,7 +156,9 @@ public class ClusterStateAggregator {
         for (Map.Entry<Integer, MetricsReport> entry : latestMetrics.entrySet()) {
             MetricsReport report = entry.getValue();
 
-            if (report.hasClusterMetrics() && "LEADER".equals(report.getClusterMetrics().getNodeRole())) {
+            if (!"backup".equals(nodeAgentModes.get(report.getNodeId()))
+                    && report.hasClusterMetrics()
+                    && "LEADER".equals(report.getClusterMetrics().getNodeRole())) {
                 leaderNodeId = report.getNodeId();
             }
 
@@ -173,6 +180,10 @@ public class ClusterStateAggregator {
         result.put("nodeId", report.getNodeId());
         result.put("timestamp", report.getTimestamp());
         result.put("agentConnected", connectedNodes.contains(report.getNodeId()));
+        String agentMode = nodeAgentModes.get(report.getNodeId());
+        if (agentMode != null) {
+            result.put("agentMode", agentMode);
+        }
 
         if (report.hasClusterMetrics()) {
             ClusterMetrics cm = report.getClusterMetrics();
