@@ -7,7 +7,7 @@ import { Alert, ClusterOverview } from '../types'
 
 export default function Dashboard() {
   useWebSocket()
-  const { nodes, leaderNodeId, alerts, connected, updateCluster, setAlerts } = useClusterStore()
+  const { nodes, leaderNodeId, alerts, updateCluster, setAlerts } = useClusterStore()
 
   useEffect(() => {
     fetch('/api/cluster')
@@ -30,20 +30,6 @@ export default function Dashboard() {
 
   return (
     <div className="space-y-6">
-      <div className="flex items-center justify-between">
-        <h2 className="text-2xl font-semibold">Cluster Dashboard</h2>
-        <div className="flex items-center gap-2 text-sm">
-          <span
-            className={`inline-block h-2 w-2 rounded-full ${
-              connected ? 'bg-green-500' : 'bg-red-500'
-            }`}
-          />
-          <span className="text-gray-400">
-            {connected ? 'Connected' : 'Disconnected'}
-          </span>
-        </div>
-      </div>
-
       {sortedNodes.length === 0 ? (
         <div className="text-gray-500">
           No nodes reporting. Waiting for cluster data...

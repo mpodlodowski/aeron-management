@@ -99,26 +99,6 @@ export default function NodeDetail() {
 
   return (
     <div className="space-y-6">
-      <div className="flex items-center justify-between">
-        <div className="flex items-center gap-3">
-          <h2 className="text-2xl font-semibold">
-            {isBackup ? 'Backup' : `Node ${id}`}
-          </h2>
-          {(() => {
-            const role = isBackup ? 'BACKUP' : (clusterMetrics?.nodeRole ?? 'UNKNOWN')
-            const color = isBackup ? 'bg-purple-500' :
-              role === 'LEADER' ? 'bg-green-500' :
-              role === 'FOLLOWER' ? 'bg-blue-500' :
-              role === 'CANDIDATE' ? 'bg-yellow-500' : 'bg-red-500'
-            return (
-              <span className={`inline-flex items-center rounded-full px-2.5 py-0.5 text-xs font-medium ${color} text-white`}>
-                {role}
-              </span>
-            )
-          })()}
-        </div>
-      </div>
-
       {/* Summary Cards */}
       <div className="grid grid-cols-3 md:grid-cols-4 lg:grid-cols-6 gap-3">
         {isBackup ? (<>

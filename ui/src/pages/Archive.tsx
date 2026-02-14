@@ -44,13 +44,6 @@ export default function Archive() {
 
   return (
     <div className="space-y-6">
-      <div className="flex items-center justify-between">
-        <h2 className="text-2xl font-semibold">Archive Recordings</h2>
-        <span className="text-sm text-gray-400">
-          {filtered.length} recording{filtered.length !== 1 ? 's' : ''}
-        </span>
-      </div>
-
       {/* Node Filter Buttons */}
       <div className="flex flex-wrap gap-2">
         <button
