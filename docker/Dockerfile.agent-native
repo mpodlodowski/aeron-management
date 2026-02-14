@@ -1,0 +1,36 @@
+# Stage 1: Build native image
+FROM ghcr.io/graalvm/native-image-community:21 AS build
+
+RUN microdnf clean all && microdnf install -y findutils && microdnf clean all
+
+WORKDIR /app
+COPY . .
+
+# Download dependencies, patch grpc-netty-shaded, then compile native image.
+# The grpc-netty-shaded JAR ships a native-image.properties that loads a reflection
+# config registering ManagementFactory, causing PlatformManagedObject errors on
+# GraalVM CE 21. The shadow JAR excludes these (build.gradle), but the individual
+# dependency JAR on the classpath also needs patching.
+RUN ./gradlew :agent:compileJava --no-daemon && \
+    DEP_JAR=$(find /root/.gradle/caches -name "grpc-netty-shaded-*.jar" | head -1) && \
+    mkdir -p /tmp/patch/META-INF/native-image/io.grpc.netty.shaded.io.netty/netty-transport && \
+    echo "# Patched: removed ManagementFactory reflection config reference" \
+      > /tmp/patch/META-INF/native-image/io.grpc.netty.shaded.io.netty/netty-transport/native-image.properties && \
+    echo '[]' \
+      > /tmp/patch/META-INF/native-image/io.grpc.netty.shaded.io.netty/netty-transport/reflection-config.json && \
+    jar uf "$DEP_JAR" \
+      -C /tmp/patch META-INF/native-image/io.grpc.netty.shaded.io.netty/netty-transport/native-image.properties \
+      -C /tmp/patch META-INF/native-image/io.grpc.netty.shaded.io.netty/netty-transport/reflection-config.json && \
+    rm -rf /tmp/patch && \
+    ./gradlew :agent:nativeCompile --no-daemon
+
+# Stage 2: Minimal runtime (distroless provides glibc + libz, ~20 MB)
+FROM gcr.io/distroless/base-debian12:nonroot
+
+COPY --from=build /app/agent/build/native/nativeCompile/agent /app/agent
+
+EXPOSE 7070
+ENTRYPOINT ["/app/agent"]
+
+# Plans
+docs/

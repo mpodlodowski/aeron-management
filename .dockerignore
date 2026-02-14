@@ -1,0 +1,8 @@
+**/build/
+**/.gradle/
+**/node_modules/
+ui/dist/
+.git/
+
+# Plans
+docs/

@@ -32,7 +32,7 @@
     "allDeclaredMethods": true
   },
   {
-    "name": "java.lang.management.ManagementFactory",
-    "allDeclaredMethods": true
+    "name": "sun.nio.ch.SelectorImpl",
+    "allDeclaredFields": true
   }
 ]

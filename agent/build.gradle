@@ -18,6 +18,11 @@ dependencies {
 }
 
 graalvmNative {
+    metadataRepository {
+        // Disable GraalVM reachability metadata repository — it pulls in configs
+        // (e.g. for logback) that register ManagementFactory, causing PlatformManagedObject errors
+        enabled = false
+    }
     binaries {
         main {
             imageName = 'agent'
@@ -26,8 +31,9 @@ graalvmNative {
                 '--no-fallback',
                 '--enable-url-protocols=http',
                 '-H:+ReportExceptionStackTraces',
-                '--initialize-at-build-time=org.slf4j',
-                '--initialize-at-build-time=ch.qos.logback',
+                // Exclude gRPC-shaded Netty transport reflection config that registers
+                // ManagementFactory, causing PlatformManagedObject errors on GraalVM CE 21
+                '--exclude-config', 'grpc-netty-shaded.*\\.jar', 'META-INF/native-image/io\\.grpc\\.netty\\.shaded\\.io\\.netty/netty-transport/reflection-config\\.json',
             )
         }
     }
@@ -36,6 +42,11 @@ graalvmNative {
 shadowJar {
     archiveClassifier.set('')
     mergeServiceFiles()
+    // Exclude grpc-netty-shaded's bundled native-image transport config that registers
+    // ManagementFactory for reflection (causes PlatformManagedObject errors on GraalVM CE 21).
+    // Our own reflect-config.json provides the needed Netty reflection entries.
+    exclude 'META-INF/native-image/io.grpc.netty.shaded.io.netty/netty-transport/native-image.properties'
+    exclude 'META-INF/native-image/io.grpc.netty.shaded.io.netty/netty-transport/reflection-config.json'
 }
 
 // Disable the standard jar to avoid conflicts with shadowJar (both produce the same artifact name)
@@ -48,3 +59,11 @@ tasks.distZip.dependsOn tasks.shadowJar
 tasks.distTar.dependsOn tasks.shadowJar
 tasks.startScripts.dependsOn tasks.shadowJar
 tasks.startShadowScripts.dependsOn tasks.jar
+
+// Native compilation needs the shadow JAR (since regular jar is disabled)
+tasks.named('nativeCompile') {
+    dependsOn tasks.named('shadowJar')
+}
+tasks.named('generateResourcesConfigFile') {
+    dependsOn tasks.named('shadowJar')
+}
