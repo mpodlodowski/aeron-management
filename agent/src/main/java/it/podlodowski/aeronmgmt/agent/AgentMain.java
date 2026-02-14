@@ -25,8 +25,7 @@ public class AgentMain {
                 config.agentId, identity.nodeId(), identity.aeronDir(), identity.agentMode());
 
         CncReader cncReader = new CncReader(identity.aeronDir());
-        boolean isBackup = "backup".equals(identity.agentMode());
-        ArchiveMetricsCollector archiveCollector = new ArchiveMetricsCollector(identity.aeronDir(), isBackup);
+        ArchiveMetricsCollector archiveCollector = new ArchiveMetricsCollector(config.clusterDir);
         MetricsCollector metricsCollector = new MetricsCollector(
                 cncReader, archiveCollector, identity.nodeId(), identity.agentMode());
         AdminCommandExecutor commandExecutor = new AdminCommandExecutor(config.clusterDir);

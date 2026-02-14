@@ -7,6 +7,10 @@ interface RecordingRow extends ArchiveRecording {
   nodeId: number
 }
 
+function nodeName(nodeId: number, agentMode?: string) {
+  return agentMode === 'backup' ? 'Backup' : `Node ${nodeId}`
+}
+
 export default function Archive() {
   useWebSocket()
   const nodes = useClusterStore((s) => s.nodes)
@@ -46,27 +50,17 @@ export default function Archive() {
     <div className="space-y-6">
       {/* Node Filter Buttons */}
       <div className="flex flex-wrap gap-2">
-        <button
-          onClick={() => setFilterNode(null)}
-          className={`rounded-md px-3 py-1.5 text-xs font-medium transition-colors ${
-            filterNode === null
-              ? 'bg-blue-600 text-white'
-              : 'bg-gray-800 text-gray-400 hover:text-gray-200'
-          }`}
-        >
-          All Nodes
-        </button>
         {nodeIds.map((id) => (
           <button
             key={id}
-            onClick={() => setFilterNode(id)}
+            onClick={() => setFilterNode(filterNode === id ? null : id)}
             className={`rounded-md px-3 py-1.5 text-xs font-medium transition-colors ${
               filterNode === id
                 ? 'bg-blue-600 text-white'
                 : 'bg-gray-800 text-gray-400 hover:text-gray-200'
             }`}
           >
-            Node {id}
+            {nodeName(id, nodes.get(id)?.agentMode)}
           </button>
         ))}
       </div>
@@ -111,7 +105,7 @@ export default function Archive() {
                 const isActive = rec.stopPosition === -1 || rec.stopTimestamp === 0
                 return (
                   <tr key={`${rec.nodeId}-${rec.recordingId}`} className="hover:bg-gray-800/50">
-                    <td className="px-4 py-2 text-gray-200">Node {rec.nodeId}</td>
+                    <td className="px-4 py-2 text-gray-200">{nodeName(rec.nodeId, nodes.get(rec.nodeId)?.agentMode)}</td>
                     <td className="px-4 py-2 font-mono text-gray-200">
                       {rec.recordingId}
                     </td>
