@@ -1,5 +1,6 @@
 package it.podlodowski.aeronmgmt.agent;
 
+import io.aeron.archive.ArchiveTool;
 import io.aeron.cluster.ClusterTool;
 import it.podlodowski.aeronmgmt.common.proto.AdminCommand;
 import it.podlodowski.aeronmgmt.common.proto.CommandResult;
@@ -9,26 +10,23 @@ import org.slf4j.LoggerFactory;
 import java.io.ByteArrayOutputStream;
 import java.io.File;
 import java.io.PrintStream;
+import java.util.Set;
 
 /**
- * Wraps Aeron {@link ClusterTool} operations. Receives an {@link AdminCommand}
- * protobuf message and executes the corresponding Aeron tool operation on the
- * local cluster directory.
- *
- * <p>The Aeron 1.44.1 ClusterTool API uses two parameter orderings:
- * <ul>
- *   <li>Mutating actions: {@code (File, PrintStream)} — return boolean</li>
- *   <li>Read-only diagnostics: {@code (PrintStream, File)} — return void (throw on failure)</li>
- * </ul>
+ * Wraps Aeron {@link ClusterTool} and {@link ArchiveTool} operations.
+ * Receives an {@link AdminCommand} protobuf message and executes the
+ * corresponding Aeron tool operation on the local cluster/archive directory.
  */
 public class AdminCommandExecutor {
 
     private static final Logger LOGGER = LoggerFactory.getLogger(AdminCommandExecutor.class);
 
     private final File clusterDir;
+    private final File archiveDir;
 
     public AdminCommandExecutor(String clusterDirPath) {
         this.clusterDir = new File(clusterDirPath);
+        this.archiveDir = new File(clusterDir.getParentFile(), "archive");
     }
 
     /**
@@ -109,6 +107,42 @@ public class AdminCommandExecutor {
             case "DESCRIBE_SNAPSHOT":
                 ClusterTool.describeLatestConsensusModuleSnapshot(out, clusterDir);
                 return true;
+
+            // --- ArchiveTool operations (work on cluster + backup nodes) ---
+            case "ARCHIVE_DESCRIBE_RECORDING": {
+                long recordingId = Long.parseLong(command.getParametersOrThrow("recordingId"));
+                ArchiveTool.describeRecording(out, archiveDir, recordingId);
+                return true;
+            }
+            case "ARCHIVE_VERIFY":
+                return ArchiveTool.verify(out, archiveDir, Set.of(), null, f -> true);
+            case "ARCHIVE_VERIFY_RECORDING": {
+                long recordingId = Long.parseLong(command.getParametersOrThrow("recordingId"));
+                return ArchiveTool.verifyRecording(out, archiveDir, recordingId, Set.of(), null, f -> true);
+            }
+            case "ARCHIVE_COMPACT":
+                ArchiveTool.compact(out, archiveDir);
+                return true;
+            case "ARCHIVE_DELETE_ORPHANED":
+                ArchiveTool.deleteOrphanedSegments(out, archiveDir);
+                return true;
+            case "ARCHIVE_MARK_INVALID": {
+                long recordingId = Long.parseLong(command.getParametersOrThrow("recordingId"));
+                ArchiveTool.markRecordingInvalid(out, archiveDir, recordingId);
+                return true;
+            }
+            case "ARCHIVE_MARK_VALID": {
+                long recordingId = Long.parseLong(command.getParametersOrThrow("recordingId"));
+                ArchiveTool.markRecordingValid(out, archiveDir, recordingId);
+                return true;
+            }
+            case "ARCHIVE_DELETE_RECORDING": {
+                long recordingId = Long.parseLong(command.getParametersOrThrow("recordingId"));
+                ArchiveTool.markRecordingInvalid(out, archiveDir, recordingId);
+                out.println("Marked recording " + recordingId + " as invalid, compacting...");
+                ArchiveTool.compact(out, archiveDir);
+                return true;
+            }
 
             default:
                 throw new IllegalArgumentException("Unknown command type: " + command.getType());

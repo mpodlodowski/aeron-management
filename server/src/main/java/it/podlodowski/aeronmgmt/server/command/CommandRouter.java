@@ -49,6 +49,22 @@ public class CommandRouter {
      * Sends an admin command to the specified node with parameters and waits for the result.
      */
     public Map<String, Object> sendCommand(int nodeId, String commandType, Map<String, String> parameters) {
+        return doSendCommand(nodeId, commandType, parameters, false);
+    }
+
+    /**
+     * Sends an archive command — allowed on both cluster and backup nodes.
+     */
+    public Map<String, Object> sendArchiveCommand(int nodeId, String commandType) {
+        return doSendCommand(nodeId, commandType, Map.of(), true);
+    }
+
+    public Map<String, Object> sendArchiveCommand(int nodeId, String commandType, Map<String, String> parameters) {
+        return doSendCommand(nodeId, commandType, parameters, true);
+    }
+
+    private Map<String, Object> doSendCommand(int nodeId, String commandType, Map<String, String> parameters,
+                                               boolean allowBackup) {
         AgentRegistry.AgentConnection connection = registry.get(nodeId);
         if (connection == null) {
             Map<String, Object> error = new LinkedHashMap<>();
@@ -57,7 +73,7 @@ public class CommandRouter {
             return error;
         }
 
-        if ("backup".equals(connection.getAgentMode())) {
+        if (!allowBackup && "backup".equals(connection.getAgentMode())) {
             Map<String, Object> error = new LinkedHashMap<>();
             error.put("success", false);
             error.put("error", "Commands not supported on backup nodes");

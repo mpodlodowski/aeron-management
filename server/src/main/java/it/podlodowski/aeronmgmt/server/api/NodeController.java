@@ -120,4 +120,51 @@ public class NodeController {
     public Map<String, Object> describeSnapshot(@PathVariable int id) {
         return commandRouter.sendCommand(id, "DESCRIBE_SNAPSHOT");
     }
+
+    // --- Archive operations (work on cluster + backup nodes) ---
+
+    @GetMapping("/{id}/archive/verify")
+    public Map<String, Object> archiveVerify(@PathVariable int id) {
+        return commandRouter.sendArchiveCommand(id, "ARCHIVE_VERIFY");
+    }
+
+    @PostMapping("/{id}/archive/compact")
+    public Map<String, Object> archiveCompact(@PathVariable int id) {
+        return commandRouter.sendArchiveCommand(id, "ARCHIVE_COMPACT");
+    }
+
+    @PostMapping("/{id}/archive/delete-orphaned")
+    public Map<String, Object> archiveDeleteOrphaned(@PathVariable int id) {
+        return commandRouter.sendArchiveCommand(id, "ARCHIVE_DELETE_ORPHANED");
+    }
+
+    @GetMapping("/{id}/archive/recordings/{rid}/describe")
+    public Map<String, Object> archiveDescribeRecording(@PathVariable int id, @PathVariable long rid) {
+        return commandRouter.sendArchiveCommand(id, "ARCHIVE_DESCRIBE_RECORDING",
+                Map.of("recordingId", String.valueOf(rid)));
+    }
+
+    @GetMapping("/{id}/archive/recordings/{rid}/verify")
+    public Map<String, Object> archiveVerifyRecording(@PathVariable int id, @PathVariable long rid) {
+        return commandRouter.sendArchiveCommand(id, "ARCHIVE_VERIFY_RECORDING",
+                Map.of("recordingId", String.valueOf(rid)));
+    }
+
+    @PostMapping("/{id}/archive/recordings/{rid}/mark-invalid")
+    public Map<String, Object> archiveMarkInvalid(@PathVariable int id, @PathVariable long rid) {
+        return commandRouter.sendArchiveCommand(id, "ARCHIVE_MARK_INVALID",
+                Map.of("recordingId", String.valueOf(rid)));
+    }
+
+    @PostMapping("/{id}/archive/recordings/{rid}/mark-valid")
+    public Map<String, Object> archiveMarkValid(@PathVariable int id, @PathVariable long rid) {
+        return commandRouter.sendArchiveCommand(id, "ARCHIVE_MARK_VALID",
+                Map.of("recordingId", String.valueOf(rid)));
+    }
+
+    @PostMapping("/{id}/archive/recordings/{rid}/delete")
+    public Map<String, Object> archiveDeleteRecording(@PathVariable int id, @PathVariable long rid) {
+        return commandRouter.sendArchiveCommand(id, "ARCHIVE_DELETE_RECORDING",
+                Map.of("recordingId", String.valueOf(rid)));
+    }
 }
