@@ -120,7 +120,7 @@ export default function NodeDetail() {
       </div>
 
       {/* Summary Cards */}
-      <div className="grid grid-cols-4 md:grid-cols-6 lg:grid-cols-12 gap-3">
+      <div className="grid grid-cols-3 md:grid-cols-4 lg:grid-cols-6 gap-3">
         <SummaryCard
           label="Commit Position"
           value={clusterMetrics?.commitPosition?.toLocaleString() ?? '\u2014'}
@@ -205,32 +205,32 @@ export default function NodeDetail() {
       {/* Admin Actions & Diagnostics */}
       {!isBackup && (
         <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
-          <div className="rounded-lg border border-gray-800 bg-gray-900 p-5">
-            <h3 className="text-sm font-medium text-gray-400 mb-3">Admin Actions</h3>
-            <div className="flex flex-wrap gap-3">
+          <div className="rounded-lg border border-gray-800 bg-gray-900 p-4">
+            <h3 className="text-xs font-medium text-gray-400 mb-2">Admin Actions</h3>
+            <div className="flex flex-wrap gap-1.5">
               {actions.map((action) => (
                 <button
                   key={action.id}
                   onClick={() => executeAction(action.id, action.endpoint)}
                   disabled={loading !== null}
-                  className={`rounded-md px-4 py-2 text-sm font-medium text-white transition-colors disabled:opacity-50 disabled:cursor-not-allowed ${action.color}`}
+                  className={`rounded px-2.5 py-1 text-xs font-medium text-white transition-colors disabled:opacity-50 disabled:cursor-not-allowed ${action.color}`}
                 >
-                  {loading === action.id ? 'Processing...' : action.label}
+                  {loading === action.id ? '...' : action.label}
                 </button>
               ))}
             </div>
           </div>
-          <div className="rounded-lg border border-gray-800 bg-gray-900 p-5">
-            <h3 className="text-sm font-medium text-gray-400 mb-3">Diagnostics</h3>
-            <div className="flex flex-wrap gap-3">
+          <div className="rounded-lg border border-gray-800 bg-gray-900 p-4">
+            <h3 className="text-xs font-medium text-gray-400 mb-2">Diagnostics</h3>
+            <div className="flex flex-wrap gap-1.5">
               {diagnostics.map((diag) => (
                 <button
                   key={diag.id}
                   onClick={() => executeAction(diag.id, diag.endpoint, 'GET')}
                   disabled={loading !== null}
-                  className="rounded-md px-4 py-2 text-sm font-medium text-white transition-colors disabled:opacity-50 disabled:cursor-not-allowed bg-gray-600 hover:bg-gray-500"
+                  className="rounded px-2.5 py-1 text-xs font-medium text-white transition-colors disabled:opacity-50 disabled:cursor-not-allowed bg-gray-600 hover:bg-gray-500"
                 >
-                  {loading === diag.id ? 'Loading...' : diag.label}
+                  {loading === diag.id ? '...' : diag.label}
                 </button>
               ))}
             </div>
