@@ -77,14 +77,15 @@ export default function NodeDetail() {
   const bytesMapped = counterByLabel(c, 'Bytes currently mapped')?.value ?? 0
   const naksRecv = counterByLabel(c, 'NAKs received')?.value ?? 0
 
+  const isLeader = clusterMetrics?.nodeRole === 'LEADER'
   const actions = [
-    { id: 'SNAPSHOT', label: 'Snapshot', endpoint: 'snapshot', color: 'bg-blue-600 hover:bg-blue-500' },
-    { id: 'SUSPEND', label: 'Suspend', endpoint: 'suspend', color: 'bg-yellow-600 hover:bg-yellow-500' },
-    { id: 'RESUME', label: 'Resume', endpoint: 'resume', color: 'bg-green-600 hover:bg-green-500' },
-    { id: 'SHUTDOWN', label: 'Shutdown', endpoint: 'shutdown', color: 'bg-red-600 hover:bg-red-500' },
-    { id: 'ABORT', label: 'Abort', endpoint: 'abort', color: 'bg-red-700 hover:bg-red-600' },
-    { id: 'INVALIDATE_SNAPSHOT', label: 'Invalidate Snapshot', endpoint: 'invalidate-snapshot', color: 'bg-orange-600 hover:bg-orange-500' },
-  ]
+    { id: 'SNAPSHOT', label: 'Snapshot', endpoint: 'snapshot', color: 'bg-blue-600 hover:bg-blue-500', leaderOnly: true },
+    { id: 'SUSPEND', label: 'Suspend', endpoint: 'suspend', color: 'bg-yellow-600 hover:bg-yellow-500', leaderOnly: true },
+    { id: 'RESUME', label: 'Resume', endpoint: 'resume', color: 'bg-green-600 hover:bg-green-500', leaderOnly: true },
+    { id: 'SHUTDOWN', label: 'Shutdown', endpoint: 'shutdown', color: 'bg-red-600 hover:bg-red-500', leaderOnly: true },
+    { id: 'ABORT', label: 'Abort', endpoint: 'abort', color: 'bg-red-700 hover:bg-red-600', leaderOnly: true },
+    { id: 'INVALIDATE_SNAPSHOT', label: 'Invalidate Snapshot', endpoint: 'invalidate-snapshot', color: 'bg-orange-600 hover:bg-orange-500', leaderOnly: false },
+  ].filter(a => !a.leaderOnly || isLeader)
 
   const diagnostics = [
     { id: 'DESCRIBE', label: 'Describe', endpoint: 'describe' },

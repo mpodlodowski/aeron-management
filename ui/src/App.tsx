@@ -11,7 +11,7 @@ function PageTitle() {
   if (location.pathname === '/') return <>Dashboard</>
   if (location.pathname === '/archive') return <>Archive</>
 
-  const match = location.pathname.match(/^\/nodes\/(\d+)$/)
+  const match = location.pathname.match(/^\/nodes\/(-?\d+)$/)
   if (match) {
     const id = Number(match[1])
     const metrics = nodes.get(id)
