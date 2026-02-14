@@ -1,6 +1,7 @@
 plugins {
     id 'application'
     id 'com.github.johnrengelman.shadow' version '8.1.1'
+    id 'org.graalvm.buildtools.native' version '0.10.4'
 }
 
 application {
@@ -14,6 +15,22 @@ dependencies {
     implementation 'io.grpc:grpc-netty-shaded:1.62.2'
     implementation 'ch.qos.logback:logback-classic:1.4.14'
     implementation 'org.slf4j:slf4j-api:2.0.9'
+}
+
+graalvmNative {
+    binaries {
+        main {
+            imageName = 'agent'
+            mainClass = 'it.podlodowski.aeronmgmt.agent.AgentMain'
+            buildArgs.addAll(
+                '--no-fallback',
+                '--enable-url-protocols=http',
+                '-H:+ReportExceptionStackTraces',
+                '--initialize-at-build-time=org.slf4j',
+                '--initialize-at-build-time=ch.qos.logback',
+            )
+        }
+    }
 }
 
 shadowJar {
