@@ -1,6 +1,6 @@
 import { Link } from 'react-router-dom'
 import { MetricsReport } from '../types'
-import { totalErrors, counterByType, counterByLabel, formatBytes, COUNTER_TYPE } from '../utils/counters'
+import { totalErrors, counterByType, counterByLabel, formatBytes, backupStateName, COUNTER_TYPE } from '../utils/counters'
 
 interface Props {
   metrics: MetricsReport
@@ -43,33 +43,51 @@ export default function NodeCard({ metrics, isLeader }: Props) {
         </span>
       </div>
       <div className="space-y-2 text-sm text-gray-400">
-        <div className="flex justify-between">
-          <span>Commit Position</span>
-          <span className="text-gray-200 font-mono">{clusterMetrics?.commitPosition?.toLocaleString() ?? '\u2014'}</span>
-        </div>
-        {isBackup ? (
+        {isBackup ? (<>
+          <div className="flex justify-between">
+            <span>Backup State</span>
+            <span className="text-gray-200">{backupStateName(counterByType(c, COUNTER_TYPE.BACKUP_STATE)?.value ?? -1)}</span>
+          </div>
+          <div className="flex justify-between">
+            <span>Live Log Position</span>
+            <span className="text-gray-200 font-mono">{(counterByType(c, COUNTER_TYPE.BACKUP_LIVE_LOG_POSITION)?.value ?? 0).toLocaleString()}</span>
+          </div>
           <div className="flex justify-between">
             <span>Recordings</span>
             <span className="text-gray-200">{metrics.recordings?.length ?? 0}</span>
           </div>
-        ) : (
+          <div className="flex justify-between">
+            <span>Errors</span>
+            <span className={(counterByType(c, COUNTER_TYPE.BACKUP_ERRORS)?.value ?? 0) > 0 ? 'text-red-400 font-medium' : 'text-gray-200'}>
+              {counterByType(c, COUNTER_TYPE.BACKUP_ERRORS)?.value ?? 0}
+            </span>
+          </div>
+          <div className="flex justify-between">
+            <span>Traffic</span>
+            <span className="text-gray-200 font-mono text-xs">&uarr;{formatBytes(bytesSent)} &darr;{formatBytes(bytesRecv)}</span>
+          </div>
+        </>) : (<>
+          <div className="flex justify-between">
+            <span>Commit Position</span>
+            <span className="text-gray-200 font-mono">{clusterMetrics?.commitPosition?.toLocaleString() ?? '\u2014'}</span>
+          </div>
           <div className="flex justify-between">
             <span>Clients</span>
             <span className="text-gray-200">{clusterMetrics?.connectedClientCount ?? 0}</span>
           </div>
-        )}
-        <div className="flex justify-between">
-          <span>Errors</span>
-          <span className={errors > 0 ? 'text-red-400 font-medium' : 'text-gray-200'}>{errors}</span>
-        </div>
-        <div className="flex justify-between">
-          <span>Snapshots</span>
-          <span className="text-gray-200">{counterByType(c, COUNTER_TYPE.SNAPSHOT_COUNT)?.value ?? 0}</span>
-        </div>
-        <div className="flex justify-between">
-          <span>Traffic</span>
-          <span className="text-gray-200 font-mono text-xs">&uarr;{formatBytes(bytesSent)} &darr;{formatBytes(bytesRecv)}</span>
-        </div>
+          <div className="flex justify-between">
+            <span>Errors</span>
+            <span className={errors > 0 ? 'text-red-400 font-medium' : 'text-gray-200'}>{errors}</span>
+          </div>
+          <div className="flex justify-between">
+            <span>Snapshots</span>
+            <span className="text-gray-200">{counterByType(c, COUNTER_TYPE.SNAPSHOT_COUNT)?.value ?? 0}</span>
+          </div>
+          <div className="flex justify-between">
+            <span>Traffic</span>
+            <span className="text-gray-200 font-mono text-xs">&uarr;{formatBytes(bytesSent)} &darr;{formatBytes(bytesRecv)}</span>
+          </div>
+        </>)}
       </div>
     </Link>
   )

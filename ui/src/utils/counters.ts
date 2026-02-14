@@ -7,7 +7,25 @@ export const COUNTER_TYPE = {
   SNAPSHOT_COUNT: 205,
   ELECTION_COUNT: 238,
   MAX_CYCLE_TIME_NS: 216,
+  BACKUP_STATE: 208,
+  BACKUP_LIVE_LOG_POSITION: 209,
+  BACKUP_NEXT_QUERY_DEADLINE_MS: 210,
+  BACKUP_ERRORS: 211,
 } as const
+
+const BACKUP_STATE_NAMES: Record<number, string> = {
+  0: 'INIT',
+  1: 'BACKUP_QUERY',
+  2: 'SNAPSHOT_RETRIEVE',
+  3: 'LIVE_LOG_REPLAY',
+  4: 'UPDATE_RECORDING_LOG',
+  5: 'BACKING_UP',
+  6: 'RESET_BACKUP',
+}
+
+export function backupStateName(value: number): string {
+  return BACKUP_STATE_NAMES[value] ?? `UNKNOWN(${value})`
+}
 
 export function counterByType(counters: AeronCounter[], typeId: number): AeronCounter | undefined {
   return counters.find((c) => c.typeId === typeId)

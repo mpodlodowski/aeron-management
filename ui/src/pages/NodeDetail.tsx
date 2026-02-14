@@ -4,7 +4,7 @@ import { useClusterStore } from '../stores/clusterStore'
 import { useWebSocket } from '../hooks/useWebSocket'
 import CounterTable from '../components/CounterTable'
 import { MetricsReport } from '../types'
-import { totalErrors, counterByType, counterByLabel, formatBytes, formatNsAsMs, COUNTER_TYPE } from '../utils/counters'
+import { totalErrors, counterByType, counterByLabel, formatBytes, formatNsAsMs, backupStateName, COUNTER_TYPE } from '../utils/counters'
 
 interface ActionResult {
   action: string
@@ -121,85 +121,108 @@ export default function NodeDetail() {
 
       {/* Summary Cards */}
       <div className="grid grid-cols-3 md:grid-cols-4 lg:grid-cols-6 gap-3">
-        <SummaryCard
-          label="Commit Position"
-          value={clusterMetrics?.commitPosition?.toLocaleString() ?? '\u2014'}
-          tooltip="Position up to which the cluster log has been committed and replicated to a majority of nodes"
-        />
-        {!isBackup && (
+        {isBackup ? (<>
           <SummaryCard
-            label="Election State"
-            value={clusterMetrics?.electionState === '17' ? 'CLOSED' : clusterMetrics?.electionState ?? '\u2014'}
-            tooltip="Current election state. CLOSED (17) means no election in progress and the cluster is operating normally"
+            label="Backup State"
+            value={backupStateName(counterByType(c, COUNTER_TYPE.BACKUP_STATE)?.value ?? -1)}
+            alert={(counterByType(c, COUNTER_TYPE.BACKUP_STATE)?.value ?? -1) !== 5}
+            tooltip="ClusterBackup state. BACKING_UP (5) is the normal operational state indicating active replication"
           />
-        )}
-        {!isBackup && (
           <SummaryCard
-            label="Leadership Term"
-            value={String(clusterMetrics?.leaderMemberId ?? '\u2014')}
-            tooltip="Current leadership term ID. Increments each time a new leader is elected"
+            label="Live Log Position"
+            value={(counterByType(c, COUNTER_TYPE.BACKUP_LIVE_LOG_POSITION)?.value ?? 0).toLocaleString()}
+            tooltip="Current position in the live log being replicated from the cluster leader"
           />
-        )}
-        <SummaryCard
-          label="Errors"
-          value={String(errors)}
-          alert={errors > 0}
-          tooltip="Total cluster + container errors. Non-zero indicates issues that may need investigation"
-        />
-        <SummaryCard
-          label="Snapshots"
-          value={String(snapshots)}
-          tooltip="Number of snapshots taken by the consensus module for log compaction and recovery"
-        />
-        {!isBackup && (
           <SummaryCard
-            label="Elections"
-            value={String(electionCount)}
-            tooltip="Total number of leader elections since the node started. Frequent elections may indicate instability"
+            label="Backup Errors"
+            value={String(counterByType(c, COUNTER_TYPE.BACKUP_ERRORS)?.value ?? 0)}
+            alert={(counterByType(c, COUNTER_TYPE.BACKUP_ERRORS)?.value ?? 0) > 0}
+            tooltip="ClusterBackup error count. Non-zero indicates replication issues"
           />
-        )}
-        {!isBackup && (
-          <SummaryCard
-            label="Max Cycle Time"
-            value={formatNsAsMs(maxCycleNs)}
-            tooltip="Worst-case duty cycle time of the consensus module. High values indicate processing delays or GC pauses"
-          />
-        )}
-        <SummaryCard
-          label="NAKs Received"
-          value={String(naksRecv)}
-          alert={naksRecv > 0}
-          tooltip="Negative acknowledgements received, indicating packet loss requiring retransmission"
-        />
-        <SummaryCard
-          label="Bytes Sent"
-          value={formatBytes(bytesSent)}
-          tooltip="Total bytes sent by the Aeron media driver on this node"
-        />
-        <SummaryCard
-          label="Bytes Received"
-          value={formatBytes(bytesRecv)}
-          tooltip="Total bytes received by the Aeron media driver on this node"
-        />
-        <SummaryCard
-          label="Mapped Memory"
-          value={formatBytes(bytesMapped)}
-          tooltip="Total bytes of memory-mapped files used by the Aeron media driver (log buffers, CnC, etc.)"
-        />
-        {!isBackup && (
-          <SummaryCard
-            label="Clients"
-            value={String(clusterMetrics?.connectedClientCount ?? 0)}
-            tooltip="Number of client sessions currently connected to this cluster node"
-          />
-        )}
-        {isBackup && (
           <SummaryCard
             label="Recordings"
             value={String(metrics.recordings?.length ?? 0)}
             tooltip="Number of archive recordings on the backup node"
           />
-        )}
+          <SummaryCard
+            label="Bytes Sent"
+            value={formatBytes(bytesSent)}
+            tooltip="Total bytes sent by the Aeron media driver on this node"
+          />
+          <SummaryCard
+            label="Bytes Received"
+            value={formatBytes(bytesRecv)}
+            tooltip="Total bytes received by the Aeron media driver on this node"
+          />
+          <SummaryCard
+            label="Mapped Memory"
+            value={formatBytes(bytesMapped)}
+            tooltip="Total bytes of memory-mapped files used by the Aeron media driver (log buffers, CnC, etc.)"
+          />
+        </>) : (<>
+          <SummaryCard
+            label="Commit Position"
+            value={clusterMetrics?.commitPosition?.toLocaleString() ?? '\u2014'}
+            tooltip="Position up to which the cluster log has been committed and replicated to a majority of nodes"
+          />
+          <SummaryCard
+            label="Election State"
+            value={clusterMetrics?.electionState === '17' ? 'CLOSED' : clusterMetrics?.electionState ?? '\u2014'}
+            tooltip="Current election state. CLOSED (17) means no election in progress and the cluster is operating normally"
+          />
+          <SummaryCard
+            label="Leadership Term"
+            value={String(clusterMetrics?.leaderMemberId ?? '\u2014')}
+            tooltip="Current leadership term ID. Increments each time a new leader is elected"
+          />
+          <SummaryCard
+            label="Errors"
+            value={String(errors)}
+            alert={errors > 0}
+            tooltip="Total cluster + container errors. Non-zero indicates issues that may need investigation"
+          />
+          <SummaryCard
+            label="Snapshots"
+            value={String(snapshots)}
+            tooltip="Number of snapshots taken by the consensus module for log compaction and recovery"
+          />
+          <SummaryCard
+            label="Elections"
+            value={String(electionCount)}
+            tooltip="Total number of leader elections since the node started. Frequent elections may indicate instability"
+          />
+          <SummaryCard
+            label="Max Cycle Time"
+            value={formatNsAsMs(maxCycleNs)}
+            tooltip="Worst-case duty cycle time of the consensus module. High values indicate processing delays or GC pauses"
+          />
+          <SummaryCard
+            label="NAKs Received"
+            value={String(naksRecv)}
+            alert={naksRecv > 0}
+            tooltip="Negative acknowledgements received, indicating packet loss requiring retransmission"
+          />
+          <SummaryCard
+            label="Bytes Sent"
+            value={formatBytes(bytesSent)}
+            tooltip="Total bytes sent by the Aeron media driver on this node"
+          />
+          <SummaryCard
+            label="Bytes Received"
+            value={formatBytes(bytesRecv)}
+            tooltip="Total bytes received by the Aeron media driver on this node"
+          />
+          <SummaryCard
+            label="Mapped Memory"
+            value={formatBytes(bytesMapped)}
+            tooltip="Total bytes of memory-mapped files used by the Aeron media driver (log buffers, CnC, etc.)"
+          />
+          <SummaryCard
+            label="Clients"
+            value={String(clusterMetrics?.connectedClientCount ?? 0)}
+            tooltip="Number of client sessions currently connected to this cluster node"
+          />
+        </>)}
       </div>
 
       {/* Admin Actions & Diagnostics */}
