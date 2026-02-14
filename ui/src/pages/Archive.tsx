@@ -1,14 +1,24 @@
-import { useState, useMemo } from 'react'
+import { useEffect, useState, useMemo } from 'react'
 import { useClusterStore } from '../stores/clusterStore'
-import { ArchiveRecording } from '../types'
+import { useWebSocket } from '../hooks/useWebSocket'
+import { ArchiveRecording, ClusterOverview } from '../types'
 
 interface RecordingRow extends ArchiveRecording {
   nodeId: number
 }
 
 export default function Archive() {
+  useWebSocket()
   const nodes = useClusterStore((s) => s.nodes)
+  const updateCluster = useClusterStore((s) => s.updateCluster)
   const [filterNode, setFilterNode] = useState<number | null>(null)
+
+  useEffect(() => {
+    fetch('/api/cluster')
+      .then((res) => res.json())
+      .then((data: ClusterOverview) => updateCluster(data))
+      .catch(() => {})
+  }, [updateCluster])
 
   const allRecordings = useMemo(() => {
     const rows: RecordingRow[] = []
