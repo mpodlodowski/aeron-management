@@ -56,6 +56,8 @@ export default function Archive() {
   const [actionResult, setActionResult] = useState<ActionResult | null>(null)
   const [loading, setLoading] = useState<string | null>(null)
   const [confirmAction, setConfirmAction] = useState<{ label: string; fn: () => void } | null>(null)
+  const [page, setPage] = useState(0)
+  const pageSize = 100
 
   useEffect(() => {
     fetch('/api/cluster')
@@ -80,8 +82,12 @@ export default function Archive() {
     let rows = allRecordings
     if (filterNode !== null) rows = rows.filter((r) => r.nodeId === filterNode)
     if (filterType !== null) rows = rows.filter((r) => r.type === filterType)
+    setPage(0)
     return rows
   }, [allRecordings, filterNode, filterType])
+
+  const totalPages = Math.ceil(filtered.length / pageSize)
+  const paged = filtered.slice(page * pageSize, (page + 1) * pageSize)
 
   const nodeIds = useMemo(
     () => Array.from(nodes.keys()).sort((a, b) => a - b),
@@ -226,6 +232,35 @@ export default function Archive() {
         </div>
       )}
 
+      {/* Summary + Pagination */}
+      <div className="flex items-center justify-between">
+        <span className="text-xs text-gray-400">
+          {filtered.length.toLocaleString()} recordings
+          {filtered.length !== allRecordings.length && ` (of ${allRecordings.length.toLocaleString()})`}
+        </span>
+        {totalPages > 1 && (
+          <div className="flex items-center gap-2">
+            <button
+              disabled={page === 0}
+              onClick={() => setPage(page - 1)}
+              className="rounded-md bg-gray-800 px-2 py-1 text-xs text-gray-300 hover:bg-gray-700 disabled:opacity-30"
+            >
+              Prev
+            </button>
+            <span className="text-xs text-gray-400">
+              {page + 1} / {totalPages}
+            </span>
+            <button
+              disabled={page >= totalPages - 1}
+              onClick={() => setPage(page + 1)}
+              className="rounded-md bg-gray-800 px-2 py-1 text-xs text-gray-300 hover:bg-gray-700 disabled:opacity-30"
+            >
+              Next
+            </button>
+          </div>
+        )}
+      </div>
+
       {/* Recordings Table */}
       <div className="rounded-lg border border-gray-800 bg-gray-900 overflow-auto">
         <table className="w-full text-sm">
@@ -267,14 +302,14 @@ export default function Archive() {
             </tr>
           </thead>
           <tbody className="divide-y divide-gray-800">
-            {filtered.length === 0 ? (
+            {paged.length === 0 ? (
               <tr>
                 <td colSpan={11} className="px-4 py-8 text-center text-gray-500">
                   No recordings available
                 </td>
               </tr>
             ) : (
-              filtered.map((rec) => {
+              paged.map((rec) => {
                 const isActive = rec.stopPosition === -1 || rec.stopTimestamp === 0
                 return (
                   <tr key={`${rec.nodeId}-${rec.recordingId}`} className="hover:bg-gray-800/50">
