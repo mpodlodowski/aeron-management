@@ -20,6 +20,7 @@ export default function NodeDetail() {
   const nodes = useClusterStore((s) => s.nodes)
   const updateNode = useClusterStore((s) => s.updateNode)
   const metrics = nodes.get(id)
+  const isBackup = metrics?.agentMode === 'backup'
   const [actionResult, setActionResult] = useState<ActionResult | null>(null)
   const [loading, setLoading] = useState<string | null>(null)
 
@@ -109,51 +110,63 @@ export default function NodeDetail() {
 
       <div className="flex items-center justify-between">
         <h2 className="text-2xl font-semibold">
-          Node {id}
+          {isBackup ? 'Backup' : `Node ${id}`}
           <span className="ml-3 text-sm font-normal text-gray-400">
-            {clusterMetrics?.nodeRole ?? 'UNKNOWN'}
+            {isBackup ? 'BACKUP' : (clusterMetrics?.nodeRole ?? 'UNKNOWN')}
           </span>
         </h2>
       </div>
 
       {/* Summary Cards */}
       <div className="grid grid-cols-3 md:grid-cols-4 lg:grid-cols-6 gap-3">
-        <SummaryCard
-          label="Commit Position"
-          value={clusterMetrics?.commitPosition?.toLocaleString() ?? '\u2014'}
-          tooltip="Position up to which the cluster log has been committed and replicated to a majority of nodes"
-        />
-        <SummaryCard
-          label="Election State"
-          value={clusterMetrics?.electionState === '17' ? 'CLOSED' : clusterMetrics?.electionState ?? '\u2014'}
-          tooltip="Current election state. CLOSED (17) means no election in progress and the cluster is operating normally"
-        />
-        <SummaryCard
-          label="Leadership Term"
-          value={String(clusterMetrics?.leaderMemberId ?? '\u2014')}
-          tooltip="Current leadership term ID. Increments each time a new leader is elected"
-        />
+        {!isBackup && (
+          <SummaryCard
+            label="Commit Position"
+            value={clusterMetrics?.commitPosition?.toLocaleString() ?? '\u2014'}
+            tooltip="Position up to which the cluster log has been committed and replicated to a majority of nodes"
+          />
+        )}
+        {!isBackup && (
+          <SummaryCard
+            label="Election State"
+            value={clusterMetrics?.electionState === '17' ? 'CLOSED' : clusterMetrics?.electionState ?? '\u2014'}
+            tooltip="Current election state. CLOSED (17) means no election in progress and the cluster is operating normally"
+          />
+        )}
+        {!isBackup && (
+          <SummaryCard
+            label="Leadership Term"
+            value={String(clusterMetrics?.leaderMemberId ?? '\u2014')}
+            tooltip="Current leadership term ID. Increments each time a new leader is elected"
+          />
+        )}
         <SummaryCard
           label="Errors"
           value={String(errors)}
           alert={errors > 0}
           tooltip="Total cluster + container errors. Non-zero indicates issues that may need investigation"
         />
-        <SummaryCard
-          label="Snapshots"
-          value={String(snapshots)}
-          tooltip="Number of snapshots taken by the consensus module for log compaction and recovery"
-        />
-        <SummaryCard
-          label="Elections"
-          value={String(electionCount)}
-          tooltip="Total number of leader elections since the node started. Frequent elections may indicate instability"
-        />
-        <SummaryCard
-          label="Max Cycle Time"
-          value={formatNsAsMs(maxCycleNs)}
-          tooltip="Worst-case duty cycle time of the consensus module. High values indicate processing delays or GC pauses"
-        />
+        {!isBackup && (
+          <SummaryCard
+            label="Snapshots"
+            value={String(snapshots)}
+            tooltip="Number of snapshots taken by the consensus module for log compaction and recovery"
+          />
+        )}
+        {!isBackup && (
+          <SummaryCard
+            label="Elections"
+            value={String(electionCount)}
+            tooltip="Total number of leader elections since the node started. Frequent elections may indicate instability"
+          />
+        )}
+        {!isBackup && (
+          <SummaryCard
+            label="Max Cycle Time"
+            value={formatNsAsMs(maxCycleNs)}
+            tooltip="Worst-case duty cycle time of the consensus module. High values indicate processing delays or GC pauses"
+          />
+        )}
         <SummaryCard
           label="NAKs Received"
           value={String(naksRecv)}
@@ -175,65 +188,78 @@ export default function NodeDetail() {
           value={formatBytes(bytesMapped)}
           tooltip="Total bytes of memory-mapped files used by the Aeron media driver (log buffers, CnC, etc.)"
         />
-        <SummaryCard
-          label="Clients"
-          value={String(clusterMetrics?.connectedClientCount ?? 0)}
-          tooltip="Number of client sessions currently connected to this cluster node"
-        />
-      </div>
-
-      {/* Admin Actions */}
-      <div className="rounded-lg border border-gray-800 bg-gray-900 p-5">
-        <h3 className="text-sm font-medium text-gray-400 mb-3">Admin Actions</h3>
-        <div className="flex flex-wrap gap-3">
-          {actions.map((action) => (
-            <button
-              key={action.id}
-              onClick={() => executeAction(action.id, action.endpoint)}
-              disabled={loading !== null}
-              className={`rounded-md px-4 py-2 text-sm font-medium text-white transition-colors disabled:opacity-50 disabled:cursor-not-allowed ${action.color}`}
-            >
-              {loading === action.id ? 'Processing...' : action.label}
-            </button>
-          ))}
-        </div>
-        {actionResult && (
-          <div className="mt-3 space-y-2">
-            <div
-              className={`rounded-md px-4 py-2 text-sm ${
-                actionResult.success
-                  ? 'bg-green-900/50 text-green-300 border border-green-800'
-                  : 'bg-red-900/50 text-red-300 border border-red-800'
-              }`}
-            >
-              <span className="font-medium">{actionResult.action}:</span>{' '}
-              {actionResult.message}
-            </div>
-            {actionResult.output && (
-              <pre className="rounded-md bg-black/80 border border-gray-700 px-4 py-3 text-xs font-mono text-gray-300 overflow-x-auto whitespace-pre-wrap">
-                {actionResult.output}
-              </pre>
-            )}
-          </div>
+        {!isBackup && (
+          <SummaryCard
+            label="Clients"
+            value={String(clusterMetrics?.connectedClientCount ?? 0)}
+            tooltip="Number of client sessions currently connected to this cluster node"
+          />
+        )}
+        {isBackup && (
+          <SummaryCard
+            label="Recordings"
+            value={String(metrics.recordings?.length ?? 0)}
+            tooltip="Number of archive recordings on the backup node"
+          />
         )}
       </div>
 
-      {/* Diagnostics */}
-      <div className="rounded-lg border border-gray-800 bg-gray-900 p-5">
-        <h3 className="text-sm font-medium text-gray-400 mb-3">Diagnostics</h3>
-        <div className="flex flex-wrap gap-3">
-          {diagnostics.map((diag) => (
-            <button
-              key={diag.id}
-              onClick={() => executeAction(diag.id, diag.endpoint, 'GET')}
-              disabled={loading !== null}
-              className="rounded-md px-4 py-2 text-sm font-medium text-white transition-colors disabled:opacity-50 disabled:cursor-not-allowed bg-gray-600 hover:bg-gray-500"
-            >
-              {loading === diag.id ? 'Loading...' : diag.label}
-            </button>
-          ))}
+      {/* Admin Actions */}
+      {!isBackup && (
+        <div className="rounded-lg border border-gray-800 bg-gray-900 p-5">
+          <h3 className="text-sm font-medium text-gray-400 mb-3">Admin Actions</h3>
+          <div className="flex flex-wrap gap-3">
+            {actions.map((action) => (
+              <button
+                key={action.id}
+                onClick={() => executeAction(action.id, action.endpoint)}
+                disabled={loading !== null}
+                className={`rounded-md px-4 py-2 text-sm font-medium text-white transition-colors disabled:opacity-50 disabled:cursor-not-allowed ${action.color}`}
+              >
+                {loading === action.id ? 'Processing...' : action.label}
+              </button>
+            ))}
+          </div>
+          {actionResult && (
+            <div className="mt-3 space-y-2">
+              <div
+                className={`rounded-md px-4 py-2 text-sm ${
+                  actionResult.success
+                    ? 'bg-green-900/50 text-green-300 border border-green-800'
+                    : 'bg-red-900/50 text-red-300 border border-red-800'
+                }`}
+              >
+                <span className="font-medium">{actionResult.action}:</span>{' '}
+                {actionResult.message}
+              </div>
+              {actionResult.output && (
+                <pre className="rounded-md bg-black/80 border border-gray-700 px-4 py-3 text-xs font-mono text-gray-300 overflow-x-auto whitespace-pre-wrap">
+                  {actionResult.output}
+                </pre>
+              )}
+            </div>
+          )}
         </div>
-      </div>
+      )}
+
+      {/* Diagnostics */}
+      {!isBackup && (
+        <div className="rounded-lg border border-gray-800 bg-gray-900 p-5">
+          <h3 className="text-sm font-medium text-gray-400 mb-3">Diagnostics</h3>
+          <div className="flex flex-wrap gap-3">
+            {diagnostics.map((diag) => (
+              <button
+                key={diag.id}
+                onClick={() => executeAction(diag.id, diag.endpoint, 'GET')}
+                disabled={loading !== null}
+                className="rounded-md px-4 py-2 text-sm font-medium text-white transition-colors disabled:opacity-50 disabled:cursor-not-allowed bg-gray-600 hover:bg-gray-500"
+              >
+                {loading === diag.id ? 'Loading...' : diag.label}
+              </button>
+            ))}
+          </div>
+        </div>
+      )}
 
       {/* Counters Table */}
       <div>

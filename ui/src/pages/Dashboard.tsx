@@ -22,9 +22,12 @@ export default function Dashboard() {
       .catch((err) => console.error('Failed to fetch events:', err))
   }, [updateCluster, setAlerts])
 
-  const sortedNodes = Array.from(nodes.values()).sort(
-    (a, b) => a.nodeId - b.nodeId,
-  )
+  const sortedNodes = Array.from(nodes.values()).sort((a, b) => {
+    const aIsBackup = a.agentMode === 'backup' ? 1 : 0
+    const bIsBackup = b.agentMode === 'backup' ? 1 : 0
+    if (aIsBackup !== bIsBackup) return aIsBackup - bIsBackup
+    return a.nodeId - b.nodeId
+  })
 
   return (
     <div className="space-y-6">
