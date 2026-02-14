@@ -109,23 +109,32 @@ export default function NodeDetail() {
       </Link>
 
       <div className="flex items-center justify-between">
-        <h2 className="text-2xl font-semibold">
-          {isBackup ? 'Backup' : `Node ${id}`}
-          <span className="ml-3 text-sm font-normal text-gray-400">
-            {isBackup ? 'BACKUP' : (clusterMetrics?.nodeRole ?? 'UNKNOWN')}
-          </span>
-        </h2>
+        <div className="flex items-center gap-3">
+          <h2 className="text-2xl font-semibold">
+            {isBackup ? 'Backup' : `Node ${id}`}
+          </h2>
+          {(() => {
+            const role = isBackup ? 'BACKUP' : (clusterMetrics?.nodeRole ?? 'UNKNOWN')
+            const color = isBackup ? 'bg-purple-500' :
+              role === 'LEADER' ? 'bg-green-500' :
+              role === 'FOLLOWER' ? 'bg-blue-500' :
+              role === 'CANDIDATE' ? 'bg-yellow-500' : 'bg-red-500'
+            return (
+              <span className={`inline-flex items-center rounded-full px-2.5 py-0.5 text-xs font-medium ${color} text-white`}>
+                {role}
+              </span>
+            )
+          })()}
+        </div>
       </div>
 
       {/* Summary Cards */}
-      <div className="grid grid-cols-3 md:grid-cols-4 lg:grid-cols-6 gap-3">
-        {!isBackup && (
-          <SummaryCard
-            label="Commit Position"
-            value={clusterMetrics?.commitPosition?.toLocaleString() ?? '\u2014'}
-            tooltip="Position up to which the cluster log has been committed and replicated to a majority of nodes"
-          />
-        )}
+      <div className="grid grid-cols-4 md:grid-cols-6 lg:grid-cols-12 gap-3">
+        <SummaryCard
+          label="Commit Position"
+          value={clusterMetrics?.commitPosition?.toLocaleString() ?? '\u2014'}
+          tooltip="Position up to which the cluster log has been committed and replicated to a majority of nodes"
+        />
         {!isBackup && (
           <SummaryCard
             label="Election State"
@@ -146,13 +155,11 @@ export default function NodeDetail() {
           alert={errors > 0}
           tooltip="Total cluster + container errors. Non-zero indicates issues that may need investigation"
         />
-        {!isBackup && (
-          <SummaryCard
-            label="Snapshots"
-            value={String(snapshots)}
-            tooltip="Number of snapshots taken by the consensus module for log compaction and recovery"
-          />
-        )}
+        <SummaryCard
+          label="Snapshots"
+          value={String(snapshots)}
+          tooltip="Number of snapshots taken by the consensus module for log compaction and recovery"
+        />
         {!isBackup && (
           <SummaryCard
             label="Elections"
@@ -204,60 +211,58 @@ export default function NodeDetail() {
         )}
       </div>
 
-      {/* Admin Actions */}
+      {/* Admin Actions & Diagnostics */}
       {!isBackup && (
-        <div className="rounded-lg border border-gray-800 bg-gray-900 p-5">
-          <h3 className="text-sm font-medium text-gray-400 mb-3">Admin Actions</h3>
-          <div className="flex flex-wrap gap-3">
-            {actions.map((action) => (
-              <button
-                key={action.id}
-                onClick={() => executeAction(action.id, action.endpoint)}
-                disabled={loading !== null}
-                className={`rounded-md px-4 py-2 text-sm font-medium text-white transition-colors disabled:opacity-50 disabled:cursor-not-allowed ${action.color}`}
-              >
-                {loading === action.id ? 'Processing...' : action.label}
-              </button>
-            ))}
-          </div>
-          {actionResult && (
-            <div className="mt-3 space-y-2">
-              <div
-                className={`rounded-md px-4 py-2 text-sm ${
-                  actionResult.success
-                    ? 'bg-green-900/50 text-green-300 border border-green-800'
-                    : 'bg-red-900/50 text-red-300 border border-red-800'
-                }`}
-              >
-                <span className="font-medium">{actionResult.action}:</span>{' '}
-                {actionResult.message}
-              </div>
-              {actionResult.output && (
-                <pre className="rounded-md bg-black/80 border border-gray-700 px-4 py-3 text-xs font-mono text-gray-300 overflow-x-auto whitespace-pre-wrap">
-                  {actionResult.output}
-                </pre>
-              )}
+        <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
+          <div className="rounded-lg border border-gray-800 bg-gray-900 p-5">
+            <h3 className="text-sm font-medium text-gray-400 mb-3">Admin Actions</h3>
+            <div className="flex flex-wrap gap-3">
+              {actions.map((action) => (
+                <button
+                  key={action.id}
+                  onClick={() => executeAction(action.id, action.endpoint)}
+                  disabled={loading !== null}
+                  className={`rounded-md px-4 py-2 text-sm font-medium text-white transition-colors disabled:opacity-50 disabled:cursor-not-allowed ${action.color}`}
+                >
+                  {loading === action.id ? 'Processing...' : action.label}
+                </button>
+              ))}
             </div>
-          )}
+          </div>
+          <div className="rounded-lg border border-gray-800 bg-gray-900 p-5">
+            <h3 className="text-sm font-medium text-gray-400 mb-3">Diagnostics</h3>
+            <div className="flex flex-wrap gap-3">
+              {diagnostics.map((diag) => (
+                <button
+                  key={diag.id}
+                  onClick={() => executeAction(diag.id, diag.endpoint, 'GET')}
+                  disabled={loading !== null}
+                  className="rounded-md px-4 py-2 text-sm font-medium text-white transition-colors disabled:opacity-50 disabled:cursor-not-allowed bg-gray-600 hover:bg-gray-500"
+                >
+                  {loading === diag.id ? 'Loading...' : diag.label}
+                </button>
+              ))}
+            </div>
+          </div>
         </div>
       )}
-
-      {/* Diagnostics */}
-      {!isBackup && (
-        <div className="rounded-lg border border-gray-800 bg-gray-900 p-5">
-          <h3 className="text-sm font-medium text-gray-400 mb-3">Diagnostics</h3>
-          <div className="flex flex-wrap gap-3">
-            {diagnostics.map((diag) => (
-              <button
-                key={diag.id}
-                onClick={() => executeAction(diag.id, diag.endpoint, 'GET')}
-                disabled={loading !== null}
-                className="rounded-md px-4 py-2 text-sm font-medium text-white transition-colors disabled:opacity-50 disabled:cursor-not-allowed bg-gray-600 hover:bg-gray-500"
-              >
-                {loading === diag.id ? 'Loading...' : diag.label}
-              </button>
-            ))}
+      {actionResult && (
+        <div className="space-y-2">
+          <div
+            className={`rounded-md px-4 py-2 text-sm ${
+              actionResult.success
+                ? 'bg-green-900/50 text-green-300 border border-green-800'
+                : 'bg-red-900/50 text-red-300 border border-red-800'
+            }`}
+          >
+            <span className="font-medium">{actionResult.action}:</span>{' '}
+            {actionResult.message}
           </div>
+          {actionResult.output && (
+            <pre className="rounded-md bg-black/80 border border-gray-700 px-4 py-3 text-xs font-mono text-gray-300 overflow-x-auto whitespace-pre-wrap">
+              {actionResult.output}
+            </pre>
+          )}
         </div>
       )}
 
