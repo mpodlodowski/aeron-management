@@ -1,6 +1,11 @@
 import { useState, useMemo } from 'react'
 import { AeronCounter } from '../types'
 
+/** Epoch ms range ~2001–2096 */
+function isEpochMs(v: number): boolean {
+  return v > 1_000_000_000_000 && v < 4_100_000_000_000
+}
+
 interface Props {
   counters: AeronCounter[]
 }
@@ -89,20 +94,28 @@ export default function CounterTable({ counters }: Props) {
                 </td>
               </tr>
             ) : (
-              sorted.map((counter) => (
-                <tr key={counter.counterId} className="hover:bg-gray-800/50">
-                  <td className="px-4 py-2 font-mono text-gray-400">
-                    {counter.counterId}
-                  </td>
-                  <td className="px-4 py-2 text-gray-200">{counter.label}</td>
-                  <td className="px-4 py-2 font-mono text-gray-200">
-                    {counter.value.toLocaleString()}
-                  </td>
-                  <td className="px-4 py-2 font-mono text-gray-400">
-                    {counter.typeId}
-                  </td>
-                </tr>
-              ))
+              sorted.map((counter) => {
+                const tsTooltip = isEpochMs(counter.value)
+                  ? new Date(counter.value).toLocaleString()
+                  : undefined
+                return (
+                  <tr key={counter.counterId} className="hover:bg-gray-800/50">
+                    <td className="px-4 py-2 font-mono text-gray-400">
+                      {counter.counterId}
+                    </td>
+                    <td className="px-4 py-2 text-gray-200">{counter.label}</td>
+                    <td
+                      className={`px-4 py-2 font-mono text-gray-200${tsTooltip ? ' cursor-help underline decoration-dotted decoration-gray-600' : ''}`}
+                      title={tsTooltip}
+                    >
+                      {counter.value.toLocaleString()}
+                    </td>
+                    <td className="px-4 py-2 font-mono text-gray-400">
+                      {counter.typeId}
+                    </td>
+                  </tr>
+                )
+              })
             )}
           </tbody>
         </table>
