@@ -29,8 +29,8 @@ public class AgentMain {
         scheduler.scheduleAtFixedRate(() -> {
             try {
                 grpcClient.sendMetrics(metricsCollector.collect());
-            } catch (Exception e) {
-                LOGGER.error("Metrics collection failed", e);
+            } catch (Throwable t) {
+                LOGGER.error("Metrics collection failed", t);
             }
         }, 0, config.metricsIntervalMs, TimeUnit.MILLISECONDS);
 

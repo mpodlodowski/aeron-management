@@ -51,39 +51,43 @@ public class CncReader {
      * @return list of all counters, or empty list if the CnC file does not exist or has a version mismatch
      */
     public List<AeronCounter> readCounters() {
-        List<AeronCounter> counters = new ArrayList<>();
         File cncFile = new File(aeronDir, CncFileDescriptor.CNC_FILE);
         if (!cncFile.exists()) {
-            LOGGER.warn("CnC file not found: {}", cncFile.getAbsolutePath());
-            return counters;
+            LOGGER.debug("CnC file not found: {}", cncFile.getAbsolutePath());
+            return List.of();
         }
 
-        MappedByteBuffer cncByteBuffer = IoUtil.mapExistingFile(cncFile, "cnc");
         try {
-            DirectBuffer cncMetaData = CncFileDescriptor.createMetaDataBuffer(cncByteBuffer);
+            MappedByteBuffer cncByteBuffer = IoUtil.mapExistingFile(cncFile, "cnc");
+            try {
+                DirectBuffer cncMetaData = CncFileDescriptor.createMetaDataBuffer(cncByteBuffer);
 
-            int cncVersion = cncMetaData.getInt(CncFileDescriptor.cncVersionOffset(0));
-            if (CncFileDescriptor.CNC_VERSION != cncVersion) {
-                LOGGER.warn("CnC version mismatch: expected={}, actual={}", CncFileDescriptor.CNC_VERSION, cncVersion);
+                int cncVersion = cncMetaData.getInt(CncFileDescriptor.cncVersionOffset(0));
+                if (CncFileDescriptor.CNC_VERSION != cncVersion) {
+                    LOGGER.warn("CnC version mismatch: expected={}, actual={}", CncFileDescriptor.CNC_VERSION, cncVersion);
+                    return List.of();
+                }
+
+                List<AeronCounter> counters = new ArrayList<>();
+                CountersReader countersReader = createCountersReader(cncByteBuffer, cncMetaData);
+
+                countersReader.forEach((counterId, typeId, keyBuffer, label) -> {
+                    long value = countersReader.getCounterValue(counterId);
+                    counters.add(AeronCounter.newBuilder()
+                            .setCounterId(counterId)
+                            .setTypeId(typeId)
+                            .setLabel(label)
+                            .setValue(value)
+                            .build());
+                });
                 return counters;
+            } finally {
+                IoUtil.unmap(cncByteBuffer);
             }
-
-            CountersReader countersReader = createCountersReader(cncByteBuffer, cncMetaData);
-
-            countersReader.forEach((counterId, typeId, keyBuffer, label) -> {
-                long value = countersReader.getCounterValue(counterId);
-                counters.add(AeronCounter.newBuilder()
-                        .setCounterId(counterId)
-                        .setTypeId(typeId)
-                        .setLabel(label)
-                        .setValue(value)
-                        .build());
-            });
-        } finally {
-            IoUtil.unmap(cncByteBuffer);
+        } catch (Exception e) {
+            LOGGER.debug("Failed to read CnC counters: {}", e.getMessage());
+            return List.of();
         }
-
-        return counters;
     }
 
     /**
@@ -99,42 +103,46 @@ public class CncReader {
             return builder.build();
         }
 
-        MappedByteBuffer cncByteBuffer = IoUtil.mapExistingFile(cncFile, "cnc");
         try {
-            DirectBuffer cncMetaData = CncFileDescriptor.createMetaDataBuffer(cncByteBuffer);
+            MappedByteBuffer cncByteBuffer = IoUtil.mapExistingFile(cncFile, "cnc");
+            try {
+                DirectBuffer cncMetaData = CncFileDescriptor.createMetaDataBuffer(cncByteBuffer);
 
-            int cncVersion = cncMetaData.getInt(CncFileDescriptor.cncVersionOffset(0));
-            if (CncFileDescriptor.CNC_VERSION != cncVersion) {
-                LOGGER.warn("CnC version mismatch: expected={}, actual={}", CncFileDescriptor.CNC_VERSION, cncVersion);
-                return builder.build();
-            }
-
-            CountersReader countersReader = createCountersReader(cncByteBuffer, cncMetaData);
-
-            countersReader.forEach((counterId, typeId, keyBuffer, label) -> {
-                long value = countersReader.getCounterValue(counterId);
-                switch (typeId) {
-                    case CLUSTER_NODE_ROLE_TYPE_ID:
-                        builder.setNodeRole(roleToString(value));
-                        break;
-                    case COMMIT_POSITION_TYPE_ID:
-                        builder.setCommitPosition(value);
-                        break;
-                    case ELECTION_STATE_TYPE_ID:
-                        builder.setElectionState(String.valueOf(value));
-                        break;
-                    case CLUSTER_TIMED_OUT_CLIENT_COUNT_TYPE_ID:
-                        builder.setConnectedClientCount((int) value);
-                        break;
-                    case LEADERSHIP_TERM_ID_TYPE_ID:
-                        builder.setLeaderMemberId((int) value);
-                        break;
-                    default:
-                        break;
+                int cncVersion = cncMetaData.getInt(CncFileDescriptor.cncVersionOffset(0));
+                if (CncFileDescriptor.CNC_VERSION != cncVersion) {
+                    LOGGER.warn("CnC version mismatch: expected={}, actual={}", CncFileDescriptor.CNC_VERSION, cncVersion);
+                    return builder.build();
                 }
-            });
-        } finally {
-            IoUtil.unmap(cncByteBuffer);
+
+                CountersReader countersReader = createCountersReader(cncByteBuffer, cncMetaData);
+
+                countersReader.forEach((counterId, typeId, keyBuffer, label) -> {
+                    long value = countersReader.getCounterValue(counterId);
+                    switch (typeId) {
+                        case CLUSTER_NODE_ROLE_TYPE_ID:
+                            builder.setNodeRole(roleToString(value));
+                            break;
+                        case COMMIT_POSITION_TYPE_ID:
+                            builder.setCommitPosition(value);
+                            break;
+                        case ELECTION_STATE_TYPE_ID:
+                            builder.setElectionState(String.valueOf(value));
+                            break;
+                        case CLUSTER_TIMED_OUT_CLIENT_COUNT_TYPE_ID:
+                            builder.setConnectedClientCount((int) value);
+                            break;
+                        case LEADERSHIP_TERM_ID_TYPE_ID:
+                            builder.setLeaderMemberId((int) value);
+                            break;
+                        default:
+                            break;
+                    }
+                });
+            } finally {
+                IoUtil.unmap(cncByteBuffer);
+            }
+        } catch (Exception e) {
+            LOGGER.debug("Failed to read CnC cluster metrics: {}", e.getMessage());
         }
 
         return builder.build();
