@@ -52,6 +52,7 @@ services:
     image: aeron-cluster-demo:local
     pull_policy: always
     shm_size: '1gb'
+    ipc: shareable
     environment:
       MODE: BACKUP
       CLUSTER_ADDRESSES: node0,node1,node2
@@ -153,6 +154,27 @@ services:
       AGENT_MODE: cluster
     depends_on:
       - node2
+      - management-server
+    restart: always
+    networks:
+      - net
+
+  agent-backup:
+    build:
+      context: ..
+      dockerfile: docker/Dockerfile.agent
+    ipc: service:backup
+    volumes:
+      - node-backup:/home/aeron/aeron-cluster
+    environment:
+      MANAGEMENT_SERVER_HOST: management-server
+      MANAGEMENT_SERVER_PORT: "8081"
+      AERON_DIR: /dev/shm/aeron-aeron
+      CLUSTER_DIR: /home/aeron/aeron-cluster/cluster
+      AGENT_NODE_ID: "99"
+      AGENT_MODE: backup
+    depends_on:
+      - backup
       - management-server
     restart: always
     networks:
