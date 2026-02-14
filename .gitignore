@@ -1,0 +1,25 @@
+# Gradle
+.gradle/
+build/
+!gradle/wrapper/gradle-wrapper.jar
+
+# IDE
+.idea/
+*.iml
+.vscode/
+.project
+.classpath
+.settings/
+
+# Node
+ui/node_modules/
+ui/dist/
+
+# Generated
+common/src/generated/
+
+# OS
+.DS_Store
+
+# Plans
+docs/

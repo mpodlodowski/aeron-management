@@ -1,0 +1,6 @@
+rootProject.name = 'aeron-management'
+
+include 'common'
+include 'agent'
+include 'server'
+include 'ui'

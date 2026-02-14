@@ -1,0 +1,34 @@
+plugins {
+    id 'application'
+    id 'com.github.johnrengelman.shadow' version '8.1.1'
+}
+
+application {
+    mainClass = 'it.podlodowski.aeronmgmt.agent.AgentMain'
+}
+
+dependencies {
+    implementation project(':common')
+    implementation 'io.aeron:aeron-all:1.44.1'
+    implementation 'org.agrona:agrona:1.20.0'
+    implementation 'io.javalin:javalin:6.1.3'
+    implementation 'io.grpc:grpc-netty-shaded:1.62.2'
+    implementation 'ch.qos.logback:logback-classic:1.4.14'
+    implementation 'org.slf4j:slf4j-api:2.0.9'
+}
+
+shadowJar {
+    archiveClassifier.set('')
+    mergeServiceFiles()
+}
+
+// Disable the standard jar to avoid conflicts with shadowJar (both produce the same artifact name)
+jar {
+    enabled = false
+}
+
+// Wire up task dependencies so distribution tasks use the shadow jar
+tasks.distZip.dependsOn tasks.shadowJar
+tasks.distTar.dependsOn tasks.shadowJar
+tasks.startScripts.dependsOn tasks.shadowJar
+tasks.startShadowScripts.dependsOn tasks.jar

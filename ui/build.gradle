@@ -1,0 +1,19 @@
+plugins {
+    id 'com.github.node-gradle.node' version '7.0.2'
+}
+
+node {
+    version = '20.11.1'
+    download = true
+}
+
+task buildUi(type: com.github.gradle.node.npm.task.NpmTask) {
+    dependsOn npmInstall
+    args = ['run', 'build']
+}
+
+task copyUi(type: Copy) {
+    dependsOn buildUi
+    from 'dist'
+    into "${project(':server').buildDir}/resources/main/static"
+}
