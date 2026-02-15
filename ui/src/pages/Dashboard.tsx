@@ -4,7 +4,7 @@ import { useWebSocket } from '../hooks/useWebSocket'
 import NodeCard from '../components/NodeCard'
 import EventLog from '../components/EventLog'
 import { Alert, ClusterOverview } from '../types'
-import { formatUptime, formatNsAsMs } from '../utils/counters'
+import { formatNsAsMs } from '../utils/counters'
 
 interface ActionResult {
   action: string
@@ -39,7 +39,6 @@ export default function Dashboard() {
   })
 
   const cs = clusterStats
-  const uptime = cs?.clusterStartMs ? Date.now() - cs.clusterStartMs : null
 
   async function clusterAction(label: string, endpoint: string) {
     setLoading(label)
@@ -100,8 +99,8 @@ export default function Dashboard() {
             )}
           </div>
           <div className="grid grid-cols-2 md:grid-cols-4 lg:grid-cols-6 gap-3">
-            {uptime !== null && (
-              <StatCard label="Uptime" value={formatUptime(uptime)} tooltip="Time since the earliest log recording was created (cluster creation)" />
+            {cs.clusterStartMs != null && cs.clusterStartMs > 0 && (
+              <StatCard label="Start Time" value={new Date(cs.clusterStartMs).toLocaleString()} tooltip="Time when the earliest log recording was created (cluster creation)" />
             )}
             <StatCard
               label="Clients"
