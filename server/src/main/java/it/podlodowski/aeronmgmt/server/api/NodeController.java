@@ -73,6 +73,11 @@ public class NodeController {
         return commandRouter.sendCommand(id, "INVALIDATE_SNAPSHOT");
     }
 
+    @PostMapping("/{id}/seed-recording-log")
+    public Map<String, Object> seedRecordingLog(@PathVariable int id) {
+        return commandRouter.sendCommand(id, "SEED_RECORDING_LOG");
+    }
+
     /** Backwards-compatible alias for {@link #shutdownNode(int)}. */
     @PostMapping("/{id}/step-down")
     public Map<String, Object> stepDown(@PathVariable int id) {

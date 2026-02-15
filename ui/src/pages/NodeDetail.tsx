@@ -118,6 +118,7 @@ export default function NodeDetail() {
 
   const actions = [
     { id: 'INVALIDATE_SNAPSHOT', label: 'Invalidate Snapshot', endpoint: 'invalidate-snapshot', color: 'bg-orange-600 hover:bg-orange-500', tooltip: 'Mark the latest snapshot as invalid so the node recovers from the log on next restart' },
+    { id: 'SEED_RECORDING_LOG', label: 'Seed Recording Log', endpoint: 'seed-recording-log', color: 'bg-orange-600 hover:bg-orange-500', tooltip: 'Rebuild recording log from the latest valid snapshot. Use when the node fails to start due to missing recordings.' },
   ]
 
   const diagnostics = [

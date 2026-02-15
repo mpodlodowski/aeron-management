@@ -14,13 +14,13 @@ export const COUNTER_TYPE = {
 } as const
 
 const BACKUP_STATE_NAMES: Record<number, string> = {
-  0: 'INIT',
-  1: 'BACKUP_QUERY',
-  2: 'SNAPSHOT_RETRIEVE',
-  3: 'LIVE_LOG_REPLAY',
-  4: 'UPDATE_RECORDING_LOG',
-  5: 'BACKING_UP',
-  6: 'RESET_BACKUP',
+  0: 'init',
+  1: 'backup query',
+  2: 'snapshot retrieve',
+  3: 'live log replay',
+  4: 'update recording log',
+  5: 'backing up',
+  6: 'reset backup',
 }
 
 export function backupStateName(value: number): string {

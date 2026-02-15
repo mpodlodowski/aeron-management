@@ -4,11 +4,12 @@ services:
   # === Aeron Cluster Nodes (3-node Raft consensus) ===
   node0:
     image: aeron-cluster-demo:local
-    pull_policy: always
+    pull_policy: never
     environment:
       NODE_ID: 0
       CLUSTER_ADDRESSES: node0,node1,node2
       DEBUG: false
+      AERON_CLUSTER_PURGELOGSCHEDULE: "*/10 * * * * *"
     restart: always
     volumes:
       - node-data-0:/home/aeron/aeron-cluster
@@ -18,11 +19,12 @@ services:
 
   node1:
     image: aeron-cluster-demo:local
-    pull_policy: always
+    pull_policy: never
     environment:
       NODE_ID: 1
       CLUSTER_ADDRESSES: node0,node1,node2
       DEBUG: false
+      AERON_CLUSTER_PURGELOGSCHEDULE: "*/10 * * * * *"
     restart: always
     volumes:
       - node-data-1:/home/aeron/aeron-cluster
@@ -32,11 +34,12 @@ services:
 
   node2:
     image: aeron-cluster-demo:local
-    pull_policy: always
+    pull_policy: never
     environment:
       NODE_ID: 2
       CLUSTER_ADDRESSES: node0,node1,node2
       DEBUG: false
+      AERON_CLUSTER_PURGELOGSCHEDULE: "*/10 * * * * *"
     restart: always
     volumes:
       - node-data-2:/home/aeron/aeron-cluster
@@ -47,7 +50,7 @@ services:
   # === Aeron Backup ===
   backup:
     image: aeron-cluster-demo:local
-    pull_policy: always
+    pull_policy: never
     environment:
       MODE: BACKUP
       CLUSTER_ADDRESSES: node0,node1,node2
@@ -64,7 +67,7 @@ services:
   # === Aeron Snapshot ===
   snapshot:
     image: aeron-cluster-demo:local
-    pull_policy: always
+    pull_policy: never
     shm_size: '1gb'
     environment:
       CLUSTER_ADDRESSES: node0,node1,node2

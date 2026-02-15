@@ -56,6 +56,16 @@ export default function NodeCard({ metrics, isLeader }: Props) {
               {statusLabel}
             </span>
           )}
+          {!statusLabel && isBackup && (
+            <span className="ml-2 text-xs font-normal text-purple-400">
+              {backupStateName(counterByType(c, COUNTER_TYPE.BACKUP_STATE)?.value ?? -1)}
+            </span>
+          )}
+          {!statusLabel && !isBackup && clusterMetrics?.electionState && clusterMetrics.electionState !== '17' && (
+            <span className="ml-2 text-xs font-normal text-yellow-400">
+              electing
+            </span>
+          )}
         </span>
         <span className={`inline-flex items-center gap-1.5 rounded-full px-2.5 py-0.5 text-xs font-medium ${statusColor} text-white`}>
           {agentDown ? 'OFFLINE' : noCnc ? 'DETACHED' : nodeDown ? 'DOWN' : isLeader ? 'LEADER' : role}
@@ -64,12 +74,8 @@ export default function NodeCard({ metrics, isLeader }: Props) {
       <div className="space-y-2 text-sm text-gray-400">
         {isBackup ? (<>
           <div className="flex justify-between">
-            <span>State / Pos</span>
-            <span className="text-gray-200 text-xs">
-              {backupStateName(counterByType(c, COUNTER_TYPE.BACKUP_STATE)?.value ?? -1)}
-              {' '}
-              <span className="font-mono">{(counterByType(c, COUNTER_TYPE.BACKUP_LIVE_LOG_POSITION)?.value ?? 0).toLocaleString()}</span>
-            </span>
+            <span>Live Log Position</span>
+            <span className="text-gray-200 font-mono">{(counterByType(c, COUNTER_TYPE.BACKUP_LIVE_LOG_POSITION)?.value ?? 0).toLocaleString()}</span>
           </div>
           <div className="flex justify-between">
             <span>Recordings</span>

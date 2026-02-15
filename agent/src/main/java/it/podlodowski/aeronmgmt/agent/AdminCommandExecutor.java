@@ -86,6 +86,9 @@ public class AdminCommandExecutor {
                 return ClusterTool.abort(clusterDir, out);
             case "INVALIDATE_SNAPSHOT":
                 return ClusterTool.invalidateLatestSnapshot(out, clusterDir);
+            case "SEED_RECORDING_LOG":
+                ClusterTool.seedRecordingLogFromSnapshot(clusterDir);
+                return true;
 
             // --- Read-only diagnostics: (PrintStream, File) → void ---
             case "DESCRIBE":
@@ -173,8 +176,6 @@ public class AdminCommandExecutor {
         sb.append(",\"currentTimeNs\":").append(membership.currentTimeNs);
         sb.append(",\"activeMembers\":[");
         appendMembers(sb, membership.activeMembers);
-        sb.append("],\"passiveMembers\":[");
-        appendMembers(sb, membership.passiveMembers);
         sb.append("]}");
         return sb.toString();
     }
