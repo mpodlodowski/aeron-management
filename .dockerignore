@@ -1,10 +1,13 @@
+.git/
+.github/
+.gradle/
+.idea/
+.actrc
+*.iml
+.DS_Store
 **/build/
-!server/build/libs/
-!agent/build/libs/
-**/.gradle/
 **/node_modules/
 ui/dist/
-.git/
-
-# Plans
+common/src/generated/
+examples/
 docs/

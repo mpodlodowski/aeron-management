@@ -18,8 +18,8 @@ ui/dist/
 # Generated
 common/src/generated/
 
+# Plans
+docs/plans/
+
 # OS
 .DS_Store
-
-# Plans
-docs/
