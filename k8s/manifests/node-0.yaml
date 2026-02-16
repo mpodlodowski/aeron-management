@@ -1,0 +1,50 @@
+apiVersion: v1
+kind: Pod
+metadata:
+  name: node-0
+  namespace: aeron-demo
+  labels:
+    app: aeron-cluster
+    node-id: "0"
+spec:
+  hostname: node-0
+  subdomain: aeron-cluster
+  restartPolicy: Always
+  containers:
+    - name: cluster-node
+      image: aeron-cluster-demo:local
+      imagePullPolicy: Never
+      env:
+        - name: NODE_ID
+          value: "0"
+        - name: CLUSTER_ADDRESSES
+          value: "node-0.aeron-cluster,node-1.aeron-cluster,node-2.aeron-cluster"
+      volumeMounts:
+        - name: shm
+          mountPath: /dev/shm
+        - name: data
+          mountPath: /home/aeron/aeron-cluster
+    - name: agent
+      image: aeron-management-agent:local
+      imagePullPolicy: Never
+      env:
+        - name: MANAGEMENT_SERVER_HOST
+          value: "management-server.aeron-demo.svc.cluster.local"
+        - name: MANAGEMENT_SERVER_PORT
+          value: "8081"
+        - name: CLUSTER_DIR
+          value: "/home/aeron/aeron-cluster/aeron-cluster-0/cluster"
+        - name: AGENT_ID
+          value: "agent-0"
+      volumeMounts:
+        - name: shm
+          mountPath: /dev/shm
+        - name: data
+          mountPath: /home/aeron/aeron-cluster
+  volumes:
+    - name: shm
+      emptyDir:
+        medium: Memory
+        sizeLimit: 1Gi
+    - name: data
+      emptyDir: {}

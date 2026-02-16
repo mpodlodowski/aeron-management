@@ -1,0 +1,45 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: management-server
+  namespace: aeron-demo
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: management-server
+  template:
+    metadata:
+      labels:
+        app: management-server
+    spec:
+      containers:
+        - name: server
+          image: aeron-management-server:local
+          imagePullPolicy: Never
+          ports:
+            - containerPort: 8080
+              name: http
+            - containerPort: 8081
+              name: grpc
+          env:
+            - name: GRPC_SERVER_PORT
+              value: "8081"
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: management-server
+  namespace: aeron-demo
+spec:
+  type: NodePort
+  selector:
+    app: management-server
+  ports:
+    - port: 8080
+      targetPort: 8080
+      nodePort: 30080
+      name: http
+    - port: 8081
+      targetPort: 8081
+      name: grpc
