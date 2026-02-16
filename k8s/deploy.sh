@@ -40,8 +40,9 @@ kind load docker-image aeron-cluster-demo:local --name "$CLUSTER_NAME"
 kind load docker-image aeron-management-agent:local --name "$CLUSTER_NAME"
 kind load docker-image aeron-management-server:local --name "$CLUSTER_NAME"
 
-# Apply manifests
+# Apply manifests (namespace first, then everything else)
 echo "--- Deploying to Kubernetes ---"
+kubectl apply -f "$SCRIPT_DIR/manifests/namespace.yaml"
 kubectl apply -f "$SCRIPT_DIR/manifests/"
 
 # Wait for pods
