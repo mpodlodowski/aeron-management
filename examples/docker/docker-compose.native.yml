@@ -3,12 +3,11 @@ name: 'aeron-cluster-managed'
 services:
   # === Aeron Cluster Nodes (3-node Raft consensus) ===
   node0:
-    image: aeron-cluster-demo:local
-    pull_policy: always
+    build:
+      context: ../k8s/cluster-image
     environment:
       NODE_ID: 0
       CLUSTER_ADDRESSES: node0,node1,node2
-      DEBUG: false
     restart: always
     volumes:
       - node-data-0:/home/aeron/aeron-cluster
@@ -17,12 +16,11 @@ services:
       - net
 
   node1:
-    image: aeron-cluster-demo:local
-    pull_policy: always
+    build:
+      context: ../k8s/cluster-image
     environment:
       NODE_ID: 1
       CLUSTER_ADDRESSES: node0,node1,node2
-      DEBUG: false
     restart: always
     volumes:
       - node-data-1:/home/aeron/aeron-cluster
@@ -31,12 +29,11 @@ services:
       - net
 
   node2:
-    image: aeron-cluster-demo:local
-    pull_policy: always
+    build:
+      context: ../k8s/cluster-image
     environment:
       NODE_ID: 2
       CLUSTER_ADDRESSES: node0,node1,node2
-      DEBUG: false
     restart: always
     volumes:
       - node-data-2:/home/aeron/aeron-cluster
@@ -44,16 +41,14 @@ services:
     networks:
       - net
 
-  # === Aeron Backup ===
+  # === Aeron Backup Node ===
   backup:
-    image: aeron-cluster-demo:local
-    pull_policy: always
+    build:
+      context: ../k8s/cluster-image
+    hostname: backup
+    command: ["BackupNode"]
     environment:
-      MODE: BACKUP
       CLUSTER_ADDRESSES: node0,node1,node2
-      POD_IP: backup
-      CLUSTER_BACKUP_INTERVAL_NS: 60000000000
-      DEBUG: false
     restart: always
     volumes:
       - node-backup:/home/aeron/aeron-cluster
@@ -61,27 +56,11 @@ services:
     networks:
       - net
 
-  # === Aeron Snapshot ===
-  snapshot:
-    image: aeron-cluster-demo:local
-    pull_policy: always
-    shm_size: '1gb'
-    environment:
-      CLUSTER_ADDRESSES: node0,node1,node2
-      POD_IP: snapshot
-      MESSAGE_TIMEOUT_NS: 5000000000
-      MODE: SNAPSHOT
-      NODE_ID: 4
-      SNAPSHOT_PERIOD: 5s
-    restart: always
-    networks:
-      - net
-
   # === Management Server (UI + gRPC aggregator) ===
   management-server:
     build:
-      context: ..
-      dockerfile: docker/Dockerfile.server
+      context: ../..
+      dockerfile: examples/docker/Dockerfile.server
     ports:
       - "8080:8080"
       - "8081:8081"
@@ -91,11 +70,11 @@ services:
     networks:
       - net
 
-  # === Native Management Agents (GraalVM native image, ~104 MB per container) ===
+  # === Native Management Agents (GraalVM native image) ===
   agent-0:
     build:
-      context: ..
-      dockerfile: docker/Dockerfile.agent-native
+      context: ../..
+      dockerfile: examples/docker/Dockerfile.agent-native
     volumes:
       - node-data-0:/home/aeron/aeron-cluster
       - shm-node0:/dev/shm
@@ -112,8 +91,8 @@ services:
 
   agent-1:
     build:
-      context: ..
-      dockerfile: docker/Dockerfile.agent-native
+      context: ../..
+      dockerfile: examples/docker/Dockerfile.agent-native
     volumes:
       - node-data-1:/home/aeron/aeron-cluster
       - shm-node1:/dev/shm
@@ -130,8 +109,8 @@ services:
 
   agent-2:
     build:
-      context: ..
-      dockerfile: docker/Dockerfile.agent-native
+      context: ../..
+      dockerfile: examples/docker/Dockerfile.agent-native
     volumes:
       - node-data-2:/home/aeron/aeron-cluster
       - shm-node2:/dev/shm
@@ -148,8 +127,8 @@ services:
 
   agent-backup:
     build:
-      context: ..
-      dockerfile: docker/Dockerfile.agent-native
+      context: ../..
+      dockerfile: examples/docker/Dockerfile.agent-native
     volumes:
       - node-backup:/home/aeron/aeron-cluster
       - shm-backup:/dev/shm

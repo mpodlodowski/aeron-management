@@ -1,0 +1,63 @@
+services:
+  management-server:
+    build:
+      context: ../..
+      dockerfile: examples/docker/Dockerfile.server
+    ports:
+      - "8080:8080"
+      - "8081:8081"
+    environment:
+      GRPC_SERVER_PORT: "8081"
+
+  agent-0:
+    build:
+      context: ../..
+      dockerfile: examples/docker/Dockerfile.agent
+    volumes:
+      - node-data-0:/home/aeron/aeron-cluster
+      - shm-node0:/dev/shm
+    environment:
+      MANAGEMENT_SERVER_HOST: management-server
+      MANAGEMENT_SERVER_PORT: "8081"
+      CLUSTER_DIR: /home/aeron/aeron-cluster/aeron-cluster-0/cluster
+      AGENT_ID: agent-0
+
+  agent-1:
+    build:
+      context: ../..
+      dockerfile: examples/docker/Dockerfile.agent
+    volumes:
+      - node-data-1:/home/aeron/aeron-cluster
+      - shm-node1:/dev/shm
+    environment:
+      MANAGEMENT_SERVER_HOST: management-server
+      MANAGEMENT_SERVER_PORT: "8081"
+      CLUSTER_DIR: /home/aeron/aeron-cluster/aeron-cluster-1/cluster
+      AGENT_ID: agent-1
+
+  agent-2:
+    build:
+      context: ../..
+      dockerfile: examples/docker/Dockerfile.agent
+    volumes:
+      - node-data-2:/home/aeron/aeron-cluster
+      - shm-node2:/dev/shm
+    environment:
+      MANAGEMENT_SERVER_HOST: management-server
+      MANAGEMENT_SERVER_PORT: "8081"
+      CLUSTER_DIR: /home/aeron/aeron-cluster/aeron-cluster-2/cluster
+      AGENT_ID: agent-2
+
+volumes:
+  node-data-0:
+    external: true
+  node-data-1:
+    external: true
+  node-data-2:
+    external: true
+  shm-node0:
+    external: true
+  shm-node1:
+    external: true
+  shm-node2:
+    external: true

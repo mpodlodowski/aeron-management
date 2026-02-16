@@ -1,7 +1,0 @@
-FROM eclipse-temurin:17-jre-jammy
-
-COPY server/build/libs/server-*.jar /app/server.jar
-
-EXPOSE 8080 8081
-
-ENTRYPOINT ["java", "-jar", "/app/server.jar"]

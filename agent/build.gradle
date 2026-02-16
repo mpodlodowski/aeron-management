@@ -29,6 +29,8 @@ graalvmNative {
                 '--no-fallback',
                 '--enable-url-protocols=http',
                 '-H:+ReportExceptionStackTraces',
+                '--initialize-at-build-time=org.agrona.UnsafeApi,org.agrona.BufferUtil',
+                '-J--add-opens=java.base/jdk.internal.misc=ALL-UNNAMED',
             )
         }
     }

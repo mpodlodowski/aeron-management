@@ -2,7 +2,7 @@
 set -euo pipefail
 
 SCRIPT_DIR="$(cd "$(dirname "$0")" && pwd)"
-PROJECT_DIR="$(cd "$SCRIPT_DIR/.." && pwd)"
+PROJECT_DIR="$(cd "$SCRIPT_DIR/../.." && pwd)"
 CLUSTER_NAME="aeron-demo"
 
 echo "=== Aeron Management Center — Kubernetes Demo ==="
@@ -16,15 +16,11 @@ for cmd in kind kubectl docker; do
     fi
 done
 
-# Build management JARs
-echo "--- Building management JARs ---"
-"$PROJECT_DIR/gradlew" -p "$PROJECT_DIR" :agent:shadowJar :server:bootJar --quiet
-
-# Build Docker images
+# Build Docker images (multi-stage builds handle Gradle internally)
 echo "--- Building Docker images ---"
 docker build -t aeron-cluster-demo:local "$SCRIPT_DIR/cluster-image/"
-docker build -t aeron-management-agent:local -f "$PROJECT_DIR/docker/Dockerfile.agent" "$PROJECT_DIR"
-docker build -t aeron-management-server:local -f "$PROJECT_DIR/docker/Dockerfile.server" "$PROJECT_DIR"
+docker build -t aeron-management-agent:local -f "$PROJECT_DIR/examples/docker/Dockerfile.agent" "$PROJECT_DIR"
+docker build -t aeron-management-server:local -f "$PROJECT_DIR/examples/docker/Dockerfile.server" "$PROJECT_DIR"
 
 # Create kind cluster (delete if exists)
 if kind get clusters 2>/dev/null | grep -q "^${CLUSTER_NAME}$"; then

@@ -6,7 +6,30 @@
     "allDeclaredConstructors": true
   },
   {
+    "name": "jdk.internal.misc.Unsafe",
+    "methods": [
+      { "name": "arrayBaseOffset", "parameterTypes": ["java.lang.Class"] },
+      { "name": "arrayIndexScale", "parameterTypes": ["java.lang.Class"] },
+      { "name": "objectFieldOffset", "parameterTypes": ["java.lang.reflect.Field"] },
+      { "name": "objectFieldOffset", "parameterTypes": ["java.lang.Class", "java.lang.String"] },
+      { "name": "getUnsafe", "parameterTypes": [] }
+    ]
+  },
+  {
     "name": "sun.nio.ch.SelectorImpl",
     "allDeclaredFields": true
+  },
+  {
+    "name": "java.nio.ByteBuffer",
+    "allDeclaredFields": true
+  },
+  {
+    "name": "java.nio.Buffer",
+    "allDeclaredFields": true
+  },
+  {
+    "name": "java.nio.DirectByteBuffer",
+    "allDeclaredFields": true,
+    "allDeclaredConstructors": true
   }
 ]

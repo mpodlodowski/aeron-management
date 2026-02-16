@@ -25,8 +25,7 @@ Each agent is a lightweight sidecar sharing IPC with its Aeron node. It reads Cn
 ## Quick Start
 
 ```bash
-./gradlew build
-docker compose -f docker/docker-compose.full-system.yml up --build
+docker compose -f examples/docker/docker-compose.full-system.yml up --build
 ```
 
 Open **http://localhost:8080**.

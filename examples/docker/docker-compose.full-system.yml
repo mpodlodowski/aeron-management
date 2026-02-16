@@ -1,14 +1,13 @@
-name: 'aeron-cluster-big'
+name: 'aeron-cluster-managed'
 
 services:
-  # === Aeron Cluster Nodes (5-node Raft consensus) ===
+  # === Aeron Cluster Nodes (3-node Raft consensus) ===
   node0:
-    image: aeron-cluster-demo:local
-    pull_policy: always
+    build:
+      context: ../k8s/cluster-image
     environment:
       NODE_ID: 0
-      CLUSTER_ADDRESSES: node0,node1,node2,node3,node4
-      DEBUG: false
+      CLUSTER_ADDRESSES: node0,node1,node2
     restart: always
     volumes:
       - node-data-0:/home/aeron/aeron-cluster
@@ -17,12 +16,11 @@ services:
       - net
 
   node1:
-    image: aeron-cluster-demo:local
-    pull_policy: always
+    build:
+      context: ../k8s/cluster-image
     environment:
       NODE_ID: 1
-      CLUSTER_ADDRESSES: node0,node1,node2,node3,node4
-      DEBUG: false
+      CLUSTER_ADDRESSES: node0,node1,node2
     restart: always
     volumes:
       - node-data-1:/home/aeron/aeron-cluster
@@ -31,12 +29,11 @@ services:
       - net
 
   node2:
-    image: aeron-cluster-demo:local
-    pull_policy: always
+    build:
+      context: ../k8s/cluster-image
     environment:
       NODE_ID: 2
-      CLUSTER_ADDRESSES: node0,node1,node2,node3,node4
-      DEBUG: false
+      CLUSTER_ADDRESSES: node0,node1,node2
     restart: always
     volumes:
       - node-data-2:/home/aeron/aeron-cluster
@@ -44,44 +41,14 @@ services:
     networks:
       - net
 
-  node3:
-    image: aeron-cluster-demo:local
-    pull_policy: always
-    environment:
-      NODE_ID: 3
-      CLUSTER_ADDRESSES: node0,node1,node2,node3,node4
-      DEBUG: false
-    restart: always
-    volumes:
-      - node-data-3:/home/aeron/aeron-cluster
-      - shm-node3:/dev/shm
-    networks:
-      - net
-
-  node4:
-    image: aeron-cluster-demo:local
-    pull_policy: always
-    environment:
-      NODE_ID: 4
-      CLUSTER_ADDRESSES: node0,node1,node2,node3,node4
-      DEBUG: false
-    restart: always
-    volumes:
-      - node-data-4:/home/aeron/aeron-cluster
-      - shm-node4:/dev/shm
-    networks:
-      - net
-
-  # === Aeron Backup ===
+  # === Aeron Backup Node ===
   backup:
-    image: aeron-cluster-demo:local
-    pull_policy: always
+    build:
+      context: ../k8s/cluster-image
+    hostname: backup
+    command: ["BackupNode"]
     environment:
-      MODE: BACKUP
-      CLUSTER_ADDRESSES: node0,node1,node2,node3,node4
-      POD_IP: backup
-      CLUSTER_BACKUP_INTERVAL_NS: 60000000000
-      DEBUG: false
+      CLUSTER_ADDRESSES: node0,node1,node2
     restart: always
     volumes:
       - node-backup:/home/aeron/aeron-cluster
@@ -92,8 +59,8 @@ services:
   # === Management Server (UI + gRPC aggregator) ===
   management-server:
     build:
-      context: ..
-      dockerfile: docker/Dockerfile.server
+      context: ../..
+      dockerfile: examples/docker/Dockerfile.server
     ports:
       - "8080:8080"
       - "8081:8081"
@@ -103,11 +70,13 @@ services:
     networks:
       - net
 
-  # === Management Agents ===
+  # === Management Agents (sidecar per cluster node, shares /dev/shm for CnC access) ===
+  # Agents auto-discover nodeId, aeronDir, and mode from the cluster-mark.dat file.
+  # /dev/shm is shared via tmpfs volumes so agents can read CnC without IPC namespace coupling.
   agent-0:
     build:
-      context: ..
-      dockerfile: docker/Dockerfile.agent
+      context: ../..
+      dockerfile: examples/docker/Dockerfile.agent
     volumes:
       - node-data-0:/home/aeron/aeron-cluster
       - shm-node0:/dev/shm
@@ -124,8 +93,8 @@ services:
 
   agent-1:
     build:
-      context: ..
-      dockerfile: docker/Dockerfile.agent
+      context: ../..
+      dockerfile: examples/docker/Dockerfile.agent
     volumes:
       - node-data-1:/home/aeron/aeron-cluster
       - shm-node1:/dev/shm
@@ -142,8 +111,8 @@ services:
 
   agent-2:
     build:
-      context: ..
-      dockerfile: docker/Dockerfile.agent
+      context: ../..
+      dockerfile: examples/docker/Dockerfile.agent
     volumes:
       - node-data-2:/home/aeron/aeron-cluster
       - shm-node2:/dev/shm
@@ -158,46 +127,10 @@ services:
     networks:
       - net
 
-  agent-3:
-    build:
-      context: ..
-      dockerfile: docker/Dockerfile.agent
-    volumes:
-      - node-data-3:/home/aeron/aeron-cluster
-      - shm-node3:/dev/shm
-    environment:
-      MANAGEMENT_SERVER_HOST: management-server
-      MANAGEMENT_SERVER_PORT: "8081"
-      CLUSTER_DIR: /home/aeron/aeron-cluster/aeron-cluster-3/cluster
-      AGENT_ID: agent-3
-    depends_on:
-      - management-server
-    restart: always
-    networks:
-      - net
-
-  agent-4:
-    build:
-      context: ..
-      dockerfile: docker/Dockerfile.agent
-    volumes:
-      - node-data-4:/home/aeron/aeron-cluster
-      - shm-node4:/dev/shm
-    environment:
-      MANAGEMENT_SERVER_HOST: management-server
-      MANAGEMENT_SERVER_PORT: "8081"
-      CLUSTER_DIR: /home/aeron/aeron-cluster/aeron-cluster-4/cluster
-      AGENT_ID: agent-4
-    depends_on:
-      - management-server
-    restart: always
-    networks:
-      - net
-
   agent-backup:
     build:
-      context: ..
-      dockerfile: docker/Dockerfile.agent
+      context: ../..
+      dockerfile: examples/docker/Dockerfile.agent
     volumes:
       - node-backup:/home/aeron/aeron-cluster
       - shm-backup:/dev/shm
@@ -219,9 +152,8 @@ volumes:
   node-data-0:
   node-data-1:
   node-data-2:
-  node-data-3:
-  node-data-4:
   node-backup:
+  # tmpfs volumes shared between nodes and agents for CnC file access
   shm-node0:
     driver: local
     driver_opts:
@@ -235,18 +167,6 @@ volumes:
       device: tmpfs
       o: size=1g
   shm-node2:
-    driver: local
-    driver_opts:
-      type: tmpfs
-      device: tmpfs
-      o: size=1g
-  shm-node3:
-    driver: local
-    driver_opts:
-      type: tmpfs
-      device: tmpfs
-      o: size=1g
-  shm-node4:
     driver: local
     driver_opts:
       type: tmpfs
