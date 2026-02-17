@@ -1,30 +1,22 @@
 name: Release
 run-name: >-
   Release${{
-    inputs.agent != 'none' && format(' · agent ({0})', inputs.agent) || ''
+    inputs.agent_version != '' && format(' · agent v{0}', inputs.agent_version) || ''
   }}${{
-    inputs.server != 'none' && format(' · server ({0})', inputs.server) || ''
+    inputs.server_version != '' && format(' · server v{0}', inputs.server_version) || ''
   }}
 
 on:
   workflow_dispatch:
     inputs:
-      agent:
-        description: Agent version bump
-        type: choice
-        options:
-          - none
-          - patch
-          - minor
-          - major
-      server:
-        description: Server version bump
-        type: choice
-        options:
-          - none
-          - patch
-          - minor
-          - major
+      agent_version:
+        description: 'Agent version to release (e.g. 1.2.0, empty = skip)'
+        type: string
+        default: ''
+      server_version:
+        description: 'Server version to release (e.g. 1.2.0, empty = skip)'
+        type: string
+        default: ''
 
 permissions:
   contents: write
@@ -32,86 +24,78 @@ permissions:
 
 jobs:
   release-agent:
-    name: Release Agent
-    if: inputs.agent != 'none'
+    name: Release Agent v${{ inputs.agent_version }}
+    if: inputs.agent_version != ''
     runs-on: ubuntu-latest
-    outputs:
-      version: ${{ steps.version.outputs.version }}
     steps:
       - uses: actions/checkout@v4
         with:
           fetch-depth: 0
 
-      - name: Compute next version
-        id: version
+      - name: Validate version
         run: |
-          BUMP="${{ inputs.agent }}"
+          VERSION="${{ inputs.agent_version }}"
+
+          if ! [[ "$VERSION" =~ ^[0-9]+\.[0-9]+\.[0-9]+$ ]]; then
+            echo "::error::Invalid version format: $VERSION (expected X.Y.Z)"
+            exit 1
+          fi
+
           LATEST=$(git tag -l "agent/v*" --sort=-v:refname | head -1)
 
-          if [ -z "$LATEST" ]; then
-            NEXT="0.1.0"
-          else
+          if [ -n "$LATEST" ]; then
             CURRENT=${LATEST#agent/v}
-            IFS='.' read -r MAJOR MINOR PATCH <<< "$CURRENT"
-
-            if [ "$BUMP" = "major" ]; then
-              NEXT="$((MAJOR + 1)).0.0"
-            elif [ "$BUMP" = "minor" ]; then
-              NEXT="${MAJOR}.$((MINOR + 1)).0"
-            else
-              NEXT="${MAJOR}.${MINOR}.$((PATCH + 1))"
+            HIGHER=$(printf '%s\n' "$CURRENT" "$VERSION" | sort -V | tail -1)
+            if [ "$HIGHER" = "$CURRENT" ] || [ "$VERSION" = "$CURRENT" ]; then
+              echo "::error::Version $VERSION must be greater than current $CURRENT"
+              exit 1
             fi
+            echo "Upgrading agent $CURRENT → $VERSION"
+          else
+            echo "First agent release: $VERSION"
           fi
-
-          echo "tag=agent/v${NEXT}" >> $GITHUB_OUTPUT
-          echo "version=${NEXT}" >> $GITHUB_OUTPUT
-          echo "Releasing agent v${NEXT}"
 
       - name: Create and push tag
         run: |
-          git tag ${{ steps.version.outputs.tag }}
-          git push origin ${{ steps.version.outputs.tag }}
+          git tag "agent/v${{ inputs.agent_version }}"
+          git push origin "agent/v${{ inputs.agent_version }}"
 
   release-server:
-    name: Release Server
-    if: inputs.server != 'none'
+    name: Release Server v${{ inputs.server_version }}
+    if: inputs.server_version != ''
     runs-on: ubuntu-latest
-    outputs:
-      version: ${{ steps.version.outputs.version }}
     steps:
       - uses: actions/checkout@v4
         with:
           fetch-depth: 0
 
-      - name: Compute next version
-        id: version
+      - name: Validate version
         run: |
-          BUMP="${{ inputs.server }}"
-          LATEST=$(git tag -l "server/v*" --sort=-v:refname | head -1)
+          VERSION="${{ inputs.server_version }}"
 
-          if [ -z "$LATEST" ]; then
-            NEXT="0.1.0"
-          else
-            CURRENT=${LATEST#server/v}
-            IFS='.' read -r MAJOR MINOR PATCH <<< "$CURRENT"
-
-            if [ "$BUMP" = "major" ]; then
-              NEXT="$((MAJOR + 1)).0.0"
-            elif [ "$BUMP" = "minor" ]; then
-              NEXT="${MAJOR}.$((MINOR + 1)).0"
-            else
-              NEXT="${MAJOR}.${MINOR}.$((PATCH + 1))"
-            fi
+          if ! [[ "$VERSION" =~ ^[0-9]+\.[0-9]+\.[0-9]+$ ]]; then
+            echo "::error::Invalid version format: $VERSION (expected X.Y.Z)"
+            exit 1
           fi
 
-          echo "tag=server/v${NEXT}" >> $GITHUB_OUTPUT
-          echo "version=${NEXT}" >> $GITHUB_OUTPUT
-          echo "Releasing server v${NEXT}"
+          LATEST=$(git tag -l "server/v*" --sort=-v:refname | head -1)
+
+          if [ -n "$LATEST" ]; then
+            CURRENT=${LATEST#server/v}
+            HIGHER=$(printf '%s\n' "$CURRENT" "$VERSION" | sort -V | tail -1)
+            if [ "$HIGHER" = "$CURRENT" ] || [ "$VERSION" = "$CURRENT" ]; then
+              echo "::error::Version $VERSION must be greater than current $CURRENT"
+              exit 1
+            fi
+            echo "Upgrading server $CURRENT → $VERSION"
+          else
+            echo "First server release: $VERSION"
+          fi
 
       - name: Create and push tag
         run: |
-          git tag ${{ steps.version.outputs.tag }}
-          git push origin ${{ steps.version.outputs.tag }}
+          git tag "server/v${{ inputs.server_version }}"
+          git push origin "server/v${{ inputs.server_version }}"
 
   trigger-ci:
     name: Trigger CI
@@ -122,11 +106,11 @@ jobs:
       - name: Trigger CI workflow
         run: |
           ARGS=""
-          if [ -n "${{ needs.release-agent.outputs.version }}" ]; then
-            ARGS="$ARGS -f agent_version=${{ needs.release-agent.outputs.version }}"
+          if [ -n "${{ inputs.agent_version }}" ] && [ "${{ needs.release-agent.result }}" = "success" ]; then
+            ARGS="$ARGS -f agent_version=${{ inputs.agent_version }}"
           fi
-          if [ -n "${{ needs.release-server.outputs.version }}" ]; then
-            ARGS="$ARGS -f server_version=${{ needs.release-server.outputs.version }}"
+          if [ -n "${{ inputs.server_version }}" ] && [ "${{ needs.release-server.result }}" = "success" ]; then
+            ARGS="$ARGS -f server_version=${{ inputs.server_version }}"
           fi
           echo "Triggering CI with:$ARGS"
           gh workflow run ci.yml --repo "$GITHUB_REPOSITORY" $ARGS
