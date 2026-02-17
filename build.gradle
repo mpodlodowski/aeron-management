@@ -4,6 +4,7 @@ plugins {
 
 allprojects {
     group = 'it.podlodowski'
+    version = 'dev'
 
     repositories {
         mavenCentral()
