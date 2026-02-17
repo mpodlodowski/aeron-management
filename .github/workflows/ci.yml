@@ -1,4 +1,13 @@
 name: CI
+run-name: >-
+  ${{
+    github.event_name == 'workflow_dispatch'
+    && format('CI{0}{1}',
+      inputs.agent_version && format(' · agent v{0}', inputs.agent_version) || '',
+      inputs.server_version && format(' · server v{0}', inputs.server_version) || '')
+    || github.event.head_commit.message
+    || 'CI'
+  }}
 
 on:
   push:
