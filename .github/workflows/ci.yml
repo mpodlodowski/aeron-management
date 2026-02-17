@@ -39,6 +39,7 @@ jobs:
           path: |
             agent/build/libs/agent-*.jar
             server/build/libs/server-*.jar
+            !server/build/libs/server-*-plain.jar
           retention-days: 1
 
   docker-build:
