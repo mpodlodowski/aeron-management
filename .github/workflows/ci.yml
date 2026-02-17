@@ -1,4 +1,10 @@
 name: CI
+run-name: >-
+  CI${{
+    inputs.agent_version && format(' · agent v{0}', inputs.agent_version) || ''
+  }}${{
+    inputs.server_version && format(' · server v{0}', inputs.server_version) || ''
+  }}
 
 on:
   push:

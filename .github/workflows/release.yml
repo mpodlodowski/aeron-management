@@ -1,4 +1,10 @@
 name: Release
+run-name: >-
+  Release${{
+    inputs.agent != 'none' && format(' · agent ({0})', inputs.agent) || ''
+  }}${{
+    inputs.server != 'none' && format(' · server ({0})', inputs.server) || ''
+  }}
 
 on:
   workflow_dispatch:
