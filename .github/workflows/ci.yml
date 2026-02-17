@@ -244,7 +244,7 @@ jobs:
 
   publish-agent:
     name: Publish Agent
-    needs: [setup, e2e, e2e-native]
+    needs: [setup, e2e]
     if: needs.setup.outputs.agent_version != ''
     runs-on: ubuntu-latest
     steps:
@@ -288,7 +288,7 @@ jobs:
 
   publish-agent-native:
     name: Publish Agent Native
-    needs: [setup, e2e-native, native-build]
+    needs: [setup, e2e-native]
     if: needs.setup.outputs.agent_version != ''
     runs-on: ubuntu-latest
     steps:
