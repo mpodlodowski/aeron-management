@@ -23,21 +23,21 @@ permissions:
   actions: write
 
 jobs:
-  release-agent:
-    name: Release Agent v${{ inputs.agent_version }}
-    if: inputs.agent_version != ''
+  validate:
+    name: Validate
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
         with:
           fetch-depth: 0
 
-      - name: Validate version
+      - name: Validate agent version
+        if: inputs.agent_version != ''
         run: |
           VERSION="${{ inputs.agent_version }}"
 
           if ! [[ "$VERSION" =~ ^[0-9]+\.[0-9]+\.[0-9]+$ ]]; then
-            echo "::error::Invalid version format: $VERSION (expected X.Y.Z)"
+            echo "::error::Invalid agent version format: $VERSION (expected X.Y.Z)"
             exit 1
           fi
 
@@ -47,34 +47,21 @@ jobs:
             CURRENT=${LATEST#agent/v}
             HIGHER=$(printf '%s\n' "$CURRENT" "$VERSION" | sort -V | tail -1)
             if [ "$HIGHER" = "$CURRENT" ] || [ "$VERSION" = "$CURRENT" ]; then
-              echo "::error::Version $VERSION must be greater than current $CURRENT"
+              echo "::error::Agent version $VERSION must be greater than current $CURRENT"
               exit 1
             fi
-            echo "Upgrading agent $CURRENT → $VERSION"
+            echo "Agent $CURRENT → $VERSION"
           else
             echo "First agent release: $VERSION"
           fi
 
-      - name: Create and push tag
-        run: |
-          git tag "agent/v${{ inputs.agent_version }}"
-          git push origin "agent/v${{ inputs.agent_version }}"
-
-  release-server:
-    name: Release Server v${{ inputs.server_version }}
-    if: inputs.server_version != ''
-    runs-on: ubuntu-latest
-    steps:
-      - uses: actions/checkout@v4
-        with:
-          fetch-depth: 0
-
-      - name: Validate version
+      - name: Validate server version
+        if: inputs.server_version != ''
         run: |
           VERSION="${{ inputs.server_version }}"
 
           if ! [[ "$VERSION" =~ ^[0-9]+\.[0-9]+\.[0-9]+$ ]]; then
-            echo "::error::Invalid version format: $VERSION (expected X.Y.Z)"
+            echo "::error::Invalid server version format: $VERSION (expected X.Y.Z)"
             exit 1
           fi
 
@@ -84,13 +71,34 @@ jobs:
             CURRENT=${LATEST#server/v}
             HIGHER=$(printf '%s\n' "$CURRENT" "$VERSION" | sort -V | tail -1)
             if [ "$HIGHER" = "$CURRENT" ] || [ "$VERSION" = "$CURRENT" ]; then
-              echo "::error::Version $VERSION must be greater than current $CURRENT"
+              echo "::error::Server version $VERSION must be greater than current $CURRENT"
               exit 1
             fi
-            echo "Upgrading server $CURRENT → $VERSION"
+            echo "Server $CURRENT → $VERSION"
           else
             echo "First server release: $VERSION"
           fi
+
+  tag-agent:
+    name: Tag agent/v${{ inputs.agent_version }}
+    needs: validate
+    if: inputs.agent_version != ''
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Create and push tag
+        run: |
+          git tag "agent/v${{ inputs.agent_version }}"
+          git push origin "agent/v${{ inputs.agent_version }}"
+
+  tag-server:
+    name: Tag server/v${{ inputs.server_version }}
+    needs: validate
+    if: inputs.server_version != ''
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
 
       - name: Create and push tag
         run: |
@@ -99,17 +107,17 @@ jobs:
 
   trigger-ci:
     name: Trigger CI
-    needs: [release-agent, release-server]
-    if: always() && (needs.release-agent.result == 'success' || needs.release-server.result == 'success')
+    needs: [tag-agent, tag-server]
+    if: always() && (needs.tag-agent.result == 'success' || needs.tag-server.result == 'success')
     runs-on: ubuntu-latest
     steps:
       - name: Trigger CI workflow
         run: |
           ARGS=""
-          if [ -n "${{ inputs.agent_version }}" ] && [ "${{ needs.release-agent.result }}" = "success" ]; then
+          if [ "${{ needs.tag-agent.result }}" = "success" ]; then
             ARGS="$ARGS -f agent_version=${{ inputs.agent_version }}"
           fi
-          if [ -n "${{ inputs.server_version }}" ] && [ "${{ needs.release-server.result }}" = "success" ]; then
+          if [ "${{ needs.tag-server.result }}" = "success" ]; then
             ARGS="$ARGS -f server_version=${{ inputs.server_version }}"
           fi
           echo "Triggering CI with:$ARGS"
