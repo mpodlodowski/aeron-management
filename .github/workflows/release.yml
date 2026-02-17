@@ -22,6 +22,7 @@ on:
 
 permissions:
   contents: write
+  actions: write
 
 jobs:
   release-agent:
@@ -63,6 +64,11 @@ jobs:
           git tag ${{ steps.version.outputs.tag }}
           git push origin ${{ steps.version.outputs.tag }}
 
+      - name: Trigger CI
+        run: gh workflow run ci.yml --ref ${{ steps.version.outputs.tag }}
+        env:
+          GH_TOKEN: ${{ github.token }}
+
   release-server:
     name: Release Server
     if: inputs.server != 'none'
@@ -101,3 +107,8 @@ jobs:
         run: |
           git tag ${{ steps.version.outputs.tag }}
           git push origin ${{ steps.version.outputs.tag }}
+
+      - name: Trigger CI
+        run: gh workflow run ci.yml --ref ${{ steps.version.outputs.tag }}
+        env:
+          GH_TOKEN: ${{ github.token }}
