@@ -88,6 +88,34 @@ jobs:
           path: ${{ matrix.image }}.tar
           retention-days: 1
 
+  native-build:
+    name: Native Image Build
+    needs: build-and-test
+    if: startsWith(github.ref, 'refs/tags/v')
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: docker/setup-buildx-action@v3
+
+      - name: Build native image
+        uses: docker/build-push-action@v6
+        with:
+          context: .
+          file: examples/docker/Dockerfile.agent-native
+          platforms: linux/amd64
+          load: true
+          tags: aeron-management-agent-native:ci
+
+      - name: Save image tarball
+        run: docker save aeron-management-agent-native:ci -o agent-native.tar
+
+      - uses: actions/upload-artifact@v4
+        with:
+          name: image-agent-native
+          path: agent-native.tar
+          retention-days: 1
+
   e2e:
     name: E2E (docker-jvm)
     needs: [docker-build]
@@ -124,31 +152,27 @@ jobs:
 
   e2e-native:
     name: E2E (docker-native)
-    needs: [docker-build]
+    needs: [docker-build, native-build]
     if: startsWith(github.ref, 'refs/tags/v')
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
-
-      - uses: docker/setup-buildx-action@v3
-
-      - name: Build native image
-        uses: docker/build-push-action@v6
-        with:
-          context: .
-          file: examples/docker/Dockerfile.agent-native
-          platforms: linux/amd64
-          load: true
-          tags: aeron-management-agent-native:ci
 
       - uses: actions/download-artifact@v4
         with:
           name: image-server
           path: /tmp/images/
 
-      - name: Load server image
+      - uses: actions/download-artifact@v4
+        with:
+          name: image-agent-native
+          path: /tmp/images/
+
+      - name: Load images
         run: |
-          docker load -i /tmp/images/server.tar
+          for f in /tmp/images/*.tar; do
+            docker load -i "$f"
+          done
           docker images
 
       - name: Build cluster image
