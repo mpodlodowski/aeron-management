@@ -3,7 +3,7 @@ name: CI
 on:
   push:
     branches: [main]
-    tags: ['v*']
+    tags: ['agent/v*', 'server/v*']
   pull_request:
     branches: [main]
 
@@ -18,6 +18,24 @@ permissions:
   id-token: write
 
 jobs:
+  setup:
+    name: Setup
+    runs-on: ubuntu-latest
+    outputs:
+      component: ${{ steps.parse.outputs.component }}
+      version: ${{ steps.parse.outputs.version }}
+    steps:
+      - name: Parse tag
+        id: parse
+        run: |
+          if [[ "$GITHUB_REF" =~ refs/tags/(agent|server)/v(.+) ]]; then
+            echo "component=${BASH_REMATCH[1]}" >> $GITHUB_OUTPUT
+            echo "version=${BASH_REMATCH[2]}" >> $GITHUB_OUTPUT
+            echo "Releasing ${BASH_REMATCH[1]} v${BASH_REMATCH[2]}"
+          else
+            echo "Not a release tag"
+          fi
+
   build-and-test:
     name: Build & Test
     runs-on: ubuntu-latest
@@ -90,8 +108,8 @@ jobs:
 
   native-build:
     name: Native Image Build
-    needs: build-and-test
-    if: startsWith(github.ref, 'refs/tags/v')
+    needs: [setup, build-and-test]
+    if: needs.setup.outputs.component == 'agent'
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
@@ -152,8 +170,8 @@ jobs:
 
   e2e-native:
     name: E2E (docker-native)
-    needs: [docker-build, native-build]
-    if: startsWith(github.ref, 'refs/tags/v')
+    needs: [setup, docker-build, native-build]
+    if: needs.setup.outputs.component == 'agent'
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
@@ -185,19 +203,16 @@ jobs:
           SERVER_IMAGE: aeron-management-server:ci
           AGENT_NATIVE_IMAGE: aeron-management-agent-native:ci
 
-  docker-push:
-    name: Publish (${{ matrix.image }})
-    needs: [e2e, e2e-native]
-    if: startsWith(github.ref, 'refs/tags/v')
+  publish-agent:
+    name: Publish Agent (${{ matrix.image }})
+    needs: [setup, e2e, e2e-native]
+    if: needs.setup.outputs.component == 'agent'
     runs-on: ubuntu-latest
     strategy:
       matrix:
         include:
           - image: agent
             dockerfile: examples/docker/Dockerfile.agent
-            native: false
-          - image: server
-            dockerfile: examples/docker/Dockerfile.server
             native: false
           - image: agent-native
             dockerfile: examples/docker/Dockerfile.agent-native
@@ -215,7 +230,6 @@ jobs:
         if: ${{ !matrix.native }}
         run: |
           cp jars/agent/build/libs/agent-*.jar jars/agent.jar
-          cp jars/server/build/libs/server-*.jar jars/server.jar
 
       - uses: docker/setup-buildx-action@v3
 
@@ -230,7 +244,7 @@ jobs:
         with:
           images: ${{ env.IMAGE_PREFIX }}${{ matrix.image }}
           tags: |
-            type=semver,pattern={{version}}
+            type=raw,value=${{ needs.setup.outputs.version }}
             type=raw,value=latest
 
       - uses: docker/build-push-action@v6
@@ -238,6 +252,52 @@ jobs:
           context: .
           file: ${{ matrix.dockerfile }}
           build-contexts: ${{ !matrix.native && 'build=jars/' || '' }}
+          platforms: linux/amd64,linux/arm64
+          push: true
+          tags: ${{ steps.meta.outputs.tags }}
+          labels: ${{ steps.meta.outputs.labels }}
+          cache-from: type=gha
+          cache-to: type=gha,mode=max
+
+  publish-server:
+    name: Publish Server
+    needs: [setup, e2e]
+    if: needs.setup.outputs.component == 'server'
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/download-artifact@v4
+        with:
+          name: jars
+          path: jars/
+
+      - name: Prepare JAR
+        run: |
+          cp jars/server/build/libs/server-*.jar jars/server.jar
+
+      - uses: docker/setup-buildx-action@v3
+
+      - uses: docker/login-action@v3
+        with:
+          registry: ghcr.io
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+
+      - uses: docker/metadata-action@v5
+        id: meta
+        with:
+          images: ${{ env.IMAGE_PREFIX }}server
+          tags: |
+            type=raw,value=${{ needs.setup.outputs.version }}
+            type=raw,value=latest
+
+      - uses: docker/build-push-action@v6
+        with:
+          context: .
+          file: examples/docker/Dockerfile.server
+          build-contexts: |
+            build=jars/
           platforms: linux/amd64,linux/arm64
           push: true
           tags: ${{ steps.meta.outputs.tags }}
