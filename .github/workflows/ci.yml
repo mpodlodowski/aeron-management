@@ -133,12 +133,22 @@ jobs:
           retention-days: 1
 
   native-build:
-    name: Native Image Build
+    name: Native Build (${{ matrix.platform }})
     needs: [setup, build-and-test]
     if: needs.setup.outputs.agent_version != ''
     runs-on: ubuntu-latest
+    strategy:
+      matrix:
+        include:
+          - platform: linux/amd64
+            cache_scope: agent-native-amd64
+          - platform: linux/arm64
+            cache_scope: agent-native-arm64
     steps:
       - uses: actions/checkout@v4
+
+      - uses: docker/setup-qemu-action@v3
+        if: matrix.platform != 'linux/amd64'
 
       - uses: docker/setup-buildx-action@v3
 
@@ -147,14 +157,18 @@ jobs:
         with:
           context: .
           file: examples/docker/Dockerfile.agent-native
-          platforms: linux/amd64
-          load: true
+          platforms: ${{ matrix.platform }}
+          load: ${{ matrix.platform == 'linux/amd64' }}
           tags: aeron-management-agent-native:ci
+          cache-from: type=gha,scope=${{ matrix.cache_scope }}
+          cache-to: type=gha,mode=max,scope=${{ matrix.cache_scope }}
 
       - name: Save image tarball
+        if: matrix.platform == 'linux/amd64'
         run: docker save aeron-management-agent-native:ci -o agent-native.tar
 
       - uses: actions/upload-artifact@v4
+        if: matrix.platform == 'linux/amd64'
         with:
           name: image-agent-native
           path: agent-native.tar
@@ -230,32 +244,20 @@ jobs:
           AGENT_NATIVE_IMAGE: aeron-management-agent-native:ci
 
   publish-agent:
-    name: Publish Agent (${{ matrix.image }})
+    name: Publish Agent
     needs: [setup, e2e, e2e-native]
     if: needs.setup.outputs.agent_version != ''
     runs-on: ubuntu-latest
-    strategy:
-      matrix:
-        include:
-          - image: agent
-            dockerfile: examples/docker/Dockerfile.agent
-            native: false
-          - image: agent-native
-            dockerfile: examples/docker/Dockerfile.agent-native
-            native: true
     steps:
       - uses: actions/checkout@v4
 
       - uses: actions/download-artifact@v4
-        if: ${{ !matrix.native }}
         with:
           name: jars
           path: jars/
 
       - name: Prepare JAR
-        if: ${{ !matrix.native }}
-        run: |
-          cp jars/agent/build/libs/agent-*.jar jars/agent.jar
+        run: cp jars/agent/build/libs/agent-*.jar jars/agent.jar
 
       - uses: docker/setup-buildx-action@v3
 
@@ -268,7 +270,7 @@ jobs:
       - uses: docker/metadata-action@v5
         id: meta
         with:
-          images: ${{ env.IMAGE_PREFIX }}${{ matrix.image }}
+          images: ${{ env.IMAGE_PREFIX }}agent
           tags: |
             type=raw,value=${{ needs.setup.outputs.agent_version }}
             type=raw,value=latest
@@ -276,14 +278,50 @@ jobs:
       - uses: docker/build-push-action@v6
         with:
           context: .
-          file: ${{ matrix.dockerfile }}
-          build-contexts: ${{ !matrix.native && 'build=jars/' || '' }}
+          file: examples/docker/Dockerfile.agent
+          build-contexts: build=jars/
           platforms: linux/amd64,linux/arm64
           push: true
           tags: ${{ steps.meta.outputs.tags }}
           labels: ${{ steps.meta.outputs.labels }}
           cache-from: type=gha
           cache-to: type=gha,mode=max
+
+  publish-agent-native:
+    name: Publish Agent Native
+    needs: [setup, e2e-native, native-build]
+    if: needs.setup.outputs.agent_version != ''
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: docker/setup-buildx-action@v3
+
+      - uses: docker/login-action@v3
+        with:
+          registry: ghcr.io
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+
+      - uses: docker/metadata-action@v5
+        id: meta
+        with:
+          images: ${{ env.IMAGE_PREFIX }}agent-native
+          tags: |
+            type=raw,value=${{ needs.setup.outputs.agent_version }}
+            type=raw,value=latest
+
+      - uses: docker/build-push-action@v6
+        with:
+          context: .
+          file: examples/docker/Dockerfile.agent-native
+          platforms: linux/amd64,linux/arm64
+          push: true
+          tags: ${{ steps.meta.outputs.tags }}
+          labels: ${{ steps.meta.outputs.labels }}
+          cache-from: |
+            type=gha,scope=agent-native-amd64
+            type=gha,scope=agent-native-arm64
 
   publish-server:
     name: Publish Server
@@ -299,8 +337,7 @@ jobs:
           path: jars/
 
       - name: Prepare JAR
-        run: |
-          cp jars/server/build/libs/server-*.jar jars/server.jar
+        run: cp jars/server/build/libs/server-*.jar jars/server.jar
 
       - uses: docker/setup-buildx-action@v3
 
@@ -333,7 +370,7 @@ jobs:
 
   release-agent:
     name: Release Agent
-    needs: [setup, publish-agent]
+    needs: [setup, publish-agent, publish-agent-native]
     if: needs.setup.outputs.agent_version != ''
     runs-on: ubuntu-latest
     steps:
