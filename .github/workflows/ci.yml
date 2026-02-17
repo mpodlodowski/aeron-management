@@ -12,7 +12,7 @@ env:
   IMAGE_PREFIX: ghcr.io/${{ github.repository_owner }}/aeron-management/
 
 permissions:
-  contents: read
+  contents: write
   packages: write
   attestations: write
   id-token: write
@@ -304,3 +304,39 @@ jobs:
           labels: ${{ steps.meta.outputs.labels }}
           cache-from: type=gha
           cache-to: type=gha,mode=max
+
+  release-agent:
+    name: Release Agent
+    needs: [setup, publish-agent]
+    if: needs.setup.outputs.component == 'agent'
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Create GitHub Release
+        run: |
+          gh release create "$GITHUB_REF_NAME" \
+            --title "agent v${{ needs.setup.outputs.version }}" \
+            --generate-notes
+        env:
+          GH_TOKEN: ${{ github.token }}
+
+  release-server:
+    name: Release Server
+    needs: [setup, publish-server]
+    if: needs.setup.outputs.component == 'server'
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Create GitHub Release
+        run: |
+          gh release create "$GITHUB_REF_NAME" \
+            --title "server v${{ needs.setup.outputs.version }}" \
+            --generate-notes
+        env:
+          GH_TOKEN: ${{ github.token }}
