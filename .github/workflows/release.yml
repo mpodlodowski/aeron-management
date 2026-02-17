@@ -35,48 +35,47 @@ jobs:
         if: inputs.agent_version != ''
         run: |
           VERSION="${{ inputs.agent_version }}"
-
-          if ! [[ "$VERSION" =~ ^[0-9]+\.[0-9]+\.[0-9]+$ ]]; then
+          if ! [[ "$VERSION" =~ ^([0-9]+)\.([0-9]+)\.([0-9]+)$ ]]; then
             echo "::error::Invalid agent version format: $VERSION (expected X.Y.Z)"
             exit 1
           fi
-
-          LATEST=$(git tag -l "agent/v*" --sort=-v:refname | head -1)
-
+          MAJOR="${BASH_REMATCH[1]}"
+          MINOR="${BASH_REMATCH[2]}"
+          # Find latest tag in the same major.minor line
+          LATEST=$(git tag -l "agent/v${MAJOR}.${MINOR}.*" --sort=-v:refname | head -1)
           if [ -n "$LATEST" ]; then
             CURRENT=${LATEST#agent/v}
             HIGHER=$(printf '%s\n' "$CURRENT" "$VERSION" | sort -V | tail -1)
             if [ "$HIGHER" = "$CURRENT" ] || [ "$VERSION" = "$CURRENT" ]; then
-              echo "::error::Agent version $VERSION must be greater than current $CURRENT"
+              echo "::error::Agent version $VERSION must be greater than $CURRENT in the ${MAJOR}.${MINOR}.x line"
               exit 1
             fi
-            echo "Agent $CURRENT → $VERSION"
+            echo "Agent ${MAJOR}.${MINOR}.x: $CURRENT → $VERSION"
           else
-            echo "First agent release: $VERSION"
+            echo "Agent: new ${MAJOR}.${MINOR}.x line, releasing $VERSION"
           fi
 
       - name: Validate server version
         if: inputs.server_version != ''
         run: |
           VERSION="${{ inputs.server_version }}"
-
-          if ! [[ "$VERSION" =~ ^[0-9]+\.[0-9]+\.[0-9]+$ ]]; then
+          if ! [[ "$VERSION" =~ ^([0-9]+)\.([0-9]+)\.([0-9]+)$ ]]; then
             echo "::error::Invalid server version format: $VERSION (expected X.Y.Z)"
             exit 1
           fi
-
-          LATEST=$(git tag -l "server/v*" --sort=-v:refname | head -1)
-
+          MAJOR="${BASH_REMATCH[1]}"
+          MINOR="${BASH_REMATCH[2]}"
+          LATEST=$(git tag -l "server/v${MAJOR}.${MINOR}.*" --sort=-v:refname | head -1)
           if [ -n "$LATEST" ]; then
             CURRENT=${LATEST#server/v}
             HIGHER=$(printf '%s\n' "$CURRENT" "$VERSION" | sort -V | tail -1)
             if [ "$HIGHER" = "$CURRENT" ] || [ "$VERSION" = "$CURRENT" ]; then
-              echo "::error::Server version $VERSION must be greater than current $CURRENT"
+              echo "::error::Server version $VERSION must be greater than $CURRENT in the ${MAJOR}.${MINOR}.x line"
               exit 1
             fi
-            echo "Server $CURRENT → $VERSION"
+            echo "Server ${MAJOR}.${MINOR}.x: $CURRENT → $VERSION"
           else
-            echo "First server release: $VERSION"
+            echo "Server: new ${MAJOR}.${MINOR}.x line, releasing $VERSION"
           fi
 
   tag-agent:
