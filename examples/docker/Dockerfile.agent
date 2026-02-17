@@ -3,13 +3,14 @@ FROM eclipse-temurin:17-jdk-jammy AS build
 WORKDIR /app
 COPY . .
 RUN ./gradlew :agent:shadowJar --no-daemon -x test
+RUN cp agent/build/libs/agent-*.jar /agent.jar
 
 # Stage 2: Runtime
 FROM eclipse-temurin:17-jre-jammy
 # Run as UID 996 to match the cluster node's 'aeron' user.
 # Shared volumes (cluster data, /dev/shm) are owned by UID 996.
 RUN groupadd -g 996 aeron && useradd -u 996 -g 996 aeron
-COPY --from=build /app/agent/build/libs/agent-*.jar /app/agent.jar
+COPY --from=build /agent.jar /app/agent.jar
 
 USER 996
 EXPOSE 7070

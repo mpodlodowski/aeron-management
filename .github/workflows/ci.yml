@@ -20,7 +20,7 @@ permissions:
 jobs:
   build-and-test:
     name: Build & Test
-    runs-on: self-hosted
+    runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
 
@@ -33,10 +33,18 @@ jobs:
       - name: Build and test
         run: ./gradlew build --no-daemon
 
+      - uses: actions/upload-artifact@v4
+        with:
+          name: jars
+          path: |
+            agent/build/libs/agent-*.jar
+            server/build/libs/server-*.jar
+          retention-days: 1
+
   docker-build:
     name: Docker Build (${{ matrix.image }})
     needs: build-and-test
-    runs-on: self-hosted
+    runs-on: ubuntu-latest
     strategy:
       matrix:
         include:
@@ -46,6 +54,16 @@ jobs:
             dockerfile: examples/docker/Dockerfile.server
     steps:
       - uses: actions/checkout@v4
+
+      - uses: actions/download-artifact@v4
+        with:
+          name: jars
+          path: jars/
+
+      - name: Prepare JAR
+        run: |
+          cp jars/agent/build/libs/agent-*.jar jars/agent.jar
+          cp jars/server/build/libs/server-*.jar jars/server.jar
 
       - uses: docker/setup-buildx-action@v3
 
@@ -68,6 +86,8 @@ jobs:
         with:
           context: .
           file: ${{ matrix.dockerfile }}
+          build-contexts: |
+            build=jars/
           platforms: ${{ startsWith(github.ref, 'refs/tags/v') && 'linux/amd64,linux/arm64' || 'linux/amd64' }}
           push: ${{ startsWith(github.ref, 'refs/tags/v') }}
           tags: ${{ steps.meta.outputs.tags }}
@@ -79,7 +99,7 @@ jobs:
     name: Native Build & Publish
     needs: build-and-test
     if: startsWith(github.ref, 'refs/tags/v')
-    runs-on: self-hosted
+    runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
 

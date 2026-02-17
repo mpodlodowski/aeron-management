@@ -3,10 +3,11 @@ FROM eclipse-temurin:17-jdk-jammy AS build
 WORKDIR /app
 COPY . .
 RUN ./gradlew :server:bootJar --no-daemon -x test
+RUN cp server/build/libs/server-*.jar /server.jar
 
 # Stage 2: Runtime
 FROM eclipse-temurin:17-jre-jammy
-COPY --from=build /app/server/build/libs/server-*.jar /app/server.jar
+COPY --from=build /server.jar /app/server.jar
 
 EXPOSE 8080 8081
 
