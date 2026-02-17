@@ -1,9 +1,13 @@
 name: CI
 run-name: >-
-  CI${{
-    inputs.agent_version && format(' · agent v{0}', inputs.agent_version) || ''
-  }}${{
-    inputs.server_version && format(' · server v{0}', inputs.server_version) || ''
+  ${{
+    (inputs.agent_version || inputs.server_version)
+    && format('CI{0}{1}',
+      inputs.agent_version && format(' · agent v{0}', inputs.agent_version) || '',
+      inputs.server_version && format(' · server v{0}', inputs.server_version) || '')
+    || startsWith(github.ref, 'refs/tags/') && format('CI · {0}', github.ref_name)
+    || github.event.head_commit.message
+    || 'CI'
   }}
 
 on:
