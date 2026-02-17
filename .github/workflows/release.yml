@@ -29,6 +29,8 @@ jobs:
     name: Release Agent
     if: inputs.agent != 'none'
     runs-on: ubuntu-latest
+    outputs:
+      version: ${{ steps.version.outputs.version }}
     steps:
       - uses: actions/checkout@v4
         with:
@@ -64,15 +66,12 @@ jobs:
           git tag ${{ steps.version.outputs.tag }}
           git push origin ${{ steps.version.outputs.tag }}
 
-      - name: Trigger CI
-        run: gh workflow run ci.yml --ref ${{ steps.version.outputs.tag }}
-        env:
-          GH_TOKEN: ${{ github.token }}
-
   release-server:
     name: Release Server
     if: inputs.server != 'none'
     runs-on: ubuntu-latest
+    outputs:
+      version: ${{ steps.version.outputs.version }}
     steps:
       - uses: actions/checkout@v4
         with:
@@ -108,7 +107,22 @@ jobs:
           git tag ${{ steps.version.outputs.tag }}
           git push origin ${{ steps.version.outputs.tag }}
 
-      - name: Trigger CI
-        run: gh workflow run ci.yml --ref ${{ steps.version.outputs.tag }}
+  trigger-ci:
+    name: Trigger CI
+    needs: [release-agent, release-server]
+    if: always() && (needs.release-agent.result == 'success' || needs.release-server.result == 'success')
+    runs-on: ubuntu-latest
+    steps:
+      - name: Trigger CI workflow
+        run: |
+          ARGS=""
+          if [ -n "${{ needs.release-agent.outputs.version }}" ]; then
+            ARGS="$ARGS -f agent_version=${{ needs.release-agent.outputs.version }}"
+          fi
+          if [ -n "${{ needs.release-server.outputs.version }}" ]; then
+            ARGS="$ARGS -f server_version=${{ needs.release-server.outputs.version }}"
+          fi
+          echo "Triggering CI with:$ARGS"
+          gh workflow run ci.yml $ARGS
         env:
           GH_TOKEN: ${{ github.token }}

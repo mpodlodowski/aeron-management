@@ -7,6 +7,15 @@ on:
   pull_request:
     branches: [main]
   workflow_dispatch:
+    inputs:
+      agent_version:
+        description: 'Agent version to release (empty = skip)'
+        type: string
+        default: ''
+      server_version:
+        description: 'Server version to release (empty = skip)'
+        type: string
+        default: ''
 
 env:
   REGISTRY: ghcr.io
@@ -23,18 +32,25 @@ jobs:
     name: Setup
     runs-on: ubuntu-latest
     outputs:
-      component: ${{ steps.parse.outputs.component }}
-      version: ${{ steps.parse.outputs.version }}
+      agent_version: ${{ steps.parse.outputs.agent_version }}
+      server_version: ${{ steps.parse.outputs.server_version }}
     steps:
-      - name: Parse tag
+      - name: Parse release info
         id: parse
         run: |
-          if [[ "$GITHUB_REF" =~ refs/tags/(agent|server)/v(.+) ]]; then
-            echo "component=${BASH_REMATCH[1]}" >> $GITHUB_OUTPUT
-            echo "version=${BASH_REMATCH[2]}" >> $GITHUB_OUTPUT
-            echo "Releasing ${BASH_REMATCH[1]} v${BASH_REMATCH[2]}"
-          else
-            echo "Not a release tag"
+          # From tag push
+          if [[ "$GITHUB_REF" =~ refs/tags/agent/v(.+) ]]; then
+            echo "agent_version=${BASH_REMATCH[1]}" >> $GITHUB_OUTPUT
+          fi
+          if [[ "$GITHUB_REF" =~ refs/tags/server/v(.+) ]]; then
+            echo "server_version=${BASH_REMATCH[1]}" >> $GITHUB_OUTPUT
+          fi
+          # From workflow_dispatch inputs
+          if [ -n "${{ inputs.agent_version }}" ]; then
+            echo "agent_version=${{ inputs.agent_version }}" >> $GITHUB_OUTPUT
+          fi
+          if [ -n "${{ inputs.server_version }}" ]; then
+            echo "server_version=${{ inputs.server_version }}" >> $GITHUB_OUTPUT
           fi
 
   build-and-test:
@@ -110,7 +126,7 @@ jobs:
   native-build:
     name: Native Image Build
     needs: [setup, build-and-test]
-    if: needs.setup.outputs.component == 'agent'
+    if: needs.setup.outputs.agent_version != ''
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
@@ -172,7 +188,7 @@ jobs:
   e2e-native:
     name: E2E (docker-native)
     needs: [setup, docker-build, native-build]
-    if: needs.setup.outputs.component == 'agent'
+    if: needs.setup.outputs.agent_version != ''
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
@@ -207,7 +223,7 @@ jobs:
   publish-agent:
     name: Publish Agent (${{ matrix.image }})
     needs: [setup, e2e, e2e-native]
-    if: needs.setup.outputs.component == 'agent'
+    if: needs.setup.outputs.agent_version != ''
     runs-on: ubuntu-latest
     strategy:
       matrix:
@@ -245,7 +261,7 @@ jobs:
         with:
           images: ${{ env.IMAGE_PREFIX }}${{ matrix.image }}
           tags: |
-            type=raw,value=${{ needs.setup.outputs.version }}
+            type=raw,value=${{ needs.setup.outputs.agent_version }}
             type=raw,value=latest
 
       - uses: docker/build-push-action@v6
@@ -263,7 +279,7 @@ jobs:
   publish-server:
     name: Publish Server
     needs: [setup, e2e]
-    if: needs.setup.outputs.component == 'server'
+    if: needs.setup.outputs.server_version != ''
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
@@ -290,7 +306,7 @@ jobs:
         with:
           images: ${{ env.IMAGE_PREFIX }}server
           tags: |
-            type=raw,value=${{ needs.setup.outputs.version }}
+            type=raw,value=${{ needs.setup.outputs.server_version }}
             type=raw,value=latest
 
       - uses: docker/build-push-action@v6
@@ -309,7 +325,7 @@ jobs:
   release-agent:
     name: Release Agent
     needs: [setup, publish-agent]
-    if: needs.setup.outputs.component == 'agent'
+    if: needs.setup.outputs.agent_version != ''
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
@@ -318,8 +334,8 @@ jobs:
 
       - name: Create GitHub Release
         run: |
-          gh release create "$GITHUB_REF_NAME" \
-            --title "agent v${{ needs.setup.outputs.version }}" \
+          gh release create "agent/v${{ needs.setup.outputs.agent_version }}" \
+            --title "agent v${{ needs.setup.outputs.agent_version }}" \
             --generate-notes
         env:
           GH_TOKEN: ${{ github.token }}
@@ -327,7 +343,7 @@ jobs:
   release-server:
     name: Release Server
     needs: [setup, publish-server]
-    if: needs.setup.outputs.component == 'server'
+    if: needs.setup.outputs.server_version != ''
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
@@ -336,8 +352,8 @@ jobs:
 
       - name: Create GitHub Release
         run: |
-          gh release create "$GITHUB_REF_NAME" \
-            --title "server v${{ needs.setup.outputs.version }}" \
+          gh release create "server/v${{ needs.setup.outputs.server_version }}" \
+            --title "server v${{ needs.setup.outputs.server_version }}" \
             --generate-notes
         env:
           GH_TOKEN: ${{ github.token }}
