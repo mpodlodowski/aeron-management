@@ -1,6 +1,6 @@
 .git/
 .github/
-.gradle/
+**/.gradle/
 .idea/
 .actrc
 *.iml

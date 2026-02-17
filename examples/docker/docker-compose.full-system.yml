@@ -3,6 +3,7 @@ name: 'aeron-cluster-managed'
 services:
   # === Aeron Cluster Nodes (3-node Raft consensus) ===
   node0:
+    image: ${CLUSTER_IMAGE:-aeron-cluster-demo:local}
     build:
       context: ../k8s/cluster-image
     environment:
@@ -16,6 +17,7 @@ services:
       - net
 
   node1:
+    image: ${CLUSTER_IMAGE:-aeron-cluster-demo:local}
     build:
       context: ../k8s/cluster-image
     environment:
@@ -29,6 +31,7 @@ services:
       - net
 
   node2:
+    image: ${CLUSTER_IMAGE:-aeron-cluster-demo:local}
     build:
       context: ../k8s/cluster-image
     environment:
@@ -43,6 +46,7 @@ services:
 
   # === Aeron Backup Node ===
   backup:
+    image: ${CLUSTER_IMAGE:-aeron-cluster-demo:local}
     build:
       context: ../k8s/cluster-image
     hostname: backup
@@ -58,6 +62,7 @@ services:
 
   # === Management Server (UI + gRPC aggregator) ===
   management-server:
+    image: ${SERVER_IMAGE:-aeron-management-server:local}
     build:
       context: ../..
       dockerfile: examples/docker/Dockerfile.server
@@ -74,6 +79,7 @@ services:
   # Agents auto-discover nodeId, aeronDir, and mode from the cluster-mark.dat file.
   # /dev/shm is shared via tmpfs volumes so agents can read CnC without IPC namespace coupling.
   agent-0:
+    image: ${AGENT_IMAGE:-aeron-management-agent:local}
     build:
       context: ../..
       dockerfile: examples/docker/Dockerfile.agent
@@ -92,6 +98,7 @@ services:
       - net
 
   agent-1:
+    image: ${AGENT_IMAGE:-aeron-management-agent:local}
     build:
       context: ../..
       dockerfile: examples/docker/Dockerfile.agent
@@ -110,6 +117,7 @@ services:
       - net
 
   agent-2:
+    image: ${AGENT_IMAGE:-aeron-management-agent:local}
     build:
       context: ../..
       dockerfile: examples/docker/Dockerfile.agent
@@ -128,6 +136,7 @@ services:
       - net
 
   agent-backup:
+    image: ${AGENT_IMAGE:-aeron-management-agent:local}
     build:
       context: ../..
       dockerfile: examples/docker/Dockerfile.agent

@@ -68,41 +68,171 @@ jobs:
 
       - uses: docker/setup-buildx-action@v3
 
-      - uses: docker/login-action@v3
-        if: startsWith(github.ref, 'refs/tags/v')
-        with:
-          registry: ghcr.io
-          username: ${{ github.actor }}
-          password: ${{ secrets.GITHUB_TOKEN }}
-
-      - uses: docker/metadata-action@v5
-        id: meta
-        with:
-          images: ${{ env.IMAGE_PREFIX }}${{ matrix.image }}
-          tags: |
-            type=semver,pattern={{version}}
-            type=raw,value=latest,enable=${{ startsWith(github.ref, 'refs/tags/v') }}
-
-      - uses: docker/build-push-action@v6
+      - name: Build image
+        uses: docker/build-push-action@v6
         with:
           context: .
           file: ${{ matrix.dockerfile }}
           build-contexts: |
             build=jars/
-          platforms: ${{ startsWith(github.ref, 'refs/tags/v') && 'linux/amd64,linux/arm64' || 'linux/amd64' }}
-          push: ${{ startsWith(github.ref, 'refs/tags/v') }}
-          tags: ${{ steps.meta.outputs.tags }}
-          labels: ${{ steps.meta.outputs.labels }}
-          cache-from: type=gha
-          cache-to: type=gha,mode=max
+          platforms: linux/amd64
+          load: true
+          tags: aeron-management-${{ matrix.image }}:ci
+
+      - name: Save image tarball
+        run: docker save aeron-management-${{ matrix.image }}:ci -o ${{ matrix.image }}.tar
+
+      - uses: actions/upload-artifact@v4
+        with:
+          name: image-${{ matrix.image }}
+          path: ${{ matrix.image }}.tar
+          retention-days: 1
 
   native-build:
-    name: Native Build & Publish
+    name: Native Image Build
     needs: build-and-test
     if: startsWith(github.ref, 'refs/tags/v')
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
+
+      - uses: docker/setup-buildx-action@v3
+
+      - name: Build native image
+        uses: docker/build-push-action@v6
+        with:
+          context: .
+          file: examples/docker/Dockerfile.agent-native
+          platforms: linux/amd64
+          load: true
+          tags: aeron-management-agent-native:ci
+
+      - name: Save image tarball
+        run: docker save aeron-management-agent-native:ci -o agent-native.tar
+
+      - uses: actions/upload-artifact@v4
+        with:
+          name: image-agent-native
+          path: agent-native.tar
+          retention-days: 1
+
+  e2e:
+    name: E2E (docker-jvm)
+    needs: [docker-build]
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/download-artifact@v4
+        with:
+          name: image-server
+          path: /tmp/images/
+
+      - uses: actions/download-artifact@v4
+        with:
+          name: image-agent
+          path: /tmp/images/
+
+      - name: Load images
+        run: |
+          for f in /tmp/images/*.tar; do
+            docker load -i "$f"
+          done
+          docker images
+
+      - name: Build cluster image
+        run: docker build -t aeron-cluster-demo:local examples/k8s/cluster-image
+
+      - name: Run E2E
+        run: e2e/launchers/docker-jvm.sh
+        env:
+          CLUSTER_IMAGE: aeron-cluster-demo:local
+          SERVER_IMAGE: aeron-management-server:ci
+          AGENT_IMAGE: aeron-management-agent:ci
+
+  e2e-extended:
+    name: E2E (${{ matrix.variant }})
+    needs: [docker-build, native-build]
+    if: startsWith(github.ref, 'refs/tags/v')
+    runs-on: ubuntu-latest
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - variant: docker-native
+            agent-artifact: image-agent-native
+          - variant: k8s-jvm
+            agent-artifact: image-agent
+          - variant: k8s-native
+            agent-artifact: image-agent-native
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/download-artifact@v4
+        with:
+          name: image-server
+          path: /tmp/images/
+
+      - uses: actions/download-artifact@v4
+        with:
+          name: ${{ matrix.agent-artifact }}
+          path: /tmp/images/
+
+      - name: Load images
+        run: |
+          for f in /tmp/images/*.tar; do
+            docker load -i "$f"
+          done
+          docker images
+
+      - name: Build cluster image
+        run: docker build -t aeron-cluster-demo:local examples/k8s/cluster-image
+
+      - name: Install Kind
+        if: contains(matrix.variant, 'k8s')
+        uses: helm/kind-action@v1
+        with:
+          install_only: true
+
+      - name: Run E2E
+        run: e2e/launchers/${{ matrix.variant }}.sh
+        env:
+          CLUSTER_IMAGE: aeron-cluster-demo:local
+          SERVER_IMAGE: aeron-management-server:ci
+          AGENT_IMAGE: aeron-management-agent:ci
+          AGENT_NATIVE_IMAGE: aeron-management-agent-native:ci
+
+  docker-push:
+    name: Publish (${{ matrix.image }})
+    needs: [e2e, e2e-extended]
+    if: startsWith(github.ref, 'refs/tags/v')
+    runs-on: ubuntu-latest
+    strategy:
+      matrix:
+        include:
+          - image: agent
+            dockerfile: examples/docker/Dockerfile.agent
+            native: false
+          - image: server
+            dockerfile: examples/docker/Dockerfile.server
+            native: false
+          - image: agent-native
+            dockerfile: examples/docker/Dockerfile.agent-native
+            native: true
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/download-artifact@v4
+        if: ${{ !matrix.native }}
+        with:
+          name: jars
+          path: jars/
+
+      - name: Prepare JAR
+        if: ${{ !matrix.native }}
+        run: |
+          cp jars/agent/build/libs/agent-*.jar jars/agent.jar
+          cp jars/server/build/libs/server-*.jar jars/server.jar
 
       - uses: docker/setup-buildx-action@v3
 
@@ -115,7 +245,7 @@ jobs:
       - uses: docker/metadata-action@v5
         id: meta
         with:
-          images: ${{ env.IMAGE_PREFIX }}agent-native
+          images: ${{ env.IMAGE_PREFIX }}${{ matrix.image }}
           tags: |
             type=semver,pattern={{version}}
             type=raw,value=latest
@@ -123,7 +253,8 @@ jobs:
       - uses: docker/build-push-action@v6
         with:
           context: .
-          file: examples/docker/Dockerfile.agent-native
+          file: ${{ matrix.dockerfile }}
+          build-contexts: ${{ !matrix.native && 'build=jars/' || '' }}
           platforms: linux/amd64,linux/arm64
           push: true
           tags: ${{ steps.meta.outputs.tags }}
