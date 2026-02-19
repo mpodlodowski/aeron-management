@@ -6,6 +6,8 @@ Web-based monitoring and administration dashboard for [Aeron Cluster](https://ae
   <a href="screenshots/dashboard.png"><img src="screenshots/dashboard.png" alt="Dashboard" width="270"></a>
   <a href="screenshots/node-detail.png"><img src="screenshots/node-detail.png" alt="Node Detail" width="270"></a>
   <a href="screenshots/archive.png"><img src="screenshots/archive.png" alt="Archive" width="270"></a>
+  <a href="screenshots/recording-viewer.png"><img src="screenshots/recording-viewer.png" alt="Recording Viewer – Hex" width="270"></a>
+  <a href="screenshots/recording-viewer-tree.png"><img src="screenshots/recording-viewer-tree.png" alt="Recording Viewer – Tree" width="270"></a>
 </p>
 
 ## What It Does
@@ -14,6 +16,7 @@ Web-based monitoring and administration dashboard for [Aeron Cluster](https://ae
 - **Cluster state awareness** — see at a glance if the cluster is active, suspended, snapshotting, or shutting down
 - **One-click admin** — Snapshot, Suspend, Resume, Shutdown directly from the dashboard, automatically routed to the leader
 - **Archive browser** — paginated recordings table with type filtering, per-recording actions (verify, invalidate), and bulk operations (compact, delete orphaned segments)
+- **Recording viewer** — inspect recording bytes with annotated hex, decoded tree, and message table views; built-in decoders for Aeron cluster SBE messages (SnapshotMarker, ClientSession, etc.) plus custom decoder support via JSON import
 - **Disk forecasting** — growth rate tracking with time-to-full predictions per node
 - **Backup node monitoring** — dedicated view for ClusterBackup agents
 - **Native image agents** — optional GraalVM native compilation for ~20MB sidecar footprint
