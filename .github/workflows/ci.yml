@@ -381,7 +381,8 @@ jobs:
         run: |
           gh release create "agent/v${{ needs.setup.outputs.agent_version }}" \
             --title "agent v${{ needs.setup.outputs.agent_version }}" \
-            --generate-notes
+            --generate-notes \
+            --latest=false
         env:
           GH_TOKEN: ${{ github.token }}
 
@@ -399,6 +400,7 @@ jobs:
         run: |
           gh release create "server/v${{ needs.setup.outputs.server_version }}" \
             --title "server v${{ needs.setup.outputs.server_version }}" \
-            --generate-notes
+            --generate-notes \
+            --latest=false
         env:
           GH_TOKEN: ${{ github.token }}
