@@ -367,64 +367,88 @@ jobs:
           cache-from: type=gha
           cache-to: type=gha,mode=max
 
-  release-agent:
-    name: Release Agent
-    needs: [setup, publish-agent, publish-agent-native]
-    if: needs.setup.outputs.agent_version != ''
+  release:
+    name: Create Release
+    needs: [setup, publish-agent, publish-agent-native, publish-server]
+    if: |
+      always() && !cancelled() &&
+      (needs.setup.outputs.agent_version != '' || needs.setup.outputs.server_version != '') &&
+      (needs.setup.outputs.agent_version == '' || (needs.publish-agent.result == 'success' && needs.publish-agent-native.result == 'success')) &&
+      (needs.setup.outputs.server_version == '' || needs.publish-server.result == 'success')
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
         with:
           fetch-depth: 0
 
-      - name: Find previous agent tag
-        id: prev
-        run: |
-          PREV=$(git tag -l 'agent/v*' --sort=-v:refname | grep -v "agent/v${{ needs.setup.outputs.agent_version }}" | head -1)
-          echo "tag=$PREV" >> "$GITHUB_OUTPUT"
-
       - name: Create GitHub Release
         run: |
-          ARGS=(
-            "agent/v${{ needs.setup.outputs.agent_version }}"
-            --title "agent v${{ needs.setup.outputs.agent_version }}"
-            --generate-notes
-            --latest=false
-          )
-          if [ -n "${{ steps.prev.outputs.tag }}" ]; then
-            ARGS+=(--notes-start-tag "${{ steps.prev.outputs.tag }}")
+          set -euo pipefail
+          AGENT_VER="${{ needs.setup.outputs.agent_version }}"
+          SERVER_VER="${{ needs.setup.outputs.server_version }}"
+          PREFIX="${{ env.IMAGE_PREFIX }}"
+
+          # Determine release tag and title
+          if [ -n "$AGENT_VER" ] && [ -n "$SERVER_VER" ]; then
+            TAG="agent/v${AGENT_VER}"
+            TITLE="agent v${AGENT_VER} + server v${SERVER_VER}"
+          elif [ -n "$AGENT_VER" ]; then
+            TAG="agent/v${AGENT_VER}"
+            TITLE="agent v${AGENT_VER}"
+          else
+            TAG="server/v${SERVER_VER}"
+            TITLE="server v${SERVER_VER}"
           fi
-          gh release create "${ARGS[@]}"
-        env:
-          GH_TOKEN: ${{ github.token }}
 
-  release-server:
-    name: Release Server
-    needs: [setup, publish-server]
-    if: needs.setup.outputs.server_version != ''
-    runs-on: ubuntu-latest
-    steps:
-      - uses: actions/checkout@v4
-        with:
-          fetch-depth: 0
+          # Ensure all component tags exist (workflow_dispatch may not create them)
+          for VTAG in ${AGENT_VER:+agent/v$AGENT_VER} ${SERVER_VER:+server/v$SERVER_VER}; do
+            if ! git rev-parse "$VTAG" >/dev/null 2>&1; then
+              git tag "$VTAG"
+              git push origin "$VTAG"
+            fi
+          done
 
-      - name: Find previous server tag
-        id: prev
-        run: |
-          PREV=$(git tag -l 'server/v*' --sort=-v:refname | grep -v "server/v${{ needs.setup.outputs.server_version }}" | head -1)
-          echo "tag=$PREV" >> "$GITHUB_OUTPUT"
+          # Find the oldest previous component tag for changelog scope
+          PREV_TAG=""
+          for ARGS in ${AGENT_VER:+"agent/v* agent/v$AGENT_VER"} ${SERVER_VER:+"server/v* server/v$SERVER_VER"}; do
+            read -r PATTERN EXCLUDE <<< "$ARGS"
+            P=$(git tag -l "$PATTERN" --sort=-v:refname | grep -v "$EXCLUDE" | head -1) || true
+            if [ -n "$P" ]; then
+              if [ -z "$PREV_TAG" ] || git merge-base --is-ancestor "$P" "$PREV_TAG" 2>/dev/null; then
+                PREV_TAG="$P"
+              fi
+            fi
+          done
 
-      - name: Create GitHub Release
-        run: |
-          ARGS=(
-            "server/v${{ needs.setup.outputs.server_version }}"
-            --title "server v${{ needs.setup.outputs.server_version }}"
-            --generate-notes
-            --latest=false
-          )
-          if [ -n "${{ steps.prev.outputs.tag }}" ]; then
-            ARGS+=(--notes-start-tag "${{ steps.prev.outputs.tag }}")
+          # Generate changelog via API
+          CHANGELOG=""
+          if [ -n "$PREV_TAG" ]; then
+            CHANGELOG=$(gh api "repos/${{ github.repository }}/releases/generate-notes" \
+              -f tag_name="$TAG" \
+              -f previous_tag_name="$PREV_TAG" \
+              -q .body 2>/dev/null) || true
           fi
-          gh release create "${ARGS[@]}"
+
+          # Build release body with Docker images
+          BODY="## Docker Images"$'\n\n'
+          if [ -n "$AGENT_VER" ]; then
+            BODY+='```'$'\n'
+            BODY+="docker pull ${PREFIX}agent:${AGENT_VER}"$'\n'
+            BODY+="docker pull ${PREFIX}agent-native:${AGENT_VER}"$'\n'
+            BODY+='```'$'\n\n'
+          fi
+          if [ -n "$SERVER_VER" ]; then
+            BODY+='```'$'\n'
+            BODY+="docker pull ${PREFIX}server:${SERVER_VER}"$'\n'
+            BODY+='```'$'\n\n'
+          fi
+          if [ -n "$CHANGELOG" ]; then
+            BODY+="---"$'\n\n'"${CHANGELOG}"
+          fi
+
+          gh release create "$TAG" \
+            --title "$TITLE" \
+            --notes "$BODY" \
+            --latest=false
         env:
           GH_TOKEN: ${{ github.token }}
