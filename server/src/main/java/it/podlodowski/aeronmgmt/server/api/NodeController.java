@@ -172,4 +172,16 @@ public class NodeController {
         return commandRouter.sendArchiveCommand(id, "ARCHIVE_DELETE_RECORDING",
                 Map.of("recordingId", String.valueOf(rid)));
     }
+
+    @GetMapping("/{id}/archive/recordings/{rid}/bytes")
+    public Map<String, Object> readRecordingBytes(
+            @PathVariable int id,
+            @PathVariable long rid,
+            @RequestParam(defaultValue = "0") long offset,
+            @RequestParam(defaultValue = "65536") int length) {
+        return commandRouter.sendArchiveCommand(id, "READ_RECORDING_BYTES",
+                Map.of("recordingId", String.valueOf(rid),
+                       "offset", String.valueOf(offset),
+                       "length", String.valueOf(length)));
+    }
 }

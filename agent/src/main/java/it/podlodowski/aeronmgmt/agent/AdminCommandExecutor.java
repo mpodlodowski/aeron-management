@@ -14,6 +14,7 @@ import java.io.ByteArrayOutputStream;
 import java.io.File;
 import java.io.PrintStream;
 import java.util.ArrayList;
+import java.util.Base64;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
@@ -30,10 +31,14 @@ public class AdminCommandExecutor {
 
     private final File clusterDir;
     private final File archiveDir;
+    private final ArchiveMetricsCollector archiveMetrics;
+    private final RecordingBytesReader bytesReader;
 
-    public AdminCommandExecutor(String clusterDirPath) {
+    public AdminCommandExecutor(String clusterDirPath, ArchiveMetricsCollector archiveMetrics) {
         this.clusterDir = new File(clusterDirPath);
         this.archiveDir = new File(clusterDir.getParentFile(), "archive");
+        this.archiveMetrics = archiveMetrics;
+        this.bytesReader = new RecordingBytesReader(archiveDir);
     }
 
     /**
@@ -71,7 +76,7 @@ public class AdminCommandExecutor {
         }
     }
 
-    private boolean dispatch(AdminCommand command, PrintStream out) {
+    private boolean dispatch(AdminCommand command, PrintStream out) throws Exception {
         switch (command.getType()) {
             // --- Mutating actions: (File, PrintStream) → boolean ---
             case "SNAPSHOT":
@@ -151,6 +156,28 @@ public class AdminCommandExecutor {
                 ArchiveTool.markRecordingInvalid(out, archiveDir, recordingId);
                 out.println("Marked recording " + recordingId + " as invalid, compacting...");
                 ArchiveTool.compact(out, archiveDir);
+                return true;
+            }
+
+            case "READ_RECORDING_BYTES": {
+                long recordingId = Long.parseLong(command.getParametersOrThrow("recordingId"));
+                long offset = Long.parseLong(command.getParametersOrDefault("offset", "0"));
+                int length = Integer.parseInt(command.getParametersOrDefault("length", "65536"));
+
+                ArchiveMetricsCollector.RecordingInfo info = archiveMetrics.lookupRecording(recordingId);
+                if (info == null) {
+                    out.print("{\"error\":\"Recording " + recordingId + " not found in catalog\"}");
+                    return false;
+                }
+
+                byte[] bytes = bytesReader.readBytes(info, offset, length);
+                String base64 = Base64.getEncoder().encodeToString(bytes);
+
+                out.print("{\"recordingId\":" + recordingId
+                        + ",\"offset\":" + offset
+                        + ",\"length\":" + bytes.length
+                        + ",\"totalSize\":" + info.dataLength()
+                        + ",\"data\":\"" + base64 + "\"}");
                 return true;
             }
 
