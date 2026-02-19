@@ -44,7 +44,7 @@ public class ClusterStateAggregator {
     public ClusterStateAggregator(
             @Autowired(required = false) SimpMessagingTemplate messagingTemplate,
             DiskUsageTracker diskUsageTracker,
-            @Value("${management.metrics.history-seconds:300}") int historySeconds) {
+            @Value("${aeron.management.server.metrics-history-seconds:300}") int historySeconds) {
         this.messagingTemplate = messagingTemplate;
         this.diskUsageTracker = diskUsageTracker;
         this.windowDurationMs = historySeconds * 1000L;
@@ -221,6 +221,7 @@ public class ClusterStateAggregator {
             boolean isBackup = "backup".equals(nodeAgentModes.get(report.getNodeId()));
 
             if (!isBackup && report.hasClusterMetrics()
+                    && connectedNodes.contains(report.getNodeId())
                     && "LEADER".equals(report.getClusterMetrics().getNodeRole())) {
                 leaderNodeId = report.getNodeId();
                 commitPosition = report.getClusterMetrics().getCommitPosition();

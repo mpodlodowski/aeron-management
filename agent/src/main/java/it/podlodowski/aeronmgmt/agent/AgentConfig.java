@@ -18,17 +18,17 @@ public class AgentConfig {
     public final Integer nodeIdOverride;
 
     public AgentConfig() {
-        this.managementServerHost = env("MANAGEMENT_SERVER_HOST", "localhost");
-        this.managementServerPort = Integer.parseInt(env("MANAGEMENT_SERVER_PORT", "8081"));
-        this.clusterDir = env("CLUSTER_DIR", "aeron-cluster/cluster");
-        this.metricsIntervalMs = Long.parseLong(env("METRICS_INTERVAL_MS", "1000"));
-        this.agentId = env("AGENT_ID", UUID.randomUUID().toString().substring(0, 8));
-        this.cncFailureTimeoutMs = Long.parseLong(env("CNC_FAILURE_TIMEOUT_MS", "2000"));
+        this.managementServerHost = env("AERON_MANAGEMENT_AGENT_SERVER_HOST", "localhost");
+        this.managementServerPort = Integer.parseInt(env("AERON_MANAGEMENT_AGENT_SERVER_PORT", "8081"));
+        this.clusterDir = env("AERON_MANAGEMENT_AGENT_CLUSTER_DIR", "aeron-cluster/cluster");
+        this.metricsIntervalMs = Long.parseLong(env("AERON_MANAGEMENT_AGENT_METRICS_INTERVAL_MS", "1000"));
+        this.agentId = env("AERON_MANAGEMENT_AGENT_ID", UUID.randomUUID().toString().substring(0, 8));
+        this.cncFailureTimeoutMs = Long.parseLong(env("AERON_MANAGEMENT_AGENT_CNC_FAILURE_TIMEOUT_MS", "2000"));
 
-        String nodeIdEnv = System.getenv("AGENT_NODE_ID");
+        String nodeIdEnv = System.getenv("AERON_MANAGEMENT_AGENT_NODE_ID");
         this.nodeIdOverride = nodeIdEnv != null ? Integer.parseInt(nodeIdEnv) : null;
-        this.aeronDirOverride = System.getenv("AERON_DIR");
-        this.agentModeOverride = System.getenv("AGENT_MODE");
+        this.aeronDirOverride = System.getenv("AERON_MANAGEMENT_AGENT_AERON_DIR");
+        this.agentModeOverride = System.getenv("AERON_MANAGEMENT_AGENT_MODE");
     }
 
     private static String env(String key, String defaultValue) {

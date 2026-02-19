@@ -17,7 +17,7 @@ public class GrpcServerConfig {
 
     private static final Logger LOGGER = LoggerFactory.getLogger(GrpcServerConfig.class);
 
-    @Value("${grpc.server.port:8081}")
+    @Value("${aeron.management.server.grpc-port:8081}")
     private int grpcPort;
 
     private Server grpcServer;
