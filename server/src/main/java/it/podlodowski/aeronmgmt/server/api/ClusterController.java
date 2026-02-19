@@ -98,9 +98,11 @@ public class ClusterController {
             @RequestParam(required = false) Integer nodeId,
             @RequestParam(required = false) String type,
             @RequestParam(defaultValue = "0") int page,
-            @RequestParam(defaultValue = "100") int size) {
+            @RequestParam(defaultValue = "100") int size,
+            @RequestParam(defaultValue = "desc") String sort) {
 
         List<Map<String, Object>> rows = new ArrayList<>();
+        Set<String> availableTypes = new TreeSet<>();
 
         for (Map.Entry<Integer, MetricsReport> entry : aggregator.getLatestMetrics().entrySet()) {
             int nid = entry.getKey();
@@ -109,6 +111,7 @@ public class ClusterController {
             }
             for (ArchiveRecording rec : entry.getValue().getRecordingsList()) {
                 String recType = deriveRecordingType(rec.getChannel());
+                availableTypes.add(recType);
                 if (type != null && !type.equals(recType)) {
                     continue;
                 }
@@ -127,7 +130,8 @@ public class ClusterController {
             }
         }
 
-        rows.sort(Comparator.comparingLong(r -> (long) r.get("recordingId")));
+        Comparator<Map<String, Object>> cmp = Comparator.comparingLong(r -> (long) r.get("recordingId"));
+        rows.sort("asc".equalsIgnoreCase(sort) ? cmp : cmp.reversed());
 
         int totalElements = rows.size();
         int totalPages = size > 0 ? (int) Math.ceil((double) totalElements / size) : 1;
@@ -141,6 +145,7 @@ public class ClusterController {
         result.put("size", size);
         result.put("totalElements", totalElements);
         result.put("totalPages", totalPages);
+        result.put("availableTypes", availableTypes);
         return result;
     }
 

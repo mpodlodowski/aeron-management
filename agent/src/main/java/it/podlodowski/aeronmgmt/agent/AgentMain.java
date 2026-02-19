@@ -4,6 +4,7 @@ import it.podlodowski.aeronmgmt.common.proto.MetricsReport;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
+import java.io.File;
 import java.util.concurrent.Executors;
 import java.util.concurrent.ScheduledExecutorService;
 import java.util.concurrent.TimeUnit;
@@ -19,16 +20,23 @@ public class AgentMain {
         LOGGER.info("Agent {} starting. Cluster dir: {}, cncFailureTimeout={}ms ({} cycles)",
                 config.agentId, config.clusterDir, config.cncFailureTimeoutMs, maxCncFailures);
 
+        // Wait for cluster directories to exist — the agent must never create them.
+        // If they don't exist, the cluster node hasn't started yet.
+        awaitDirectory(new File(config.clusterDir), "Cluster directory");
+
         // Discover node identity from mark file (retries until available)
         ClusterMarkFileReader identity = ClusterMarkFileReader.discover(config);
         LOGGER.info("Agent {} discovered: nodeId={}, aeronDir={}, mode={}",
                 config.agentId, identity.nodeId(), identity.aeronDir(), identity.agentMode());
 
+        // Wait for aeron directory (shared memory) — created by the cluster node's MediaDriver
+        awaitDirectory(new File(identity.aeronDir()), "Aeron directory");
+
         CncReader cncReader = new CncReader(identity.aeronDir());
         ArchiveMetricsCollector archiveCollector = new ArchiveMetricsCollector(config.clusterDir);
         MetricsCollector metricsCollector = new MetricsCollector(
                 cncReader, archiveCollector, identity.nodeId(), identity.agentMode());
-        AdminCommandExecutor commandExecutor = new AdminCommandExecutor(config.clusterDir);
+        AdminCommandExecutor commandExecutor = new AdminCommandExecutor(config.clusterDir, archiveCollector);
         GrpcAgentClient grpcClient = new GrpcAgentClient(config, identity, commandExecutor);
         HealthEndpoint healthEndpoint = new HealthEndpoint(7070);
 
@@ -68,5 +76,13 @@ public class AgentMain {
         }));
 
         LOGGER.info("Agent {} started successfully", config.agentId);
+    }
+
+    private static void awaitDirectory(File dir, String label) throws InterruptedException {
+        while (!dir.isDirectory()) {
+            LOGGER.info("{} {} does not exist yet, waiting for cluster node to start...", label, dir);
+            Thread.sleep(5000);
+        }
+        LOGGER.info("{} {} is available", label, dir);
     }
 }

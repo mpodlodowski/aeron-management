@@ -129,3 +129,11 @@ export interface PaginatedRecordings {
   totalElements: number
   totalPages: number
 }
+
+export interface RecordingBytesResponse {
+  recordingId: number
+  offset: number
+  length: number
+  totalSize: number
+  data: string // base64-encoded bytes
+}
