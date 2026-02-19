@@ -377,12 +377,24 @@ jobs:
         with:
           fetch-depth: 0
 
+      - name: Find previous agent tag
+        id: prev
+        run: |
+          PREV=$(git tag -l 'agent/v*' --sort=-v:refname | grep -v "agent/v${{ needs.setup.outputs.agent_version }}" | head -1)
+          echo "tag=$PREV" >> "$GITHUB_OUTPUT"
+
       - name: Create GitHub Release
         run: |
-          gh release create "agent/v${{ needs.setup.outputs.agent_version }}" \
-            --title "agent v${{ needs.setup.outputs.agent_version }}" \
-            --generate-notes \
+          ARGS=(
+            "agent/v${{ needs.setup.outputs.agent_version }}"
+            --title "agent v${{ needs.setup.outputs.agent_version }}"
+            --generate-notes
             --latest=false
+          )
+          if [ -n "${{ steps.prev.outputs.tag }}" ]; then
+            ARGS+=(--notes-start-tag "${{ steps.prev.outputs.tag }}")
+          fi
+          gh release create "${ARGS[@]}"
         env:
           GH_TOKEN: ${{ github.token }}
 
@@ -396,11 +408,23 @@ jobs:
         with:
           fetch-depth: 0
 
+      - name: Find previous server tag
+        id: prev
+        run: |
+          PREV=$(git tag -l 'server/v*' --sort=-v:refname | grep -v "server/v${{ needs.setup.outputs.server_version }}" | head -1)
+          echo "tag=$PREV" >> "$GITHUB_OUTPUT"
+
       - name: Create GitHub Release
         run: |
-          gh release create "server/v${{ needs.setup.outputs.server_version }}" \
-            --title "server v${{ needs.setup.outputs.server_version }}" \
-            --generate-notes \
+          ARGS=(
+            "server/v${{ needs.setup.outputs.server_version }}"
+            --title "server v${{ needs.setup.outputs.server_version }}"
+            --generate-notes
             --latest=false
+          )
+          if [ -n "${{ steps.prev.outputs.tag }}" ]; then
+            ARGS+=(--notes-start-tag "${{ steps.prev.outputs.tag }}")
+          fi
+          gh release create "${ARGS[@]}"
         env:
           GH_TOKEN: ${{ github.token }}
