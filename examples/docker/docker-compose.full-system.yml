@@ -71,6 +71,10 @@ services:
       - "8081:8081"
     environment:
       AERON_MANAGEMENT_SERVER_PORT: "8081"
+      # Uncomment to enable basic authentication:
+      # AERON_MANAGEMENT_SERVER_AUTH_TYPE: basic
+      # AERON_MANAGEMENT_SERVER_AUTH_BASIC_USERNAME: admin
+      # AERON_MANAGEMENT_SERVER_AUTH_BASIC_PASSWORD: changeme
     restart: always
     networks:
       - net

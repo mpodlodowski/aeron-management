@@ -23,6 +23,19 @@ spec:
           env:
             - name: AERON_MANAGEMENT_SERVER_PORT
               value: "8081"
+            # Uncomment to enable basic authentication:
+            # - name: AERON_MANAGEMENT_SERVER_AUTH_TYPE
+            #   value: "basic"
+            # - name: AERON_MANAGEMENT_SERVER_AUTH_BASIC_USERNAME
+            #   valueFrom:
+            #     secretKeyRef:
+            #       name: management-auth
+            #       key: username
+            # - name: AERON_MANAGEMENT_SERVER_AUTH_BASIC_PASSWORD
+            #   valueFrom:
+            #     secretKeyRef:
+            #       name: management-auth
+            #       key: password
 ---
 apiVersion: v1
 kind: Service
