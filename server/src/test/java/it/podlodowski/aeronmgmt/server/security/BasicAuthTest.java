@@ -34,20 +34,20 @@ class BasicAuthTest {
 
     @Test
     void shouldRejectUnauthenticatedRequest() throws Exception {
-        mockMvc.perform(get("/api/cluster"))
+        mockMvc.perform(get("/api/clusters"))
                 .andExpect(status().isUnauthorized());
     }
 
     @Test
     void shouldRejectWrongCredentials() throws Exception {
-        mockMvc.perform(get("/api/cluster")
+        mockMvc.perform(get("/api/clusters")
                 .with(httpBasic("admin", "wrong")))
                 .andExpect(status().isUnauthorized());
     }
 
     @Test
     void shouldAllowValidCredentials() throws Exception {
-        mockMvc.perform(get("/api/cluster")
+        mockMvc.perform(get("/api/clusters")
                 .with(httpBasic("admin", "secret")))
                 .andExpect(status().isOk());
     }
