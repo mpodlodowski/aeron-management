@@ -17,15 +17,20 @@ public class AgentMain {
     public static void main(String[] args) throws Exception {
         AgentConfig config = new AgentConfig();
         int maxCncFailures = Math.max(1, (int) (config.cncFailureTimeoutMs / config.metricsIntervalMs));
-        LOGGER.info("Agent {} starting. Cluster dir: {}, cncFailureTimeout={}ms ({} cycles)",
-                config.agentId, config.clusterDir, config.cncFailureTimeoutMs, maxCncFailures);
+        LOGGER.info("Agent {} starting. Cluster dir template: {}, cncFailureTimeout={}ms ({} cycles)",
+                config.agentId, config.clusterDirTemplate, config.cncFailureTimeoutMs, maxCncFailures);
 
-        // Wait for cluster directories to exist — the agent must never create them.
-        // If they don't exist, the cluster node hasn't started yet.
-        awaitDirectory(new File(config.clusterDir), "Cluster directory");
+        // Resolve cluster directory: expand {node_id} template, scan if needed.
+        // Wait for the base directory first (before template expansion).
+        String baseDir = config.clusterDirTemplate.contains("{node_id}")
+                ? config.clusterDirTemplate.substring(0, config.clusterDirTemplate.indexOf("{node_id}"))
+                : config.clusterDirTemplate;
+        awaitDirectory(new File(baseDir), "Cluster base directory");
+        String clusterDir = ClusterDirResolver.resolve(config.clusterDirTemplate, System::getenv);
+        LOGGER.info("Resolved cluster dir: {}", clusterDir);
 
         // Discover node identity from mark file (retries until available)
-        ClusterMarkFileReader identity = ClusterMarkFileReader.discover(config);
+        ClusterMarkFileReader identity = ClusterMarkFileReader.discover(clusterDir);
         LOGGER.info("Agent {} discovered: nodeId={}, aeronDir={}, mode={}",
                 config.agentId, identity.nodeId(), identity.aeronDir(), identity.agentMode());
 
@@ -33,10 +38,10 @@ public class AgentMain {
         awaitDirectory(new File(identity.aeronDir()), "Aeron directory");
 
         CncReader cncReader = new CncReader(identity.aeronDir());
-        ArchiveMetricsCollector archiveCollector = new ArchiveMetricsCollector(config.clusterDir);
+        ArchiveMetricsCollector archiveCollector = new ArchiveMetricsCollector(clusterDir);
         MetricsCollector metricsCollector = new MetricsCollector(
                 cncReader, archiveCollector, identity.nodeId(), identity.agentMode());
-        AdminCommandExecutor commandExecutor = new AdminCommandExecutor(config.clusterDir, archiveCollector);
+        AdminCommandExecutor commandExecutor = new AdminCommandExecutor(clusterDir, archiveCollector);
         GrpcAgentClient grpcClient = new GrpcAgentClient(config, identity, commandExecutor);
         HealthEndpoint healthEndpoint = new HealthEndpoint(7070);
 
@@ -49,10 +54,6 @@ public class AgentMain {
                 MetricsReport report = metricsCollector.collect();
                 grpcClient.sendMetrics(report);
 
-                // If CnC file is completely inaccessible for too long, exit so
-                // Docker restarts us (shared volume may be broken).
-                // nodeReachable=false does NOT trigger exit — with shared tmpfs
-                // volumes the agent can recover when the node comes back.
                 if (!report.getCncAccessible()) {
                     int failures = cncFailures.incrementAndGet();
                     if (failures >= maxCncFailures) {
