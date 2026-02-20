@@ -7,3 +7,5 @@ aeron:
     server:
       port: 8081
       metrics-history-seconds: 300
+      auth:
+        type: none
