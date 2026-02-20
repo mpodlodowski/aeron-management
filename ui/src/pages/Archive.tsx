@@ -1,5 +1,5 @@
 import { useEffect, useState, useMemo, useCallback } from 'react'
-import { useSearchParams } from 'react-router-dom'
+import { useParams, useSearchParams } from 'react-router-dom'
 import { useClusterStore } from '../stores/clusterStore'
 import { useWebSocket } from '../hooks/useWebSocket'
 import { ClusterOverview, RecordingRow, RecordingType, DiskGrowthStats } from '../types'
@@ -38,9 +38,10 @@ function formatTimestamp(ts: number): string {
 }
 
 export default function Archive() {
-  useWebSocket()
-  const nodes = useClusterStore((s) => s.nodes)
-  const updateCluster = useClusterStore((s) => s.updateCluster)
+  const { clusterId } = useParams<{ clusterId: string }>()
+  useWebSocket(clusterId)
+  const nodes = useClusterStore((s) => s.clusters.get(clusterId ?? '')?.nodes ?? new Map())
+  const updateClusterOverview = useClusterStore((s) => s.updateClusterOverview)
   const [searchParams, setSearchParams] = useSearchParams()
   const [actionResult, setActionResult] = useState<ActionResult | null>(null)
   const [loading, setLoading] = useState<string | null>(null)
@@ -95,13 +96,15 @@ export default function Archive() {
   const [availableTypes, setAvailableTypes] = useState<string[]>([])
 
   useEffect(() => {
-    fetch('/api/cluster')
+    if (!clusterId) return
+    fetch(`/api/clusters/${clusterId}`)
       .then((res) => res.json())
-      .then((data: ClusterOverview) => updateCluster(data))
+      .then((data: ClusterOverview) => updateClusterOverview(clusterId, data))
       .catch(() => {})
-  }, [updateCluster])
+  }, [clusterId, updateClusterOverview])
 
   const fetchRecordings = useCallback(() => {
+    if (!clusterId) return
     const params = new URLSearchParams()
     if (filterNode !== null) params.set('nodeId', String(filterNode))
     if (filterType !== null) params.set('type', filterType)
@@ -110,7 +113,7 @@ export default function Archive() {
     params.set('sort', sortOrder)
 
     setFetchLoading(true)
-    fetch(`/api/cluster/recordings?${params}`)
+    fetch(`/api/clusters/${clusterId}/recordings?${params}`)
       .then((res) => res.json())
       .then((data) => {
         setRecordings(data.content)
@@ -120,7 +123,7 @@ export default function Archive() {
       })
       .catch(() => {})
       .finally(() => setFetchLoading(false))
-  }, [filterNode, filterType, page, pageSize, sortOrder])
+  }, [clusterId, filterNode, filterType, page, pageSize, sortOrder])
 
   useEffect(() => {
     fetchRecordings()
@@ -139,7 +142,7 @@ export default function Archive() {
     setLoading(label)
     setActionResult(null)
     try {
-      const res = await fetch(`/api/nodes/${nodeId}/${endpoint}`, { method })
+      const res = await fetch(`/api/clusters/${clusterId}/nodes/${nodeId}/${endpoint}`, { method })
       const data = await res.json()
       setActionResult({
         action: label,
@@ -617,6 +620,7 @@ export default function Archive() {
       {hexViewTarget && (
         <RecordingViewer
           key={`${hexViewTarget.nodeId}-${hexViewTarget.recordingId}`}
+          clusterId={clusterId!}
           nodeId={hexViewTarget.nodeId}
           recordingId={hexViewTarget.recordingId}
           totalSize={hexViewTarget.totalSize}

@@ -53,10 +53,10 @@ interface ActionResult {
 }
 
 export default function NodeDetail() {
-  useWebSocket()
-  const { nodeId } = useParams<{ nodeId: string }>()
+  const { clusterId, nodeId } = useParams<{ clusterId: string; nodeId: string }>()
+  useWebSocket(clusterId)
   const id = Number(nodeId)
-  const nodes = useClusterStore((s) => s.nodes)
+  const nodes = useClusterStore((s) => s.clusters.get(clusterId ?? '')?.nodes ?? new Map())
   const updateNode = useClusterStore((s) => s.updateNode)
   const metrics = nodes.get(id)
   const isBackup = metrics?.agentMode === 'backup'
@@ -64,21 +64,21 @@ export default function NodeDetail() {
   const [loading, setLoading] = useState<string | null>(null)
 
   useEffect(() => {
-    if (!metrics) {
-      fetch(`/api/nodes/${id}`)
+    if (!metrics && clusterId) {
+      fetch(`/api/clusters/${clusterId}/nodes/${id}`)
         .then((res) => res.ok ? res.json() : null)
         .then((data: MetricsReport | null) => {
-          if (data) updateNode(data)
+          if (data) updateNode(clusterId, data)
         })
         .catch(() => {})
     }
-  }, [id, metrics, updateNode])
+  }, [id, clusterId, metrics, updateNode])
 
   async function executeAction(action: string, endpoint: string, method: 'POST' | 'GET' = 'POST') {
     setLoading(action)
     setActionResult(null)
     try {
-      const res = await fetch(`/api/nodes/${id}/${endpoint}`, { method })
+      const res = await fetch(`/api/clusters/${clusterId}/nodes/${id}/${endpoint}`, { method })
       const data = await res.json()
       setActionResult({
         action,

@@ -1,20 +1,24 @@
 import { useState, useEffect, useRef } from 'react'
-import { BrowserRouter, Routes, Route, Link, useLocation } from 'react-router-dom'
+import { BrowserRouter, Routes, Route, Link, Navigate, useLocation, useNavigate, useMatch } from 'react-router-dom'
 import { useClusterStore } from './stores/clusterStore'
+import { ClusterSummary } from './types'
 import Dashboard from './pages/Dashboard'
 import NodeDetail from './pages/NodeDetail'
 import Archive from './pages/Archive'
 
 function PageTitle() {
   const location = useLocation()
-  const nodes = useClusterStore((s) => s.nodes)
+  const match = useMatch('/clusters/:clusterId/*')
+  const clusterId = match?.params.clusterId
+  const nodes = useClusterStore((s) => s.clusters.get(clusterId ?? '')?.nodes ?? new Map())
 
-  if (location.pathname === '/') return <>Dashboard</>
-  if (location.pathname === '/archive') return <>Archive</>
+  const isHome = location.pathname === '/' || location.pathname === '/clusters' || (match && !match.params['*'])
+  if (isHome) return <>Dashboard</>
+  if (match?.params['*'] === 'archive') return <>Archive</>
 
-  const match = location.pathname.match(/^\/nodes\/(-?\d+)$/)
-  if (match) {
-    const id = Number(match[1])
+  const nodeMatch = match?.params['*']?.match(/^nodes\/(-?\d+)$/)
+  if (nodeMatch) {
+    const id = Number(nodeMatch[1])
     const metrics = nodes.get(id)
     const agentDown = metrics?.agentConnected === false
     const noCnc = !agentDown && metrics?.cncAccessible === false
@@ -108,37 +112,81 @@ function AuthBadge() {
   )
 }
 
+function ClusterRedirect() {
+  const [loading, setLoading] = useState(true)
+  const navigate = useNavigate()
+
+  useEffect(() => {
+    fetch('/api/clusters')
+      .then((res) => res.json())
+      .then((clusters: ClusterSummary[]) => {
+        if (clusters.length > 0) {
+          navigate(`/clusters/${clusters[0].clusterId}`, { replace: true })
+        }
+        setLoading(false)
+      })
+      .catch(() => setLoading(false))
+  }, [navigate])
+
+  if (loading) return <div className="text-gray-500 p-6">Loading clusters...</div>
+  return <div className="text-gray-500 p-6">No clusters connected. Waiting for agents...</div>
+}
+
+function ClusterSelector() {
+  const navigate = useNavigate()
+  const clusterList = useClusterStore((s) => s.clusterList)
+  const match = useMatch('/clusters/:clusterId/*')
+  const clusterId = match?.params.clusterId
+
+  if (clusterList.length <= 1) return null
+
+  return (
+    <select
+      value={clusterId ?? ''}
+      onChange={(e) => navigate(`/clusters/${e.target.value}`)}
+      className="bg-gray-800 text-gray-200 text-sm rounded px-2 py-1 border border-gray-700 focus:outline-none focus:border-gray-500"
+    >
+      {clusterList.map((c) => (
+        <option key={c.clusterId} value={c.clusterId}>{c.clusterId}</option>
+      ))}
+    </select>
+  )
+}
+
 function Header() {
   const location = useLocation()
-  const isHome = location.pathname === '/'
+  const match = useMatch('/clusters/:clusterId/*')
+  const clusterId = match?.params.clusterId
+  const isHome = location.pathname === '/' || location.pathname === '/clusters' || (match && !match.params['*'])
   const connected = useClusterStore((s) => s.connected)
 
   return (
     <header className="border-b border-gray-800 px-6 py-3 flex items-center gap-4">
       <div className="w-6">
         {!isHome && (
-          <Link to="/" className="text-gray-400 hover:text-gray-200 transition-colors">
+          <Link to={clusterId ? `/clusters/${clusterId}` : '/clusters'} className="text-gray-400 hover:text-gray-200 transition-colors">
             &larr;
           </Link>
         )}
       </div>
-      <Link to="/" className="text-lg font-semibold hover:text-gray-200 transition-colors">
+      <Link to={clusterId ? `/clusters/${clusterId}` : '/clusters'} className="text-lg font-semibold hover:text-gray-200 transition-colors">
         Aeron Management
       </Link>
+      <ClusterSelector />
       <span className="text-gray-600">|</span>
       <span className="text-sm text-gray-300">
         <PageTitle />
       </span>
       <nav className="ml-auto flex items-center gap-4 text-sm">
         <Link
-          to="/"
-          className={`transition-colors ${location.pathname === '/' ? 'text-gray-200' : 'text-gray-400 hover:text-gray-200'}`}
+          to={clusterId ? `/clusters/${clusterId}` : '/clusters'}
+          className={`transition-colors ${isHome ? 'text-gray-200' : 'text-gray-400 hover:text-gray-200'}`}
         >
           Dashboard
         </Link>
         <Link
-          to="/archive"
-          className={`transition-colors ${location.pathname === '/archive' ? 'text-gray-200' : 'text-gray-400 hover:text-gray-200'}`}
+          to={clusterId ? `/clusters/${clusterId}/archive` : '/clusters'}
+          className={`transition-colors ${match?.params['*'] === 'archive' ? 'text-gray-200' : 'text-gray-400 hover:text-gray-200'}`}
         >
           Archive
         </Link>
@@ -159,9 +207,11 @@ export default function App() {
         <Header />
         <main className="p-6">
           <Routes>
-            <Route path="/" element={<Dashboard />} />
-            <Route path="/nodes/:nodeId" element={<NodeDetail />} />
-            <Route path="/archive" element={<Archive />} />
+            <Route path="/" element={<Navigate to="/clusters" replace />} />
+            <Route path="/clusters" element={<ClusterRedirect />} />
+            <Route path="/clusters/:clusterId" element={<Dashboard />} />
+            <Route path="/clusters/:clusterId/nodes/:nodeId" element={<NodeDetail />} />
+            <Route path="/clusters/:clusterId/archive" element={<Archive />} />
           </Routes>
         </main>
       </div>

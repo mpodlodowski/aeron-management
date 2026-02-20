@@ -106,6 +106,16 @@ export interface ClusterOverview {
   timestamp: number
 }
 
+export interface ClusterSummary {
+  clusterId: string
+  nodeCount: number
+  clusterNodeCount: number
+  leaderNodeId: number | null
+  clusterState: string | null
+  clusterStats: ClusterStats | null
+  nodes: Record<string, MetricsReport>
+}
+
 export interface Alert {
   type: string
   nodeId: number

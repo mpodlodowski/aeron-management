@@ -1,11 +1,12 @@
 import { useEffect, useRef } from 'react'
-import { Client } from '@stomp/stompjs'
+import { Client, StompSubscription } from '@stomp/stompjs'
 import SockJS from 'sockjs-client'
 import { useClusterStore } from '../stores/clusterStore'
 
-export function useWebSocket() {
+export function useWebSocket(clusterId: string | undefined) {
   const clientRef = useRef<Client | null>(null)
-  const { updateNode, updateCluster, addAlert, setConnected } = useClusterStore()
+  const subsRef = useRef<StompSubscription[]>([])
+  const { setClusterList, updateClusterOverview, updateNode, addAlert, setConnected } = useClusterStore()
 
   useEffect(() => {
     const client = new Client({
@@ -14,17 +15,23 @@ export function useWebSocket() {
       onConnect: () => {
         setConnected(true)
 
-        client.subscribe('/topic/cluster', (message) => {
-          updateCluster(JSON.parse(message.body))
+        const clusterListSub = client.subscribe('/topic/clusters', (message) => {
+          setClusterList(JSON.parse(message.body))
         })
+        subsRef.current = [clusterListSub]
 
-        client.subscribe('/topic/alerts', (message) => {
-          addAlert(JSON.parse(message.body))
-        })
-
-        client.subscribe('/topic/nodes', (message) => {
-          updateNode(JSON.parse(message.body))
-        })
+        if (clusterId) {
+          const clusterSub = client.subscribe(`/topic/clusters/${clusterId}/cluster`, (message) => {
+            updateClusterOverview(clusterId, JSON.parse(message.body))
+          })
+          const alertSub = client.subscribe(`/topic/clusters/${clusterId}/alerts`, (message) => {
+            addAlert(clusterId, JSON.parse(message.body))
+          })
+          const nodesSub = client.subscribe(`/topic/clusters/${clusterId}/nodes`, (message) => {
+            updateNode(clusterId, JSON.parse(message.body))
+          })
+          subsRef.current.push(clusterSub, alertSub, nodesSub)
+        }
       },
       onDisconnect: () => setConnected(false),
       onStompError: (frame) => {
@@ -37,9 +44,11 @@ export function useWebSocket() {
     clientRef.current = client
 
     return () => {
+      subsRef.current.forEach(sub => sub.unsubscribe())
+      subsRef.current = []
       client.deactivate()
     }
-  }, [updateNode, updateCluster, addAlert, setConnected])
+  }, [clusterId, setClusterList, updateClusterOverview, updateNode, addAlert, setConnected])
 
   return clientRef
 }
