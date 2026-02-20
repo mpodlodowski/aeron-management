@@ -3,7 +3,7 @@ package it.podlodowski.aeronmgmt.server.command;
 import it.podlodowski.aeronmgmt.common.proto.AdminCommand;
 import it.podlodowski.aeronmgmt.common.proto.CommandResult;
 import it.podlodowski.aeronmgmt.common.proto.ServerMessage;
-import it.podlodowski.aeronmgmt.server.aggregator.ClusterStateAggregator;
+import it.podlodowski.aeronmgmt.server.cluster.ClusterManager;
 import it.podlodowski.aeronmgmt.server.grpc.AgentRegistry;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -27,45 +27,48 @@ public class CommandRouter {
     private static final long COMMAND_TIMEOUT_SECONDS = 30;
 
     private final AgentRegistry registry;
-    private final ClusterStateAggregator aggregator;
+    private final ClusterManager clusterManager;
 
-    public CommandRouter(AgentRegistry registry, ClusterStateAggregator aggregator) {
+    public CommandRouter(AgentRegistry registry, ClusterManager clusterManager) {
         this.registry = registry;
-        this.aggregator = aggregator;
+        this.clusterManager = clusterManager;
     }
 
     /**
      * Sends an admin command to the specified node and waits for the result.
      *
+     * @param clusterId   the target cluster ID
      * @param nodeId      the target node ID
      * @param commandType the command type (e.g., SNAPSHOT, SUSPEND, RESUME, SHUTDOWN)
      * @return a map with the command result
      */
-    public Map<String, Object> sendCommand(int nodeId, String commandType) {
-        return sendCommand(nodeId, commandType, Map.of());
+    public Map<String, Object> sendCommand(String clusterId, int nodeId, String commandType) {
+        return sendCommand(clusterId, nodeId, commandType, Map.of());
     }
 
     /**
      * Sends an admin command to the specified node with parameters and waits for the result.
      */
-    public Map<String, Object> sendCommand(int nodeId, String commandType, Map<String, String> parameters) {
-        return doSendCommand(nodeId, commandType, parameters, false);
+    public Map<String, Object> sendCommand(String clusterId, int nodeId, String commandType,
+                                            Map<String, String> parameters) {
+        return doSendCommand(clusterId, nodeId, commandType, parameters, false);
     }
 
     /**
      * Sends an archive command — allowed on both cluster and backup nodes.
      */
-    public Map<String, Object> sendArchiveCommand(int nodeId, String commandType) {
-        return doSendCommand(nodeId, commandType, Map.of(), true);
+    public Map<String, Object> sendArchiveCommand(String clusterId, int nodeId, String commandType) {
+        return doSendCommand(clusterId, nodeId, commandType, Map.of(), true);
     }
 
-    public Map<String, Object> sendArchiveCommand(int nodeId, String commandType, Map<String, String> parameters) {
-        return doSendCommand(nodeId, commandType, parameters, true);
+    public Map<String, Object> sendArchiveCommand(String clusterId, int nodeId, String commandType,
+                                                    Map<String, String> parameters) {
+        return doSendCommand(clusterId, nodeId, commandType, parameters, true);
     }
 
-    private Map<String, Object> doSendCommand(int nodeId, String commandType, Map<String, String> parameters,
-                                               boolean allowBackup) {
-        AgentRegistry.AgentConnection connection = registry.get(nodeId);
+    private Map<String, Object> doSendCommand(String clusterId, int nodeId, String commandType,
+                                               Map<String, String> parameters, boolean allowBackup) {
+        AgentRegistry.AgentConnection connection = registry.get(clusterId, nodeId);
         if (connection == null) {
             Map<String, Object> error = new LinkedHashMap<>();
             error.put("success", false);
@@ -81,7 +84,7 @@ public class CommandRouter {
         }
 
         String commandId = UUID.randomUUID().toString();
-        CompletableFuture<CommandResult> future = aggregator.registerPendingCommand(commandId);
+        CompletableFuture<CommandResult> future = clusterManager.registerPendingCommand(clusterId, commandId);
 
         AdminCommand command = AdminCommand.newBuilder()
                 .setCommandId(commandId)
@@ -95,7 +98,7 @@ public class CommandRouter {
 
         try {
             connection.getResponseObserver().onNext(message);
-            LOGGER.info("Sent command {} ({}) to node {}", commandId, commandType, nodeId);
+            LOGGER.info("Sent command {} ({}) to cluster={}, node={}", commandId, commandType, clusterId, nodeId);
 
             CommandResult result = future.get(COMMAND_TIMEOUT_SECONDS, TimeUnit.SECONDS);
 

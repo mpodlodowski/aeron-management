@@ -16,43 +16,66 @@ public class AgentRegistry {
 
     private static final Logger LOGGER = LoggerFactory.getLogger(AgentRegistry.class);
 
-    private final ConcurrentHashMap<Integer, AgentConnection> connections = new ConcurrentHashMap<>();
+    private final ConcurrentHashMap<String, ConcurrentHashMap<Integer, AgentConnection>> connections =
+            new ConcurrentHashMap<>();
 
-    public void register(int nodeId, String agentMode, String hostname,
+    public void register(String clusterId, int nodeId, String agentMode, String hostname,
                          StreamObserver<ServerMessage> responseObserver) {
-        AgentConnection connection = new AgentConnection(nodeId, agentMode, hostname, responseObserver);
-        connections.put(nodeId, connection);
-        LOGGER.info("Agent registered: nodeId={}, mode={}, hostname={}", nodeId, agentMode, hostname);
+        AgentConnection connection = new AgentConnection(clusterId, nodeId, agentMode, hostname, responseObserver);
+        connections.computeIfAbsent(clusterId, k -> new ConcurrentHashMap<>())
+                .put(nodeId, connection);
+        LOGGER.info("Agent registered: clusterId={}, nodeId={}, mode={}, hostname={}",
+                clusterId, nodeId, agentMode, hostname);
     }
 
-    public void unregister(int nodeId) {
-        AgentConnection removed = connections.remove(nodeId);
-        if (removed != null) {
-            LOGGER.info("Agent unregistered: nodeId={}", nodeId);
+    public void unregister(String clusterId, int nodeId) {
+        ConcurrentHashMap<Integer, AgentConnection> clusterConnections = connections.get(clusterId);
+        if (clusterConnections != null) {
+            AgentConnection removed = clusterConnections.remove(nodeId);
+            if (removed != null) {
+                LOGGER.info("Agent unregistered: clusterId={}, nodeId={}", clusterId, nodeId);
+            }
+            if (clusterConnections.isEmpty()) {
+                connections.remove(clusterId, clusterConnections);
+            }
         }
     }
 
-    public AgentConnection get(int nodeId) {
-        return connections.get(nodeId);
+    public AgentConnection get(String clusterId, int nodeId) {
+        ConcurrentHashMap<Integer, AgentConnection> clusterConnections = connections.get(clusterId);
+        if (clusterConnections == null) {
+            return null;
+        }
+        return clusterConnections.get(nodeId);
     }
 
-    public Collection<AgentConnection> getAll() {
-        return Collections.unmodifiableCollection(connections.values());
+    public Collection<AgentConnection> getAll(String clusterId) {
+        ConcurrentHashMap<Integer, AgentConnection> clusterConnections = connections.get(clusterId);
+        if (clusterConnections == null) {
+            return Collections.emptyList();
+        }
+        return Collections.unmodifiableCollection(clusterConnections.values());
     }
 
     public static class AgentConnection {
+        private final String clusterId;
         private final int nodeId;
         private final String agentMode;
         private final String hostname;
         private final StreamObserver<ServerMessage> responseObserver;
         private volatile MetricsReport latestMetrics;
 
-        public AgentConnection(int nodeId, String agentMode, String hostname,
+        public AgentConnection(String clusterId, int nodeId, String agentMode, String hostname,
                                StreamObserver<ServerMessage> responseObserver) {
+            this.clusterId = clusterId;
             this.nodeId = nodeId;
             this.agentMode = agentMode;
             this.hostname = hostname;
             this.responseObserver = responseObserver;
+        }
+
+        public String getClusterId() {
+            return clusterId;
         }
 
         public int getNodeId() {

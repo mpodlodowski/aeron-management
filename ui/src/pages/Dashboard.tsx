@@ -1,9 +1,9 @@
-import { useEffect, useState } from 'react'
+import { useState } from 'react'
+import { useParams } from 'react-router-dom'
 import { useClusterStore } from '../stores/clusterStore'
 import { useWebSocket } from '../hooks/useWebSocket'
 import NodeCard from '../components/NodeCard'
 import EventLog from '../components/EventLog'
-import { Alert, ClusterOverview } from '../types'
 import { formatNsAsMs } from '../utils/counters'
 
 interface ActionResult {
@@ -13,23 +13,17 @@ interface ActionResult {
 }
 
 export default function Dashboard() {
-  useWebSocket()
-  const { nodes, leaderNodeId, clusterState, clusterStats, alerts, updateCluster, setAlerts } = useClusterStore()
+  const { clusterId } = useParams<{ clusterId: string }>()
+  useWebSocket(clusterId)
+  const cluster = useClusterStore((s) => s.clusters.get(clusterId ?? ''))
+  const nodes = cluster?.nodes ?? new Map()
+  const leaderNodeId = cluster?.leaderNodeId ?? null
+  const clusterState = cluster?.clusterState ?? null
+  const clusterStats = cluster?.clusterStats ?? null
+  const alerts = cluster?.alerts ?? []
   const [loading, setLoading] = useState<string | null>(null)
   const [actionResult, setActionResult] = useState<ActionResult | null>(null)
   const [confirmAction, setConfirmAction] = useState<{ label: string; fn: () => void } | null>(null)
-
-  useEffect(() => {
-    fetch('/api/cluster')
-      .then((res) => res.json())
-      .then((data: ClusterOverview) => updateCluster(data))
-      .catch((err) => console.error('Failed to fetch cluster state:', err))
-
-    fetch('/api/cluster/events')
-      .then((res) => res.json())
-      .then((data: Alert[]) => setAlerts(data))
-      .catch((err) => console.error('Failed to fetch events:', err))
-  }, [updateCluster, setAlerts])
 
   const sortedNodes = Array.from(nodes.values()).sort((a, b) => {
     const aIsBackup = a.agentMode === 'backup' ? 1 : 0
@@ -44,7 +38,7 @@ export default function Dashboard() {
     setLoading(label)
     setActionResult(null)
     try {
-      const res = await fetch(`/api/cluster/${endpoint}`, { method: 'POST' })
+      const res = await fetch(`/api/clusters/${clusterId}/${endpoint}`, { method: 'POST' })
       const data = await res.json()
       setActionResult({
         action: label,
@@ -223,6 +217,7 @@ export default function Dashboard() {
               key={metrics.nodeId}
               metrics={metrics}
               isLeader={metrics.nodeId === leaderNodeId}
+              clusterId={clusterId!}
             />
           ))}
         </div>

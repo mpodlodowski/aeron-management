@@ -2,7 +2,7 @@ package it.podlodowski.aeronmgmt.server.grpc;
 
 import io.grpc.Server;
 import io.grpc.netty.NettyServerBuilder;
-import it.podlodowski.aeronmgmt.server.aggregator.ClusterStateAggregator;
+import it.podlodowski.aeronmgmt.server.cluster.ClusterManager;
 import jakarta.annotation.PreDestroy;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -24,8 +24,8 @@ public class GrpcServerConfig {
 
     @Bean
     public AgentConnectionService agentConnectionService(AgentRegistry registry,
-                                                          ClusterStateAggregator aggregator) {
-        return new AgentConnectionService(registry, aggregator);
+                                                          ClusterManager clusterManager) {
+        return new AgentConnectionService(registry, clusterManager);
     }
 
     @Bean

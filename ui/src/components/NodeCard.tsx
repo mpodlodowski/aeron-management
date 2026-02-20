@@ -5,9 +5,10 @@ import { totalErrors, counterByType, formatBytes, formatDuration, backupStateNam
 interface Props {
   metrics: MetricsReport
   isLeader: boolean
+  clusterId: string
 }
 
-export default function NodeCard({ metrics, isLeader }: Props) {
+export default function NodeCard({ metrics, isLeader, clusterId }: Props) {
   const { clusterMetrics, counters, systemMetrics } = metrics
   const isBackup = metrics.agentMode === 'backup'
   const role = isBackup ? 'BACKUP' : (clusterMetrics?.nodeRole ?? 'UNKNOWN')
@@ -45,7 +46,7 @@ export default function NodeCard({ metrics, isLeader }: Props) {
 
   return (
     <Link
-      to={`/nodes/${metrics.nodeId}`}
+      to={`/clusters/${clusterId}/nodes/${metrics.nodeId}`}
       className={`block rounded-lg border p-5 transition-colors ${borderClass}`}
     >
       <div className="flex items-center justify-between mb-3">

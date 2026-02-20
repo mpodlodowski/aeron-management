@@ -8,6 +8,7 @@ import MessageTableView from './recording-viewer/MessageTableView'
 import DecoderEditor from './recording-viewer/DecoderEditor'
 
 interface Props {
+  clusterId: string
   nodeId: number
   recordingId: number
   totalSize: number
@@ -34,7 +35,7 @@ const VIEW_MODE_LABELS: Record<ViewMode, string> = {
   table: 'Table',
 }
 
-export default function RecordingViewer({ nodeId, recordingId, totalSize, initialOffset = 0, initialViewMode = 'hex', onClose, onStateChange }: Props) {
+export default function RecordingViewer({ clusterId, nodeId, recordingId, totalSize, initialOffset = 0, initialViewMode = 'hex', onClose, onStateChange }: Props) {
   const [data, setData] = useState<Uint8Array | null>(null)
   const [offset, setOffset] = useState(initialOffset)
   const [loading, setLoading] = useState(false)
@@ -60,7 +61,7 @@ export default function RecordingViewer({ nodeId, recordingId, totalSize, initia
       offset: String(fetchOffset),
       length: String(CHUNK_SIZE),
     })
-    fetch(`/api/nodes/${nodeId}/archive/recordings/${recordingId}/bytes?${params}`)
+    fetch(`/api/clusters/${clusterId}/nodes/${nodeId}/archive/recordings/${recordingId}/bytes?${params}`)
       .then((res) => res.json())
       .then((result) => {
         if (result.success === false) {
@@ -84,7 +85,7 @@ export default function RecordingViewer({ nodeId, recordingId, totalSize, initia
         setData(null)
       })
       .finally(() => setLoading(false))
-  }, [nodeId, recordingId])
+  }, [clusterId, nodeId, recordingId])
 
   useEffect(() => {
     fetchBytes(startOffsetRef.current)

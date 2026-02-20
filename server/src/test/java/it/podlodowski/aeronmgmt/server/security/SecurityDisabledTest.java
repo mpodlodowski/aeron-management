@@ -29,7 +29,7 @@ class SecurityDisabledTest {
 
     @Test
     void shouldAllowUnauthenticatedAccessWhenAuthDisabled() throws Exception {
-        mockMvc.perform(get("/api/cluster"))
+        mockMvc.perform(get("/api/clusters"))
                 .andExpect(status().isOk());
     }
 }

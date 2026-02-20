@@ -11,19 +11,20 @@ class MetricsCollectorTest {
     void backupModeInjectsBackupRole() {
         CncReader cncReader = new CncReader("/tmp/nonexistent-aeron-dir");
         ArchiveMetricsCollector archiveCollector = new ArchiveMetricsCollector("/tmp/nonexistent-cluster-dir");
-        MetricsCollector collector = new MetricsCollector(cncReader, archiveCollector, 99, "backup");
+        MetricsCollector collector = new MetricsCollector(cncReader, archiveCollector, 99, "backup", "test-cluster");
 
         MetricsReport report = collector.collect();
 
         assertThat(report.getClusterMetrics().getNodeRole()).isEqualTo("BACKUP");
         assertThat(report.getNodeId()).isEqualTo(99);
+        assertThat(report.getClusterId()).isEqualTo("test-cluster");
     }
 
     @Test
     void clusterModeDoesNotOverrideRole() {
         CncReader cncReader = new CncReader("/tmp/nonexistent-aeron-dir");
         ArchiveMetricsCollector archiveCollector = new ArchiveMetricsCollector("/tmp/nonexistent-cluster-dir");
-        MetricsCollector collector = new MetricsCollector(cncReader, archiveCollector, 0, "cluster");
+        MetricsCollector collector = new MetricsCollector(cncReader, archiveCollector, 0, "cluster", "default");
 
         MetricsReport report = collector.collect();
 

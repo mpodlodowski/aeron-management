@@ -1,9 +1,9 @@
-import { useEffect, useState } from 'react'
+import { useState } from 'react'
 import { useParams } from 'react-router-dom'
 import { useClusterStore } from '../stores/clusterStore'
 import { useWebSocket } from '../hooks/useWebSocket'
 import CounterTable from '../components/CounterTable'
-import { MetricsReport, DiskGrowthStats } from '../types'
+import { DiskGrowthStats } from '../types'
 import { totalErrors, counterByType, counterByLabel, formatBytes, formatNsAsMs, backupStateName, formatDuration, formatGrowthRate, COUNTER_TYPE } from '../utils/counters'
 
 function DiskUsageBar({ recordings, used, total, growth }: { recordings: number; used: number; total: number; growth?: DiskGrowthStats }) {
@@ -53,32 +53,22 @@ interface ActionResult {
 }
 
 export default function NodeDetail() {
-  useWebSocket()
-  const { nodeId } = useParams<{ nodeId: string }>()
+  const { clusterId, nodeId } = useParams<{ clusterId: string; nodeId: string }>()
+  useWebSocket(clusterId)
   const id = Number(nodeId)
-  const nodes = useClusterStore((s) => s.nodes)
-  const updateNode = useClusterStore((s) => s.updateNode)
+  const nodes = useClusterStore((s) => s.clusters.get(clusterId ?? '')?.nodes ?? new Map())
   const metrics = nodes.get(id)
   const isBackup = metrics?.agentMode === 'backup'
   const [actionResult, setActionResult] = useState<ActionResult | null>(null)
   const [loading, setLoading] = useState<string | null>(null)
 
-  useEffect(() => {
-    if (!metrics) {
-      fetch(`/api/nodes/${id}`)
-        .then((res) => res.ok ? res.json() : null)
-        .then((data: MetricsReport | null) => {
-          if (data) updateNode(data)
-        })
-        .catch(() => {})
-    }
-  }, [id, metrics, updateNode])
+  // Initial node data is delivered via WebSocket on subscribe (see WebSocketSubscriptionHandler)
 
   async function executeAction(action: string, endpoint: string, method: 'POST' | 'GET' = 'POST') {
     setLoading(action)
     setActionResult(null)
     try {
-      const res = await fetch(`/api/nodes/${id}/${endpoint}`, { method })
+      const res = await fetch(`/api/clusters/${clusterId}/nodes/${id}/${endpoint}`, { method })
       const data = await res.json()
       setActionResult({
         action,

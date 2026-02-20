@@ -1,7 +1,5 @@
 package it.podlodowski.aeronmgmt.server.aggregator;
 
-import org.springframework.stereotype.Component;
-
 import java.util.LinkedHashMap;
 import java.util.Map;
 import java.util.concurrent.ConcurrentHashMap;
@@ -11,8 +9,8 @@ import java.util.concurrent.ConcurrentHashMap;
  * Computes growth rates and time-to-full estimates by comparing recordingsTotalBytes
  * across samples, which captures both log recording growth and new snapshot creation.
  * First sample is recorded immediately (no minimum interval for the initial sample).
+ * Each {@link it.podlodowski.aeronmgmt.server.aggregator.ClusterStateAggregator} creates its own instance.
  */
-@Component
 public class DiskUsageTracker {
 
     private static final int MAX_SAMPLES = 1440; // 24h at 1 sample/min

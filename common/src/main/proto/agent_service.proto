@@ -24,6 +24,7 @@ message AgentRegistration {
   string agent_mode = 2;  // "cluster" or "backup"
   string hostname = 3;
   string agent_id = 4;    // unique agent identifier (random UUID or configured)
+  string cluster_id = 5;  // cluster slug, e.g. "production" (default: "default")
 }
 
 message MetricsReport {
@@ -35,6 +36,7 @@ message MetricsReport {
   SystemMetrics system_metrics = 6;
   bool node_reachable = 7;           // true if the media driver heartbeat is active
   bool cnc_accessible = 8;           // true if the CnC file exists and is readable
+  string cluster_id = 9;  // cluster slug, e.g. "production" (default: "default")
 }
 
 message ClusterMetrics {
