@@ -449,6 +449,6 @@ jobs:
           gh release create "$TAG" \
             --title "$TITLE" \
             --notes "$BODY" \
-            --latest=false
+            --latest
         env:
           GH_TOKEN: ${{ github.token }}
