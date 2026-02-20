@@ -10,13 +10,31 @@ Optionally compiled to a GraalVM native image for ~20 MB footprint and instant s
 |----------|---------|-------------|
 | `AERON_MANAGEMENT_AGENT_SERVER_HOST` | `localhost` | Management server hostname |
 | `AERON_MANAGEMENT_AGENT_SERVER_PORT` | `8081` | Management server gRPC port |
-| `AERON_MANAGEMENT_AGENT_CLUSTER_DIR` | `aeron-cluster/cluster` | Path to the cluster directory (contains `cluster-mark.dat`) |
+| `AERON_MANAGEMENT_AGENT_CLUSTER_DIR` | `user.home` | Cluster directory path, template, or base directory (see below) |
 | `AERON_MANAGEMENT_AGENT_METRICS_INTERVAL_MS` | `1000` | Metrics collection interval in ms |
 | `AERON_MANAGEMENT_AGENT_ID` | Random UUID prefix | Unique identifier for this agent |
 | `AERON_MANAGEMENT_AGENT_CNC_FAILURE_TIMEOUT_MS` | `2000` | Timeout before exiting when CnC file is inaccessible |
-| `AERON_MANAGEMENT_AGENT_NODE_ID` | Auto-discovered | Override node ID from cluster-mark.dat |
-| `AERON_MANAGEMENT_AGENT_AERON_DIR` | Auto-discovered | Override Aeron directory from cluster-mark.dat |
-| `AERON_MANAGEMENT_AGENT_MODE` | Auto-discovered | Override agent mode (`cluster` or `backup`) |
+
+Node ID, Aeron directory, and agent mode are auto-discovered from `cluster-mark.dat`.
+
+### Cluster Directory Resolution
+
+`AERON_MANAGEMENT_AGENT_CLUSTER_DIR` supports three modes:
+
+**Explicit path** (contains `cluster-mark.dat`):
+```
+AERON_MANAGEMENT_AGENT_CLUSTER_DIR=/home/aeron/aeron-cluster/aeron-cluster-0/cluster
+```
+
+**Template** (uses `{node_id}` placeholder, resolved from `NODE_ID` env, `POD_NAME`, or `HOSTNAME` ordinal):
+```
+AERON_MANAGEMENT_AGENT_CLUSTER_DIR=/home/aeron/aeron-cluster/aeron-cluster-{node_id}/cluster
+```
+
+**Base directory** (scans for a single `cluster-mark.dat`):
+```
+AERON_MANAGEMENT_AGENT_CLUSTER_DIR=/home/aeron/aeron-cluster
+```
 
 ## Health Endpoint
 

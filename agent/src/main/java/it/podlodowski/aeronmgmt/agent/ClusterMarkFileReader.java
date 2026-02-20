@@ -8,10 +8,6 @@ import org.slf4j.LoggerFactory;
 
 import java.io.File;
 
-/**
- * Reads node identity from the cluster-mark.dat file.
- * Discovers nodeId, aeronDir, and agentMode without manual configuration.
- */
 public class ClusterMarkFileReader {
 
     private static final Logger LOGGER = LoggerFactory.getLogger(ClusterMarkFileReader.class);
@@ -30,46 +26,33 @@ public class ClusterMarkFileReader {
     public String aeronDir() { return aeronDir; }
     public String agentMode() { return agentMode; }
 
-    /**
-     * Reads node identity from the mark file, retrying until available.
-     * Applies config overrides where provided.
-     */
-    public static ClusterMarkFileReader discover(AgentConfig config) {
+    public static ClusterMarkFileReader discover(String clusterDir) {
         while (!Thread.currentThread().isInterrupted()) {
             try {
-                return readFromMarkFile(config);
+                return readFromMarkFile(clusterDir);
             } catch (Exception e) {
                 LOGGER.info("Cluster mark file not available in {}: {}. Retrying in 5s...",
-                        config.clusterDir, e.getMessage());
+                        clusterDir, e.getMessage());
                 sleep(5000);
             }
         }
         throw new IllegalStateException("Interrupted while waiting for mark file");
     }
 
-    private static ClusterMarkFileReader readFromMarkFile(AgentConfig config) {
-        // Open cluster-mark.dat directly (the generic name used by the cluster).
-        // The typed constructor looks for cluster-mark-consensus_module.dat etc. which
-        // doesn't match what Aeron 1.46.5 writes, so we specify the filename explicitly.
-        File clusterDir = new File(config.clusterDir);
+    private static ClusterMarkFileReader readFromMarkFile(String clusterDirPath) {
+        File clusterDir = new File(clusterDirPath);
 
         try (ClusterMarkFile markFile = new ClusterMarkFile(
                 clusterDir, ClusterMarkFile.FILENAME, new SystemEpochClock(), 5000,
                 msg -> LOGGER.debug("Mark file: {}", msg))) {
             ClusterComponentType type = markFile.decoder().componentType();
-            int discoveredNodeId = markFile.decoder().memberId();
-            String discoveredAeronDir = markFile.decoder().aeronDirectory();
+            int nodeId = markFile.decoder().memberId();
+            String aeronDir = markFile.decoder().aeronDirectory();
             boolean isBackup = type == ClusterComponentType.BACKUP;
-            String discoveredMode = isBackup ? "backup" : "cluster";
+            String agentMode = isBackup ? "backup" : "cluster";
 
-            // Apply overrides
-            int nodeId = config.nodeIdOverride != null ? config.nodeIdOverride : discoveredNodeId;
-            String aeronDir = config.aeronDirOverride != null ? config.aeronDirOverride : discoveredAeronDir;
-            String agentMode = config.agentModeOverride != null ? config.agentModeOverride : discoveredMode;
-
-            LOGGER.info("Discovered from mark file: nodeId={}, aeronDir={}, mode={} (overrides: nodeId={}, aeronDir={}, mode={})",
-                    discoveredNodeId, discoveredAeronDir, discoveredMode,
-                    config.nodeIdOverride, config.aeronDirOverride, config.agentModeOverride);
+            LOGGER.info("Discovered from mark file: nodeId={}, aeronDir={}, mode={}",
+                    nodeId, aeronDir, agentMode);
 
             return new ClusterMarkFileReader(nodeId, aeronDir, agentMode);
         }

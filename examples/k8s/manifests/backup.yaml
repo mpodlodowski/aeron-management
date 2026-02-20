@@ -30,12 +30,6 @@ spec:
       env:
         - name: AERON_MANAGEMENT_AGENT_SERVER_HOST
           value: "management-server"
-        - name: AERON_MANAGEMENT_AGENT_SERVER_PORT
-          value: "8081"
-        - name: AERON_MANAGEMENT_AGENT_CLUSTER_DIR
-          value: "/home/aeron/aeron-cluster/cluster"
-        - name: AERON_MANAGEMENT_AGENT_ID
-          value: "agent-backup"
       volumeMounts:
         - name: shm
           mountPath: /dev/shm
