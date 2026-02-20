@@ -10,6 +10,7 @@ import org.springframework.security.core.userdetails.User;
 import org.springframework.security.core.userdetails.UserDetailsService;
 import org.springframework.security.provisioning.InMemoryUserDetailsManager;
 import org.springframework.security.web.SecurityFilterChain;
+import jakarta.servlet.http.HttpServletResponse;
 
 @Configuration
 @EnableWebSecurity
@@ -43,6 +44,10 @@ public class SecurityConfig {
             http
                 .authorizeHttpRequests(auth -> auth.anyRequest().authenticated())
                 .httpBasic(basic -> {})
+                .securityContext(context -> context.requireExplicitSave(false))
+                .logout(logout -> logout
+                    .logoutUrl("/api/auth/logout")
+                    .logoutSuccessHandler((req, res, auth) -> res.setStatus(HttpServletResponse.SC_OK)))
                 .csrf(csrf -> csrf.disable());
         } else {
             http
