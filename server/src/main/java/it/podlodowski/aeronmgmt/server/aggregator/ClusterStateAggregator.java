@@ -7,10 +7,7 @@ import it.podlodowski.aeronmgmt.common.proto.CommandResult;
 import it.podlodowski.aeronmgmt.common.proto.MetricsReport;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
-import org.springframework.beans.factory.annotation.Autowired;
-import org.springframework.beans.factory.annotation.Value;
 import org.springframework.messaging.simp.SimpMessagingTemplate;
-import org.springframework.stereotype.Component;
 
 import java.util.*;
 import java.util.concurrent.CompletableFuture;
@@ -19,8 +16,8 @@ import java.util.concurrent.ConcurrentHashMap;
 /**
  * Aggregates cluster state from all connected agents.
  * Maintains per-node rolling metrics windows and pushes updates via WebSocket.
+ * Each instance is scoped to a single cluster identified by {@code clusterId}.
  */
-@Component
 public class ClusterStateAggregator {
 
     private static final Logger LOGGER = LoggerFactory.getLogger(ClusterStateAggregator.class);
@@ -28,6 +25,7 @@ public class ClusterStateAggregator {
     private final SimpMessagingTemplate messagingTemplate;
     private final DiskUsageTracker diskUsageTracker;
     private final long windowDurationMs;
+    private final String clusterId;
 
     private static final int MAX_EVENTS = 200;
 
@@ -40,14 +38,18 @@ public class ClusterStateAggregator {
     private final Set<Integer> reachableNodes = ConcurrentHashMap.newKeySet();
     private final LinkedList<Map<String, Object>> recentEvents = new LinkedList<>();
 
-    @Autowired
-    public ClusterStateAggregator(
-            @Autowired(required = false) SimpMessagingTemplate messagingTemplate,
-            DiskUsageTracker diskUsageTracker,
-            @Value("${aeron.management.server.metrics-history-seconds:300}") int historySeconds) {
+    public ClusterStateAggregator(SimpMessagingTemplate messagingTemplate,
+                                  DiskUsageTracker diskUsageTracker,
+                                  int historySeconds,
+                                  String clusterId) {
         this.messagingTemplate = messagingTemplate;
         this.diskUsageTracker = diskUsageTracker;
         this.windowDurationMs = historySeconds * 1000L;
+        this.clusterId = clusterId;
+    }
+
+    public String getClusterId() {
+        return clusterId;
     }
 
     public void onMetricsReceived(MetricsReport report) {
@@ -81,9 +83,9 @@ public class ClusterStateAggregator {
         LOGGER.debug("Metrics received from node {}", nodeId);
 
         Map<String, Object> metricsMap = convertMetricsToMap(report);
-        pushToWebSocket("/topic/nodes/" + nodeId, metricsMap);
-        pushToWebSocket("/topic/nodes", metricsMap);
-        pushToWebSocket("/topic/cluster", buildClusterOverview());
+        pushToWebSocket("/topic/clusters/" + clusterId + "/nodes/" + nodeId, metricsMap);
+        pushToWebSocket("/topic/clusters/" + clusterId + "/nodes", metricsMap);
+        pushToWebSocket("/topic/clusters/" + clusterId + "/cluster", buildClusterOverview());
     }
 
     public void onCommandResult(CommandResult result) {
@@ -99,7 +101,7 @@ public class ClusterStateAggregator {
         connectedNodes.add(nodeId);
         nodeAgentModes.put(nodeId, agentMode);
         emitAlert("AGENT_CONNECTED", nodeId, "connected");
-        pushToWebSocket("/topic/cluster", buildClusterOverview());
+        pushToWebSocket("/topic/clusters/" + clusterId + "/cluster", buildClusterOverview());
     }
 
     public void onAgentDisconnected(int nodeId) {
@@ -107,7 +109,7 @@ public class ClusterStateAggregator {
         connectedNodes.remove(nodeId);
         reachableNodes.remove(nodeId);
         emitAlert("AGENT_DISCONNECTED", nodeId, "agent disconnected");
-        pushToWebSocket("/topic/cluster", buildClusterOverview());
+        pushToWebSocket("/topic/clusters/" + clusterId + "/cluster", buildClusterOverview());
     }
 
     private void detectStateChanges(int nodeId, MetricsReport previous, MetricsReport current) {
@@ -172,7 +174,7 @@ public class ClusterStateAggregator {
             }
         }
 
-        pushToWebSocket("/topic/alerts", alert);
+        pushToWebSocket("/topic/clusters/" + clusterId + "/alerts", alert);
     }
 
     public List<Map<String, Object>> getRecentEvents() {

@@ -2,7 +2,7 @@ package it.podlodowski.aeronmgmt.server.grpc;
 
 import io.grpc.stub.StreamObserver;
 import it.podlodowski.aeronmgmt.common.proto.*;
-import it.podlodowski.aeronmgmt.server.aggregator.ClusterStateAggregator;
+import it.podlodowski.aeronmgmt.server.cluster.ClusterManager;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -11,11 +11,11 @@ public class AgentConnectionService extends AgentServiceGrpc.AgentServiceImplBas
     private static final Logger LOGGER = LoggerFactory.getLogger(AgentConnectionService.class);
 
     private final AgentRegistry registry;
-    private final ClusterStateAggregator aggregator;
+    private final ClusterManager clusterManager;
 
-    public AgentConnectionService(AgentRegistry registry, ClusterStateAggregator aggregator) {
+    public AgentConnectionService(AgentRegistry registry, ClusterManager clusterManager) {
         this.registry = registry;
-        this.aggregator = aggregator;
+        this.clusterManager = clusterManager;
     }
 
     @Override
@@ -23,6 +23,7 @@ public class AgentConnectionService extends AgentServiceGrpc.AgentServiceImplBas
         return new StreamObserver<>() {
             private volatile int nodeId = -1;
             private volatile String agentId = "unknown";
+            private volatile String clusterId = "default";
 
             @Override
             public void onNext(AgentMessage message) {
@@ -51,14 +52,17 @@ public class AgentConnectionService extends AgentServiceGrpc.AgentServiceImplBas
                                              StreamObserver<ServerMessage> observer) {
                 nodeId = registration.getNodeId();
                 agentId = registration.getAgentId();
+                clusterId = registration.getClusterId().isEmpty() ? "default" : registration.getClusterId();
+
                 registry.register(
+                        clusterId,
                         registration.getNodeId(),
                         registration.getAgentMode(),
                         registration.getHostname(),
                         observer
                 );
 
-                aggregator.onAgentConnected(nodeId, registration.getAgentMode());
+                clusterManager.onAgentConnected(clusterId, nodeId, registration.getAgentMode());
 
                 ServerMessage ack = ServerMessage.newBuilder()
                         .setAck(Ack.newBuilder()
@@ -66,26 +70,27 @@ public class AgentConnectionService extends AgentServiceGrpc.AgentServiceImplBas
                                 .build())
                         .build();
                 observer.onNext(ack);
-                LOGGER.info("Agent registered: agentId={}, nodeId={}, mode={}",
-                        agentId, nodeId, registration.getAgentMode());
+                LOGGER.info("Agent registered: agentId={}, nodeId={}, clusterId={}, mode={}",
+                        agentId, nodeId, clusterId, registration.getAgentMode());
             }
 
             private void handleMetrics(MetricsReport report) {
-                AgentRegistry.AgentConnection connection = registry.get(report.getNodeId());
+                String reportClusterId = report.getClusterId().isEmpty() ? clusterId : report.getClusterId();
+                AgentRegistry.AgentConnection connection = registry.get(reportClusterId, report.getNodeId());
                 if (connection != null) {
                     connection.setLatestMetrics(report);
                 }
-                aggregator.onMetricsReceived(report);
+                clusterManager.onMetricsReceived(reportClusterId, report);
             }
 
             private void handleCommandResult(CommandResult result) {
-                aggregator.onCommandResult(result);
+                clusterManager.onCommandResult(result);
             }
 
             private void handleDisconnect() {
                 if (nodeId >= 0) {
-                    registry.unregister(nodeId);
-                    aggregator.onAgentDisconnected(nodeId);
+                    registry.unregister(clusterId, nodeId);
+                    clusterManager.onAgentDisconnected(clusterId, nodeId);
                 }
             }
         };

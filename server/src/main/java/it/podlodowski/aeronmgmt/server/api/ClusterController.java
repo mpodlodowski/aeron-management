@@ -3,103 +3,129 @@ package it.podlodowski.aeronmgmt.server.api;
 import it.podlodowski.aeronmgmt.common.proto.ArchiveRecording;
 import it.podlodowski.aeronmgmt.common.proto.MetricsReport;
 import it.podlodowski.aeronmgmt.server.aggregator.ClusterStateAggregator;
+import it.podlodowski.aeronmgmt.server.cluster.ClusterManager;
 import it.podlodowski.aeronmgmt.server.command.CommandRouter;
-import org.springframework.web.bind.annotation.GetMapping;
-import org.springframework.web.bind.annotation.PostMapping;
-import org.springframework.web.bind.annotation.RequestMapping;
-import org.springframework.web.bind.annotation.RequestParam;
-import org.springframework.web.bind.annotation.RestController;
+import org.springframework.http.ResponseEntity;
+import org.springframework.web.bind.annotation.*;
 
 import java.util.*;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
 
 @RestController
-@RequestMapping("/api/cluster")
+@RequestMapping("/api/clusters")
 public class ClusterController {
 
     private static final Pattern ALIAS_PATTERN = Pattern.compile("\\balias=(\\w+)");
 
-    private final ClusterStateAggregator aggregator;
+    private final ClusterManager clusterManager;
     private final CommandRouter commandRouter;
 
-    public ClusterController(ClusterStateAggregator aggregator, CommandRouter commandRouter) {
-        this.aggregator = aggregator;
+    public ClusterController(ClusterManager clusterManager, CommandRouter commandRouter) {
+        this.clusterManager = clusterManager;
         this.commandRouter = commandRouter;
     }
 
     @GetMapping
-    public Map<String, Object> getClusterOverview() {
-        return aggregator.buildClusterOverview();
+    public List<Map<String, Object>> listClusters() {
+        return clusterManager.getAllClusterOverviews();
     }
 
-    @GetMapping("/events")
-    public List<Map<String, Object>> getRecentEvents() {
-        return aggregator.getRecentEvents();
+    @GetMapping("/{clusterId}")
+    public ResponseEntity<Map<String, Object>> getClusterOverview(@PathVariable String clusterId) {
+        ClusterStateAggregator aggregator = clusterManager.getCluster(clusterId);
+        if (aggregator == null) {
+            return ResponseEntity.notFound().build();
+        }
+        Map<String, Object> overview = aggregator.buildClusterOverview();
+        overview.put("clusterId", clusterId);
+        return ResponseEntity.ok(overview);
     }
 
-    @GetMapping("/membership")
-    public Map<String, Object> getMembership() {
-        // Find leader node ID from latest metrics
+    @GetMapping("/{clusterId}/events")
+    public ResponseEntity<List<Map<String, Object>>> getRecentEvents(@PathVariable String clusterId) {
+        ClusterStateAggregator aggregator = clusterManager.getCluster(clusterId);
+        if (aggregator == null) {
+            return ResponseEntity.notFound().build();
+        }
+        return ResponseEntity.ok(aggregator.getRecentEvents());
+    }
+
+    @GetMapping("/{clusterId}/membership")
+    public ResponseEntity<Map<String, Object>> getMembership(@PathVariable String clusterId) {
+        ClusterStateAggregator aggregator = clusterManager.getCluster(clusterId);
+        if (aggregator == null) {
+            return ResponseEntity.notFound().build();
+        }
         for (Map.Entry<Integer, MetricsReport> entry : aggregator.getLatestMetrics().entrySet()) {
             MetricsReport report = entry.getValue();
             if (report.hasClusterMetrics() && "LEADER".equals(report.getClusterMetrics().getNodeRole())) {
-                return commandRouter.sendCommand(entry.getKey(), "LIST_MEMBERS_STRUCTURED");
+                return ResponseEntity.ok(commandRouter.sendCommand(clusterId, entry.getKey(), "LIST_MEMBERS_STRUCTURED"));
             }
         }
         Map<String, Object> error = new LinkedHashMap<>();
         error.put("success", false);
         error.put("message", "No leader node available");
-        return error;
+        return ResponseEntity.ok(error);
     }
 
     // --- Cluster-level admin actions (auto-routed to leader) ---
 
-    @PostMapping("/snapshot")
-    public Map<String, Object> snapshot() {
-        return sendToLeader("SNAPSHOT");
+    @PostMapping("/{clusterId}/snapshot")
+    public ResponseEntity<Map<String, Object>> snapshot(@PathVariable String clusterId) {
+        return sendToLeader(clusterId, "SNAPSHOT");
     }
 
-    @PostMapping("/suspend")
-    public Map<String, Object> suspend() {
-        return sendToLeader("SUSPEND");
+    @PostMapping("/{clusterId}/suspend")
+    public ResponseEntity<Map<String, Object>> suspend(@PathVariable String clusterId) {
+        return sendToLeader(clusterId, "SUSPEND");
     }
 
-    @PostMapping("/resume")
-    public Map<String, Object> resume() {
-        return sendToLeader("RESUME");
+    @PostMapping("/{clusterId}/resume")
+    public ResponseEntity<Map<String, Object>> resume(@PathVariable String clusterId) {
+        return sendToLeader(clusterId, "RESUME");
     }
 
-    @PostMapping("/shutdown")
-    public Map<String, Object> shutdown() {
-        return sendToLeader("SHUTDOWN");
+    @PostMapping("/{clusterId}/shutdown")
+    public ResponseEntity<Map<String, Object>> shutdown(@PathVariable String clusterId) {
+        return sendToLeader(clusterId, "SHUTDOWN");
     }
 
-    @PostMapping("/abort")
-    public Map<String, Object> abort() {
-        return sendToLeader("ABORT");
+    @PostMapping("/{clusterId}/abort")
+    public ResponseEntity<Map<String, Object>> abort(@PathVariable String clusterId) {
+        return sendToLeader(clusterId, "ABORT");
     }
 
-    private Map<String, Object> sendToLeader(String command) {
+    private ResponseEntity<Map<String, Object>> sendToLeader(String clusterId, String command) {
+        ClusterStateAggregator aggregator = clusterManager.getCluster(clusterId);
+        if (aggregator == null) {
+            return ResponseEntity.notFound().build();
+        }
         for (Map.Entry<Integer, MetricsReport> entry : aggregator.getLatestMetrics().entrySet()) {
             MetricsReport report = entry.getValue();
             if (report.hasClusterMetrics() && "LEADER".equals(report.getClusterMetrics().getNodeRole())) {
-                return commandRouter.sendCommand(entry.getKey(), command);
+                return ResponseEntity.ok(commandRouter.sendCommand(clusterId, entry.getKey(), command));
             }
         }
         Map<String, Object> error = new LinkedHashMap<>();
         error.put("success", false);
         error.put("message", "No leader node available");
-        return error;
+        return ResponseEntity.ok(error);
     }
 
-    @GetMapping("/recordings")
-    public Map<String, Object> getRecordings(
+    @GetMapping("/{clusterId}/recordings")
+    public ResponseEntity<Map<String, Object>> getRecordings(
+            @PathVariable String clusterId,
             @RequestParam(required = false) Integer nodeId,
             @RequestParam(required = false) String type,
             @RequestParam(defaultValue = "0") int page,
             @RequestParam(defaultValue = "100") int size,
             @RequestParam(defaultValue = "desc") String sort) {
+
+        ClusterStateAggregator aggregator = clusterManager.getCluster(clusterId);
+        if (aggregator == null) {
+            return ResponseEntity.notFound().build();
+        }
 
         List<Map<String, Object>> rows = new ArrayList<>();
         Set<String> availableTypes = new TreeSet<>();
@@ -146,7 +172,7 @@ public class ClusterController {
         result.put("totalElements", totalElements);
         result.put("totalPages", totalPages);
         result.put("availableTypes", availableTypes);
-        return result;
+        return ResponseEntity.ok(result);
     }
 
     private String deriveRecordingType(String channel) {
