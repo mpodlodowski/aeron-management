@@ -1,8 +1,9 @@
 server:
   port: 8080
+  address: ${AERON_MANAGEMENT_SERVER_HOST:0.0.0.0}
 
 aeron:
   management:
     server:
-      grpc-port: 8081
+      port: 8081
       metrics-history-seconds: 300

@@ -70,7 +70,7 @@ services:
       - "8080:8080"
       - "8081:8081"
     environment:
-      AERON_MANAGEMENT_SERVER_GRPC_PORT: "8081"
+      AERON_MANAGEMENT_SERVER_PORT: "8081"
     restart: always
     networks:
       - net
@@ -87,7 +87,7 @@ services:
       - node-data-0:/home/aeron/aeron-cluster
       - shm-node0:/dev/shm
     environment:
-      AERON_MANAGEMENT_AGENT_SERVER_HOST: management-server
+      AERON_MANAGEMENT_SERVER_HOST: management-server
     depends_on:
       - management-server
     restart: always
@@ -103,7 +103,7 @@ services:
       - node-data-1:/home/aeron/aeron-cluster
       - shm-node1:/dev/shm
     environment:
-      AERON_MANAGEMENT_AGENT_SERVER_HOST: management-server
+      AERON_MANAGEMENT_SERVER_HOST: management-server
     depends_on:
       - management-server
     restart: always
@@ -119,7 +119,7 @@ services:
       - node-data-2:/home/aeron/aeron-cluster
       - shm-node2:/dev/shm
     environment:
-      AERON_MANAGEMENT_AGENT_SERVER_HOST: management-server
+      AERON_MANAGEMENT_SERVER_HOST: management-server
     depends_on:
       - management-server
     restart: always
@@ -135,7 +135,7 @@ services:
       - node-backup:/home/aeron/aeron-cluster
       - shm-backup:/dev/shm
     environment:
-      AERON_MANAGEMENT_AGENT_SERVER_HOST: management-server
+      AERON_MANAGEMENT_SERVER_HOST: management-server
     depends_on:
       - management-server
     restart: always

@@ -28,7 +28,7 @@ spec:
     - name: agent
       image: aeron-management-agent:local
       env:
-        - name: AERON_MANAGEMENT_AGENT_SERVER_HOST
+        - name: AERON_MANAGEMENT_SERVER_HOST
           value: "management-server"
       volumeMounts:
         - name: shm

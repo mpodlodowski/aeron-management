@@ -11,8 +11,8 @@ public class AgentConfig {
     public final long cncFailureTimeoutMs;
 
     public AgentConfig() {
-        this.managementServerHost = env("AERON_MANAGEMENT_AGENT_SERVER_HOST", "localhost");
-        this.managementServerPort = Integer.parseInt(env("AERON_MANAGEMENT_AGENT_SERVER_PORT", "8081"));
+        this.managementServerHost = env("AERON_MANAGEMENT_SERVER_HOST", "localhost");
+        this.managementServerPort = Integer.parseInt(env("AERON_MANAGEMENT_SERVER_PORT", "8081"));
         this.clusterDirTemplate = env("AERON_MANAGEMENT_AGENT_CLUSTER_DIR", System.getProperty("user.home"));
         this.metricsIntervalMs = Long.parseLong(env("AERON_MANAGEMENT_AGENT_METRICS_INTERVAL_MS", "1000"));
         this.agentId = env("AERON_MANAGEMENT_AGENT_ID", UUID.randomUUID().toString().substring(0, 8));
