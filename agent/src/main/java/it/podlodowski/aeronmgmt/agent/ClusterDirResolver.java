@@ -56,7 +56,9 @@ public class ClusterDirResolver {
 
         if (found.isEmpty()) {
             throw new IllegalStateException(
-                    "No " + MARK_FILE_NAME + " found under " + path + " (scanned " + MAX_SCAN_DEPTH + " levels)");
+                    "No " + MARK_FILE_NAME + " found under " + path + " (scanned " + MAX_SCAN_DEPTH + " levels deep). " +
+                    "Set AERON_MANAGEMENT_AGENT_CLUSTER_DIR to the directory containing " + MARK_FILE_NAME + ", " +
+                    "e.g. /home/aeron/aeron-cluster/aeron-cluster-0/cluster");
         }
         if (found.size() > 1) {
             throw new IllegalStateException(

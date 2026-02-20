@@ -30,8 +30,6 @@ spec:
       env:
         - name: AERON_MANAGEMENT_AGENT_SERVER_HOST
           value: "management-server"
-        - name: AERON_MANAGEMENT_AGENT_CLUSTER_DIR
-          value: "/home/aeron/aeron-cluster/cluster"
       volumeMounts:
         - name: shm
           mountPath: /dev/shm

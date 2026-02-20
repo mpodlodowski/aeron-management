@@ -18,7 +18,6 @@ services:
       - shm-node0:/dev/shm
     environment:
       AERON_MANAGEMENT_AGENT_SERVER_HOST: management-server
-      AERON_MANAGEMENT_AGENT_CLUSTER_DIR: /home/aeron/aeron-cluster
 
   agent-1:
     build:
@@ -29,7 +28,6 @@ services:
       - shm-node1:/dev/shm
     environment:
       AERON_MANAGEMENT_AGENT_SERVER_HOST: management-server
-      AERON_MANAGEMENT_AGENT_CLUSTER_DIR: /home/aeron/aeron-cluster
 
   agent-2:
     build:
@@ -40,7 +38,6 @@ services:
       - shm-node2:/dev/shm
     environment:
       AERON_MANAGEMENT_AGENT_SERVER_HOST: management-server
-      AERON_MANAGEMENT_AGENT_CLUSTER_DIR: /home/aeron/aeron-cluster
 
 volumes:
   node-data-0:
