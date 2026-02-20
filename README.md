@@ -12,6 +12,7 @@ Web-based monitoring and administration dashboard for [Aeron Cluster](https://ae
 
 ## What It Does
 
+- **Multi-cluster support** — monitor and manage multiple independent Aeron clusters from a single server, with a cluster selector in the UI
 - **Live cluster overview** — node roles, commit positions, elections, traffic rates, all updating in real time
 - **Cluster state awareness** — see at a glance if the cluster is active, suspended, snapshotting, or shutting down
 - **One-click admin** — Snapshot, Suspend, Resume, Shutdown directly from the dashboard, automatically routed to the leader
@@ -24,17 +25,21 @@ Web-based monitoring and administration dashboard for [Aeron Cluster](https://ae
 ## Architecture
 
 ```
-  React UI  <--- WebSocket/REST --->  Spring Boot Server  <--- gRPC --->  Agent sidecars
-                                                                              |
-                                                                         Aeron Nodes
+                                                                    ┌── Agent ── Cluster A nodes
+  React UI  <--- WebSocket/REST --->  Spring Boot Server  <--- gRPC ─┤
+                                                                    └── Agent ── Cluster B nodes
 ```
 
-Each agent is a lightweight sidecar sharing IPC with its Aeron node. It reads CnC counters and the archive catalog directly, streams metrics to the server over gRPC, and executes ClusterTool/ArchiveTool commands on demand.
+Each agent is a lightweight sidecar sharing IPC with its Aeron node. It reads CnC counters and the archive catalog directly, streams metrics to the server over gRPC, and executes ClusterTool/ArchiveTool commands on demand. Agents from different clusters connect to the same server and are grouped automatically by cluster ID.
 
 ## Quick Start
 
 ```bash
+# Single cluster
 docker compose -f examples/docker/docker-compose.full-system.yml up --build
+
+# Two clusters (alpha + beta) with a shared management server
+docker compose -f examples/docker/docker-compose.multi-cluster.yml up --build
 ```
 
 Open **http://localhost:8080**. See [examples/docker](examples/docker) for more setups including native agents and larger clusters.
@@ -54,7 +59,7 @@ Open **http://localhost:8080**. See [examples/docker](examples/docker) for more 
 |-|-|
 | [Agent configuration](agent) | Environment variables, health endpoint |
 | [Server configuration](server) | HTTP and gRPC ports, metrics history |
-| [Docker Compose examples](examples/docker) | Full system, native agents, big cluster |
+| [Docker Compose examples](examples/docker) | Full system, multi-cluster, native agents, big cluster |
 | [Kubernetes example](examples/k8s) | Deploying on kind |
 
 ## License

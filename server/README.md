@@ -22,3 +22,7 @@ Authentication is disabled by default. To enable HTTP Basic auth:
 | `AERON_MANAGEMENT_SERVER_AUTH_BASIC_PASSWORD` | | Password (required when type is `basic`) |
 
 When `type=basic`, the server protects all endpoints (REST API, WebSocket, UI). The browser shows a native login dialog. The gRPC port (agent connections) is not affected.
+
+### Multi-Cluster
+
+The server supports multiple clusters out of the box with no extra configuration. Each agent reports its cluster ID (set via `AERON_MANAGEMENT_CLUSTER_ID`), and the server automatically groups agents into separate clusters. The UI shows a cluster selector dropdown when more than one cluster is connected. All REST and WebSocket endpoints are scoped by cluster: `/api/clusters/{clusterId}/...`.

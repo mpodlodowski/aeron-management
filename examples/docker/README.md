@@ -28,6 +28,14 @@ docker compose -f docker-compose.native.yml up --build
 docker compose -f docker-compose.big-cluster.yml up --build
 ```
 
+## Multi-Cluster
+
+Two independent 3-node clusters (alpha and beta) managed by a single server. The UI shows a cluster selector dropdown to switch between them.
+
+```bash
+docker compose -f docker-compose.multi-cluster.yml up --build
+```
+
 ## Management Only
 
 Starts only the management server and agents. Expects a cluster already running with pre-created volumes — useful during development when you want to rebuild management without restarting the cluster.

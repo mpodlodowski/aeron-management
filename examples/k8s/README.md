@@ -28,3 +28,5 @@ This builds all images, creates a kind cluster, loads images, applies manifests,
 - One management agent per node
 - Management server with the React UI
 - NodePort service mapping port 30080 to 8080
+
+To monitor multiple clusters, deploy additional clusters with their agents setting `AERON_MANAGEMENT_CLUSTER_ID` to a unique value per cluster. All agents connect to the same management server.

@@ -7,6 +7,7 @@ set -euo pipefail
 # Usage: SERVER_URL=http://localhost:8080 ./e2e-test.sh
 
 SERVER_URL="${SERVER_URL:?SERVER_URL env var required (e.g. http://localhost:8080)}"
+CLUSTER_ID="${CLUSTER_ID:-default}"
 PASS=0
 FAIL=0
 
@@ -45,27 +46,27 @@ assert() {
 
 # 1. Wait for server to respond
 wait_for "Server responds" 60 \
-  "curl -sf ${SERVER_URL}/api/cluster"
+  "curl -sf ${SERVER_URL}/api/clusters"
 
 # 2. Wait for leader to be elected
 wait_for "Leader elected" 90 \
-  "curl -sf ${SERVER_URL}/api/cluster | jq -e '.leaderNodeId != null and .leaderNodeId >= 0'"
+  "curl -sf ${SERVER_URL}/api/clusters/${CLUSTER_ID} | jq -e '.leaderNodeId != null and .leaderNodeId >= 0'"
 
 # 3. Wait for 3 cluster nodes reporting
 wait_for "3 cluster nodes reporting" 60 \
-  "[ \$(curl -sf ${SERVER_URL}/api/nodes | jq '[.[] | select(.agentMode != \"backup\")] | length') -ge 3 ]"
+  "[ \$(curl -sf ${SERVER_URL}/api/clusters/${CLUSTER_ID}/nodes | jq '[.[] | select(.agentMode != \"backup\")] | length') -ge 3 ]"
 
 # 4. Wait for backup node reporting
 wait_for "Backup node reporting" 90 \
-  "curl -sf ${SERVER_URL}/api/nodes | jq -e '[.[] | select(.agentMode == \"backup\")] | length > 0'"
+  "curl -sf ${SERVER_URL}/api/clusters/${CLUSTER_ID}/nodes | jq -e '[.[] | select(.agentMode == \"backup\")] | length > 0'"
 
 # 5. Assert metrics are flowing (commit position advancing)
 assert "Metrics flowing (commit position > 0)" \
-  "curl -sf ${SERVER_URL}/api/cluster | jq -e '.clusterStats.commitPosition > 0'"
+  "curl -sf ${SERVER_URL}/api/clusters/${CLUSTER_ID} | jq -e '.clusterStats.commitPosition > 0'"
 
 # 6. Assert snapshot command works
 assert "Snapshot command succeeds" \
-  "curl -sf -X POST ${SERVER_URL}/api/cluster/snapshot | jq -e '.success == true'"
+  "curl -sf -X POST ${SERVER_URL}/api/clusters/${CLUSTER_ID}/snapshot | jq -e '.success == true'"
 
 # --- Summary ---
 echo ""

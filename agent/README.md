@@ -13,6 +13,7 @@ Optionally compiled to a GraalVM native image for ~20 MB footprint and instant s
 | `AERON_MANAGEMENT_AGENT_CLUSTER_DIR` | `user.home` | Cluster directory path, template, or base directory (see below) |
 | `AERON_MANAGEMENT_AGENT_METRICS_INTERVAL_MS` | `1000` | Metrics collection interval in ms |
 | `AERON_MANAGEMENT_AGENT_ID` | Random UUID prefix | Unique identifier for this agent |
+| `AERON_MANAGEMENT_CLUSTER_ID` | `default` | Cluster identifier reported to the management server |
 | `AERON_MANAGEMENT_AGENT_CNC_FAILURE_TIMEOUT_MS` | `2000` | Timeout before exiting when CnC file is inaccessible |
 
 Node ID, Aeron directory, and agent mode are auto-discovered from `cluster-mark.dat`.
