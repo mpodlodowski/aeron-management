@@ -19,10 +19,12 @@ dependencies {
     implementation project(':common')
     implementation 'org.springframework.boot:spring-boot-starter-web'
     implementation 'org.springframework.boot:spring-boot-starter-websocket'
+    implementation 'org.springframework.boot:spring-boot-starter-security'
     implementation 'io.grpc:grpc-netty:1.62.2'
     implementation 'io.grpc:grpc-protobuf:1.62.2'
     implementation 'io.grpc:grpc-stub:1.62.2'
     implementation 'com.google.protobuf:protobuf-java-util:3.25.3'
 
     testImplementation 'org.springframework.boot:spring-boot-starter-test'
+    testImplementation 'org.springframework.security:spring-security-test'
 }

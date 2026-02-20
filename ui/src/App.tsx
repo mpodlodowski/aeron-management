@@ -1,3 +1,4 @@
+import { useState, useEffect, useRef } from 'react'
 import { BrowserRouter, Routes, Route, Link, useLocation } from 'react-router-dom'
 import { useClusterStore } from './stores/clusterStore'
 import Dashboard from './pages/Dashboard'
@@ -47,6 +48,66 @@ function RoleBadge({ role }: { role: string }) {
   )
 }
 
+function AuthBadge() {
+  const [username, setUsername] = useState<string | null>(null)
+  const [open, setOpen] = useState(false)
+  const ref = useRef<HTMLDivElement>(null)
+
+  useEffect(() => {
+    fetch('/api/auth/me')
+      .then(r => r.ok ? r.json() : null)
+      .then(data => {
+        if (data?.authenticated) setUsername(data.username)
+      })
+      .catch(() => {})
+  }, [])
+
+  useEffect(() => {
+    const handleClick = (e: MouseEvent) => {
+      if (ref.current && !ref.current.contains(e.target as Node)) setOpen(false)
+    }
+    document.addEventListener('mousedown', handleClick)
+    return () => document.removeEventListener('mousedown', handleClick)
+  }, [])
+
+  if (!username) return null
+
+  const handleLogout = async () => {
+    document.documentElement.style.visibility = 'hidden'
+    await fetch('/api/auth/logout', { method: 'POST' })
+    // Clear browser's cached Basic auth credentials by sending wrong ones
+    try {
+      await fetch('/api/auth/me', {
+        headers: { 'Authorization': 'Basic ' + btoa('_:_') }
+      })
+    } catch {}
+    window.location.reload()
+  }
+
+  return (
+    <div ref={ref} className="relative">
+      <button
+        onClick={() => setOpen(!open)}
+        className="h-7 w-7 rounded-full bg-blue-600 text-white text-xs font-bold flex items-center justify-center hover:bg-blue-500 transition-colors"
+        title={username}
+      >
+        {username[0].toUpperCase()}
+      </button>
+      {open && (
+        <div className="absolute right-0 top-full mt-1 bg-gray-800 border border-gray-700 rounded shadow-lg py-1 min-w-[140px] z-50">
+          <div className="px-3 py-1.5 text-xs text-gray-400 border-b border-gray-700">{username}</div>
+          <button
+            onClick={handleLogout}
+            className="w-full text-left px-3 py-1.5 text-sm text-gray-200 hover:bg-gray-700 transition-colors"
+          >
+            Logout
+          </button>
+        </div>
+      )}
+    </div>
+  )
+}
+
 function Header() {
   const location = useLocation()
   const isHome = location.pathname === '/'
@@ -85,6 +146,7 @@ function Header() {
           className={`inline-block h-2 w-2 rounded-full ${connected ? 'bg-green-500' : 'bg-red-500'}`}
           title={connected ? 'WebSocket connected' : 'WebSocket disconnected'}
         />
+        <AuthBadge />
       </nav>
     </header>
   )
