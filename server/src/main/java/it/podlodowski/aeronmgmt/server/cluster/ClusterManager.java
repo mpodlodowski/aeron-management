@@ -38,11 +38,15 @@ public class ClusterManager {
     }
 
     public ClusterStateAggregator getOrCreateCluster(String clusterId) {
+        boolean[] created = {false};
         ClusterStateAggregator aggregator = clusters.computeIfAbsent(clusterId, id -> {
             LOGGER.info("Creating new cluster aggregator for clusterId={}", id);
+            created[0] = true;
             return new ClusterStateAggregator(messagingTemplate, new DiskUsageTracker(), historySeconds, id);
         });
-        pushClusterList();
+        if (created[0]) {
+            pushClusterList();
+        }
         return aggregator;
     }
 
@@ -95,7 +99,9 @@ public class ClusterManager {
         if (aggregator != null) {
             return aggregator.registerPendingCommand(commandId);
         }
-        return new CompletableFuture<>();
+        CompletableFuture<CommandResult> future = new CompletableFuture<>();
+        future.completeExceptionally(new IllegalStateException("Cluster not found: " + clusterId));
+        return future;
     }
 
     private void pushClusterList() {
