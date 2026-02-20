@@ -27,5 +27,8 @@ docs/plans/
 *.pem
 *.key
 
+# Worktrees
+.worktrees/
+
 # OS
 .DS_Store
