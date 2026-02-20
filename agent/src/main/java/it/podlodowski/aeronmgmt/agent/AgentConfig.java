@@ -9,6 +9,7 @@ public class AgentConfig {
     public final long metricsIntervalMs;
     public final String agentId;
     public final long cncFailureTimeoutMs;
+    public final String clusterId;
 
     public AgentConfig() {
         this.managementServerHost = env("AERON_MANAGEMENT_SERVER_HOST", "localhost");
@@ -17,6 +18,7 @@ public class AgentConfig {
         this.metricsIntervalMs = Long.parseLong(env("AERON_MANAGEMENT_AGENT_METRICS_INTERVAL_MS", "1000"));
         this.agentId = env("AERON_MANAGEMENT_AGENT_ID", UUID.randomUUID().toString().substring(0, 8));
         this.cncFailureTimeoutMs = Long.parseLong(env("AERON_MANAGEMENT_AGENT_CNC_FAILURE_TIMEOUT_MS", "2000"));
+        this.clusterId = env("AERON_MANAGEMENT_CLUSTER_ID", "default");
     }
 
     private static String env(String key, String defaultValue) {

@@ -20,12 +20,14 @@ public class MetricsCollector {
     private final ArchiveMetricsCollector archiveCollector;
     private final int nodeId;
     private final String agentMode;
+    private final String clusterId;
 
-    public MetricsCollector(CncReader cncReader, ArchiveMetricsCollector archiveCollector, int nodeId, String agentMode) {
+    public MetricsCollector(CncReader cncReader, ArchiveMetricsCollector archiveCollector, int nodeId, String agentMode, String clusterId) {
         this.cncReader = cncReader;
         this.archiveCollector = archiveCollector;
         this.nodeId = nodeId;
         this.agentMode = agentMode;
+        this.clusterId = clusterId;
     }
 
     public MetricsReport collect() {
@@ -47,6 +49,7 @@ public class MetricsCollector {
                 .addAllCounters(cnc.counters)
                 .addAllRecordings(archiveCollector.collectRecordings())
                 .setSystemMetrics(collectSystemMetrics())
+                .setClusterId(clusterId)
                 .build();
     }
 

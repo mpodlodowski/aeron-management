@@ -91,6 +91,7 @@ public class GrpcAgentClient {
                         .setAgentMode(identity.agentMode())
                         .setAgentId(config.agentId)
                         .setHostname(getHostname())
+                        .setClusterId(config.clusterId)
                         .build())
                 .build());
 

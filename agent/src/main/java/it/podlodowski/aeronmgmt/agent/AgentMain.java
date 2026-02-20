@@ -17,8 +17,8 @@ public class AgentMain {
     public static void main(String[] args) throws Exception {
         AgentConfig config = new AgentConfig();
         int maxCncFailures = Math.max(1, (int) (config.cncFailureTimeoutMs / config.metricsIntervalMs));
-        LOGGER.info("Agent {} starting. Cluster dir template: {}, cncFailureTimeout={}ms ({} cycles)",
-                config.agentId, config.clusterDirTemplate, config.cncFailureTimeoutMs, maxCncFailures);
+        LOGGER.info("Agent {} starting. Cluster dir template: {}, clusterId={}, cncFailureTimeout={}ms ({} cycles)",
+                config.agentId, config.clusterDirTemplate, config.clusterId, config.cncFailureTimeoutMs, maxCncFailures);
 
         // Resolve cluster directory: expand {node_id} template, scan if needed.
         // Wait for the base directory first (before template expansion).
@@ -40,7 +40,7 @@ public class AgentMain {
         CncReader cncReader = new CncReader(identity.aeronDir());
         ArchiveMetricsCollector archiveCollector = new ArchiveMetricsCollector(clusterDir);
         MetricsCollector metricsCollector = new MetricsCollector(
-                cncReader, archiveCollector, identity.nodeId(), identity.agentMode());
+                cncReader, archiveCollector, identity.nodeId(), identity.agentMode(), config.clusterId);
         AdminCommandExecutor commandExecutor = new AdminCommandExecutor(clusterDir, archiveCollector);
         GrpcAgentClient grpcClient = new GrpcAgentClient(config, identity, commandExecutor);
         HealthEndpoint healthEndpoint = new HealthEndpoint(7070);
