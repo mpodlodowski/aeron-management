@@ -2,7 +2,7 @@ import { useEffect, useState, useMemo, useCallback } from 'react'
 import { useParams, useSearchParams } from 'react-router-dom'
 import { useClusterStore } from '../stores/clusterStore'
 import { useWebSocket } from '../hooks/useWebSocket'
-import { ClusterOverview, RecordingRow, RecordingType, DiskGrowthStats } from '../types'
+import { RecordingRow, RecordingType, DiskGrowthStats } from '../types'
 import RecordingViewer from '../components/RecordingViewer'
 import type { ViewMode } from '../lib/decoder'
 import { formatBytes, formatGrowthRate, formatDuration } from '../utils/counters'
@@ -41,7 +41,7 @@ export default function Archive() {
   const { clusterId } = useParams<{ clusterId: string }>()
   useWebSocket(clusterId)
   const nodes = useClusterStore((s) => s.clusters.get(clusterId ?? '')?.nodes ?? new Map())
-  const updateClusterOverview = useClusterStore((s) => s.updateClusterOverview)
+
   const [searchParams, setSearchParams] = useSearchParams()
   const [actionResult, setActionResult] = useState<ActionResult | null>(null)
   const [loading, setLoading] = useState<string | null>(null)
@@ -95,13 +95,7 @@ export default function Archive() {
   const [fetchLoading, setFetchLoading] = useState(false)
   const [availableTypes, setAvailableTypes] = useState<string[]>([])
 
-  useEffect(() => {
-    if (!clusterId) return
-    fetch(`/api/clusters/${clusterId}`)
-      .then((res) => res.json())
-      .then((data: ClusterOverview) => updateClusterOverview(clusterId, data))
-      .catch(() => {})
-  }, [clusterId, updateClusterOverview])
+  // Cluster overview is delivered via WebSocket on subscribe (see WebSocketSubscriptionHandler)
 
   const fetchRecordings = useCallback(() => {
     if (!clusterId) return

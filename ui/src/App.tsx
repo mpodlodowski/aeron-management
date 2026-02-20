@@ -137,13 +137,17 @@ function ClusterSelector() {
   const clusterList = useClusterStore((s) => s.clusterList)
   const match = useMatch('/clusters/:clusterId/*')
   const clusterId = match?.params.clusterId
+  const subPath = match?.params['*'] ?? ''
 
   if (clusterList.length <= 1) return null
 
   return (
     <select
       value={clusterId ?? ''}
-      onChange={(e) => navigate(`/clusters/${e.target.value}`)}
+      onChange={(e) => {
+        const path = subPath ? `/clusters/${e.target.value}/${subPath}` : `/clusters/${e.target.value}`
+        navigate(path)
+      }}
       className="bg-gray-800 text-gray-200 text-sm rounded px-2 py-1 border border-gray-700 focus:outline-none focus:border-gray-500"
     >
       {clusterList.map((c) => (

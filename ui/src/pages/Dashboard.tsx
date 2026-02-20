@@ -1,10 +1,9 @@
-import { useEffect, useState } from 'react'
+import { useState } from 'react'
 import { useParams } from 'react-router-dom'
 import { useClusterStore } from '../stores/clusterStore'
 import { useWebSocket } from '../hooks/useWebSocket'
 import NodeCard from '../components/NodeCard'
 import EventLog from '../components/EventLog'
-import { Alert, ClusterOverview } from '../types'
 import { formatNsAsMs } from '../utils/counters'
 
 interface ActionResult {
@@ -22,24 +21,9 @@ export default function Dashboard() {
   const clusterState = cluster?.clusterState ?? null
   const clusterStats = cluster?.clusterStats ?? null
   const alerts = cluster?.alerts ?? []
-  const updateClusterOverview = useClusterStore((s) => s.updateClusterOverview)
-  const setAlerts = useClusterStore((s) => s.setAlerts)
   const [loading, setLoading] = useState<string | null>(null)
   const [actionResult, setActionResult] = useState<ActionResult | null>(null)
   const [confirmAction, setConfirmAction] = useState<{ label: string; fn: () => void } | null>(null)
-
-  useEffect(() => {
-    if (!clusterId) return
-    fetch(`/api/clusters/${clusterId}`)
-      .then((res) => res.json())
-      .then((data: ClusterOverview) => updateClusterOverview(clusterId, data))
-      .catch((err) => console.error('Failed to fetch cluster state:', err))
-
-    fetch(`/api/clusters/${clusterId}/events`)
-      .then((res) => res.json())
-      .then((data: Alert[]) => setAlerts(clusterId, data))
-      .catch((err) => console.error('Failed to fetch events:', err))
-  }, [clusterId, updateClusterOverview, setAlerts])
 
   const sortedNodes = Array.from(nodes.values()).sort((a, b) => {
     const aIsBackup = a.agentMode === 'backup' ? 1 : 0
