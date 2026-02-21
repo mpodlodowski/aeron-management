@@ -2,6 +2,7 @@ package it.podlodowski.aeronmgmt.server.events;
 
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.Pageable;
+import org.springframework.data.domain.Sort;
 import org.springframework.data.jpa.repository.JpaRepository;
 import org.springframework.data.jpa.repository.Modifying;
 import org.springframework.data.jpa.repository.Query;
@@ -15,6 +16,9 @@ public interface ClusterEventRepository extends JpaRepository<ClusterEvent, UUID
 
     Page<ClusterEvent> findByClusterIdAndTimestampBetween(
             String clusterId, Instant from, Instant to, Pageable pageable);
+
+    List<ClusterEvent> findByClusterIdAndTimestampBetween(
+            String clusterId, Instant from, Instant to, Sort sort);
 
     Page<ClusterEvent> findByClusterIdAndTimestampBetweenAndLevelIn(
             String clusterId, Instant from, Instant to,
