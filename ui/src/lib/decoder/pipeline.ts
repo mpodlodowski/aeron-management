@@ -7,6 +7,25 @@ function align(value: number, alignment: number): number {
   return (value + alignment - 1) & ~(alignment - 1)
 }
 
+function isPrintableUtf8(bytes: Uint8Array): boolean {
+  for (let i = 0; i < bytes.length; i++) {
+    const b = bytes[i]
+    // Allow tab, newline, carriage return, and printable ASCII
+    if (b === 0x09 || b === 0x0a || b === 0x0d) continue
+    if (b >= 0x20 && b <= 0x7e) continue
+    // Allow valid multi-byte UTF-8 lead bytes
+    if (b >= 0xc2 && b <= 0xf4) continue
+    // Allow UTF-8 continuation bytes
+    if (b >= 0x80 && b <= 0xbf) continue
+    return false
+  }
+  return bytes.length > 0
+}
+
+function formatHex(bytes: Uint8Array): string {
+  return Array.from(bytes, (b) => b.toString(16).padStart(2, '0')).join(' ')
+}
+
 export function decodeChunk(
   data: Uint8Array,
   baseOffset: number,
@@ -59,6 +78,68 @@ export function decodeChunk(
         if (result) {
           fields.push(...result.fields)
           if (result.label) label = result.label
+
+          // Extract trailing application body (e.g. after SessionMessageHeader)
+          const bodyStart = decoderOffset + result.size
+          const bodySize = decoderAvailable - result.size
+          if (bodySize > 0) {
+            let decoded = false
+            // Try nested SBE decoding if body is large enough for an SBE header
+            if (bodySize >= SBE_HEADER_LENGTH) {
+              const nestedSbe = decodeSbeHeader(view, bodyStart)
+              // Sanity check: blockLength must fit within remaining bytes
+              if (nestedSbe.blockLength > 0
+                && nestedSbe.blockLength <= bodySize - SBE_HEADER_LENGTH
+                && nestedSbe.schemaId > 0
+                && nestedSbe.templateId > 0) {
+                // Always show the nested SBE header
+                fields.push(...nestedSbe.fields.map(f => ({ ...f, layer: 'nested-sbe' as const })))
+                const nestedOffset = bodyStart + SBE_HEADER_LENGTH
+                const nestedAvailable = bodySize - SBE_HEADER_LENGTH
+                // Update label to reflect nested payload type
+                const outerLabel = label
+                label = `${outerLabel} > Schema ${nestedSbe.schemaId} / Template ${nestedSbe.templateId}`
+                const nestedDecoder = registry.getDecoder(nestedSbe.schemaId, nestedSbe.templateId)
+                if (nestedDecoder) {
+                  const nestedResult = nestedDecoder.decode(view, nestedOffset, nestedAvailable)
+                  if (nestedResult) {
+                    fields.push(...nestedResult.fields.map(f => ({ ...f, layer: 'nested-sbe' as const })))
+                    if (nestedResult.label) {
+                      label = `${outerLabel} > ${nestedResult.label}`
+                    }
+                    decoded = true
+                  }
+                }
+                if (!decoded) {
+                  // Show remaining bytes after nested SBE header as hex
+                  const remaining = data.slice(nestedOffset, nestedOffset + nestedAvailable)
+                  fields.push({
+                    name: 'body',
+                    value: formatHex(remaining),
+                    type: 'bytes',
+                    offset: nestedOffset,
+                    size: nestedAvailable,
+                    layer: 'nested-sbe',
+                  })
+                  decoded = true
+                }
+              }
+            }
+            if (!decoded) {
+              const bodyBytes = data.slice(bodyStart, bodyStart + bodySize)
+              const printable = isPrintableUtf8(bodyBytes)
+              fields.push({
+                name: 'body',
+                value: printable
+                  ? new TextDecoder().decode(bodyBytes)
+                  : formatHex(bodyBytes),
+                type: printable ? 'string' : 'bytes',
+                offset: bodyStart,
+                size: bodySize,
+                layer: 'payload',
+              })
+            }
+          }
         }
       }
     }

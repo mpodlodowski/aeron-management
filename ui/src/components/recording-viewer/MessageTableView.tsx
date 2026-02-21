@@ -10,7 +10,7 @@ function formatOffset(offset: number): string {
 }
 
 function keyFields(msg: DecodedMessage): string {
-  const payload = msg.fields.filter((f) => f.layer === 'payload')
+  const payload = msg.fields.filter((f) => f.layer === 'payload' || f.layer === 'nested-sbe')
   if (payload.length === 0) return '\u2014'
   return payload
     .slice(0, 3)
