@@ -5,6 +5,8 @@ import it.podlodowski.aeronmgmt.common.proto.ArchiveRecording;
 import it.podlodowski.aeronmgmt.common.proto.ClusterMetrics;
 import it.podlodowski.aeronmgmt.common.proto.CommandResult;
 import it.podlodowski.aeronmgmt.common.proto.MetricsReport;
+import it.podlodowski.aeronmgmt.server.events.EventFactory;
+import it.podlodowski.aeronmgmt.server.events.EventService;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.messaging.simp.SimpMessagingTemplate;
@@ -26,8 +28,7 @@ public class ClusterStateAggregator {
     private final DiskUsageTracker diskUsageTracker;
     private final long windowDurationMs;
     private final String clusterId;
-
-    private static final int MAX_EVENTS = 200;
+    private final EventService eventService;
 
     private final ConcurrentHashMap<Integer, MetricsWindow> metricsWindows = new ConcurrentHashMap<>();
     private final ConcurrentHashMap<Integer, MetricsReport> latestMetrics = new ConcurrentHashMap<>();
@@ -36,16 +37,17 @@ public class ClusterStateAggregator {
     private final ConcurrentHashMap<Integer, double[]> trafficRates = new ConcurrentHashMap<>();
     private final Set<Integer> connectedNodes = ConcurrentHashMap.newKeySet();
     private final Set<Integer> reachableNodes = ConcurrentHashMap.newKeySet();
-    private final LinkedList<Map<String, Object>> recentEvents = new LinkedList<>();
 
     public ClusterStateAggregator(SimpMessagingTemplate messagingTemplate,
                                   DiskUsageTracker diskUsageTracker,
                                   int historySeconds,
-                                  String clusterId) {
+                                  String clusterId,
+                                  EventService eventService) {
         this.messagingTemplate = messagingTemplate;
         this.diskUsageTracker = diskUsageTracker;
         this.windowDurationMs = historySeconds * 1000L;
         this.clusterId = clusterId;
+        this.eventService = eventService;
     }
 
     public String getClusterId() {
@@ -100,7 +102,7 @@ public class ClusterStateAggregator {
         LOGGER.info("Agent connected: nodeId={}, mode={}", nodeId, agentMode);
         connectedNodes.add(nodeId);
         nodeAgentModes.put(nodeId, agentMode);
-        emitAlert("AGENT_CONNECTED", nodeId, "connected");
+        eventService.emit(EventFactory.agentConnected(clusterId, nodeId));
         pushToWebSocket("/topic/clusters/" + clusterId + "/cluster", buildClusterOverview());
     }
 
@@ -108,7 +110,7 @@ public class ClusterStateAggregator {
         LOGGER.info("Agent disconnected: nodeId={}", nodeId);
         connectedNodes.remove(nodeId);
         reachableNodes.remove(nodeId);
-        emitAlert("AGENT_DISCONNECTED", nodeId, "agent disconnected");
+        eventService.emit(EventFactory.agentDisconnected(clusterId, nodeId));
         pushToWebSocket("/topic/clusters/" + clusterId + "/cluster", buildClusterOverview());
     }
 
@@ -124,26 +126,25 @@ public class ClusterStateAggregator {
 
         // Role change (e.g. FOLLOWER -> LEADER)
         if (!prev.getNodeRole().equals(curr.getNodeRole())) {
-            emitAlert("ROLE_CHANGE", nodeId,
-                    "role changed: " + prev.getNodeRole() + " \u2192 " + curr.getNodeRole());
-
+            eventService.emit(EventFactory.roleChange(clusterId, nodeId, prev.getNodeRole(), curr.getNodeRole()));
             if ("LEADER".equals(curr.getNodeRole())) {
-                emitAlert("LEADER_CHANGE", nodeId, "became the new leader");
+                int prevLeader = prev.getLeaderMemberId();
+                long termId = counterValue(current, 239);
+                eventService.emit(EventFactory.leaderElected(clusterId, nodeId, termId, prevLeader));
             }
         }
 
         // Consensus module state change (e.g. ACTIVE -> SUSPENDED)
         if (!prev.getConsensusModuleState().equals(curr.getConsensusModuleState())
                 && !curr.getConsensusModuleState().isEmpty()) {
-            emitAlert("MODULE_STATE_CHANGE", nodeId,
-                    "consensus module: " + prev.getConsensusModuleState() + " \u2192 " + curr.getConsensusModuleState());
+            eventService.emit(EventFactory.moduleStateChange(clusterId, nodeId,
+                    prev.getConsensusModuleState(), curr.getConsensusModuleState()));
         }
 
         // Election state change (anything != CLOSED means election in progress)
         if (!prev.getElectionState().equals(curr.getElectionState())
                 && !"17".equals(curr.getElectionState())) {
-            emitAlert("ELECTION_STARTED", nodeId,
-                    "election state: " + curr.getElectionState());
+            eventService.emit(EventFactory.electionStarted(clusterId, nodeId, curr.getElectionState()));
         }
     }
 
@@ -153,34 +154,18 @@ public class ClusterStateAggregator {
 
         if (isReachable && !wasReachable) {
             reachableNodes.add(nodeId);
-            emitAlert("NODE_UP", nodeId, "node is reachable");
+            eventService.emit(EventFactory.nodeUp(clusterId, nodeId));
         } else if (!isReachable && wasReachable) {
             reachableNodes.remove(nodeId);
-            emitAlert("NODE_DOWN", nodeId, "node is unreachable (driver heartbeat stopped)");
+            eventService.emit(EventFactory.nodeDown(clusterId, nodeId));
         }
     }
 
-    private void emitAlert(String type, int nodeId, String message) {
-        Map<String, Object> alert = new LinkedHashMap<>();
-        alert.put("type", type);
-        alert.put("nodeId", nodeId);
-        alert.put("timestamp", System.currentTimeMillis());
-        alert.put("message", message);
-
-        synchronized (recentEvents) {
-            recentEvents.addFirst(alert);
-            while (recentEvents.size() > MAX_EVENTS) {
-                recentEvents.removeLast();
-            }
+    private long counterValue(MetricsReport report, int typeId) {
+        for (AeronCounter counter : report.getCountersList()) {
+            if (counter.getTypeId() == typeId) return counter.getValue();
         }
-
-        pushToWebSocket("/topic/clusters/" + clusterId + "/alerts", alert);
-    }
-
-    public List<Map<String, Object>> getRecentEvents() {
-        synchronized (recentEvents) {
-            return new ArrayList<>(recentEvents);
-        }
+        return -1;
     }
 
     public CompletableFuture<CommandResult> registerPendingCommand(String commandId) {
