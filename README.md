@@ -17,7 +17,9 @@ Web-based monitoring and administration dashboard for [Aeron Cluster](https://ae
 - **Cluster state awareness** — see at a glance if the cluster is active, suspended, snapshotting, or shutting down
 - **One-click admin** — Snapshot, Suspend, Resume, Shutdown directly from the dashboard, automatically routed to the leader
 - **Archive browser** — paginated recordings table with type filtering, per-recording actions (verify, invalidate), and bulk operations (compact, delete orphaned segments)
-- **Recording viewer** — inspect recording bytes with annotated hex, decoded tree, and message table views; built-in decoders for Aeron cluster SBE messages (SnapshotMarker, ClientSession, etc.) plus custom decoder support via JSON import
+- **Egress spy recording** — record cluster egress traffic from the UI without disrupting the running system; uses Aeron's `aeron-spy:` passive subscription with configurable duration and auto-stop
+- **Recording viewer** — inspect recording bytes with annotated hex, decoded tree, and message table views; nested SBE decoding for wrapped messages; built-in decoders for Aeron cluster SBE messages (SnapshotMarker, ClientSession, etc.) plus custom decoder support
+- **SBE XML schema import** — import SBE XML schema files to auto-generate decoders for all message types; supports primitives, enums, type aliases, fixed-length strings, and composite types (e.g. UUID); includes a Prettier-based code formatter
 - **Disk forecasting** — growth rate tracking with time-to-full predictions per node
 - **Backup node monitoring** — dedicated view for ClusterBackup agents
 - **Native image agents** — optional GraalVM native compilation for ~20MB sidecar footprint
