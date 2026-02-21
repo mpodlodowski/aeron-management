@@ -3,7 +3,7 @@ import { useParams } from 'react-router-dom'
 import { useClusterStore } from '../stores/clusterStore'
 import { useWebSocket } from '../hooks/useWebSocket'
 import NodeCard from '../components/NodeCard'
-import EventLog from '../components/EventLog'
+import { EventsTimeline } from '../components/events/EventsTimeline'
 import { formatNsAsMs } from '../utils/counters'
 
 interface ActionResult {
@@ -20,7 +20,6 @@ export default function Dashboard() {
   const leaderNodeId = cluster?.leaderNodeId ?? null
   const clusterState = cluster?.clusterState ?? null
   const clusterStats = cluster?.clusterStats ?? null
-  const alerts = cluster?.alerts ?? []
   const [loading, setLoading] = useState<string | null>(null)
   const [actionResult, setActionResult] = useState<ActionResult | null>(null)
   const [confirmAction, setConfirmAction] = useState<{ label: string; fn: () => void } | null>(null)
@@ -326,7 +325,7 @@ export default function Dashboard() {
         </div>
       )}
 
-      <EventLog alerts={alerts} />
+      <EventsTimeline clusterId={clusterId!} />
     </div>
   )
 }
