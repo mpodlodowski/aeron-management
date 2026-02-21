@@ -68,8 +68,16 @@ export default function NodeCard({ metrics, isLeader, clusterId }: Props) {
             </span>
           )}
         </span>
-        <span className={`inline-flex items-center gap-1.5 rounded-full px-2.5 py-0.5 text-xs font-medium ${statusColor} text-white`}>
-          {agentDown ? 'OFFLINE' : noCnc ? 'DETACHED' : nodeDown ? 'DOWN' : isLeader ? 'LEADER' : role}
+        <span className="flex items-center gap-1.5">
+          {metrics.egressRecording?.active && (
+            <span className="inline-flex items-center gap-1 text-xs text-purple-400" title="Spy recording active">
+              <span className="inline-flex h-1.5 w-1.5 rounded-full bg-purple-400 animate-pulse" />
+              REC
+            </span>
+          )}
+          <span className={`inline-flex items-center gap-1.5 rounded-full px-2.5 py-0.5 text-xs font-medium ${statusColor} text-white`}>
+            {agentDown ? 'OFFLINE' : noCnc ? 'DETACHED' : nodeDown ? 'DOWN' : isLeader ? 'LEADER' : role}
+          </span>
         </span>
       </div>
       <div className="space-y-2 text-sm text-gray-400">
