@@ -2,11 +2,12 @@ import { useEffect, useRef } from 'react'
 import { Client, StompSubscription } from '@stomp/stompjs'
 import SockJS from 'sockjs-client'
 import { useClusterStore } from '../stores/clusterStore'
+import { useEventStore } from '../stores/eventStore'
 
 export function useWebSocket(clusterId: string | undefined) {
   const clientRef = useRef<Client | null>(null)
   const subsRef = useRef<StompSubscription[]>([])
-  const { setClusterList, updateClusterOverview, updateNode, addAlert, setConnected } = useClusterStore()
+  const { setClusterList, updateClusterOverview, updateNode, setConnected } = useClusterStore()
 
   useEffect(() => {
     const client = new Client({
@@ -24,13 +25,13 @@ export function useWebSocket(clusterId: string | undefined) {
           const clusterSub = client.subscribe(`/topic/clusters/${clusterId}/cluster`, (message) => {
             updateClusterOverview(clusterId, JSON.parse(message.body))
           })
-          const alertSub = client.subscribe(`/topic/clusters/${clusterId}/alerts`, (message) => {
-            addAlert(clusterId, JSON.parse(message.body))
+          const eventSub = client.subscribe(`/topic/clusters/${clusterId}/events`, (message) => {
+            useEventStore.getState().addRealtimeEvent(JSON.parse(message.body))
           })
           const nodesSub = client.subscribe(`/topic/clusters/${clusterId}/nodes`, (message) => {
             updateNode(clusterId, JSON.parse(message.body))
           })
-          subsRef.current.push(clusterSub, alertSub, nodesSub)
+          subsRef.current.push(clusterSub, eventSub, nodesSub)
         }
       },
       onDisconnect: () => setConnected(false),
@@ -48,7 +49,7 @@ export function useWebSocket(clusterId: string | undefined) {
       subsRef.current = []
       client.deactivate()
     }
-  }, [clusterId, setClusterList, updateClusterOverview, updateNode, addAlert, setConnected])
+  }, [clusterId, setClusterList, updateClusterOverview, updateNode, setConnected])
 
   return clientRef
 }
