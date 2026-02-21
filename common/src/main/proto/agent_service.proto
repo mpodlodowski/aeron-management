@@ -19,12 +19,21 @@ message AgentMessage {
   }
 }
 
+message StateChangeEntry {
+  int64 timestamp = 1;
+  int32 counter_type_id = 2;
+  int64 old_value = 3;
+  int64 new_value = 4;
+}
+
 message AgentRegistration {
   int32 node_id = 1;
   string agent_mode = 2;  // "cluster" or "backup"
   string hostname = 3;
   string agent_id = 4;    // unique agent identifier (random UUID or configured)
   string cluster_id = 5;  // cluster slug, e.g. "production" (default: "default")
+  repeated StateChangeEntry buffered_state_changes = 10;
+  map<int32, int64> current_counter_values = 11;
 }
 
 message MetricsReport {
