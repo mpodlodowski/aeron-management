@@ -18,15 +18,17 @@ public class GrpcAgentClient {
     private final AgentConfig config;
     private final ClusterMarkFileReader identity;
     private final AdminCommandExecutor commandExecutor;
+    private final StateChangeBuffer stateChangeBuffer;
     private final AtomicBoolean connected = new AtomicBoolean(false);
 
     private ManagedChannel channel;
     private volatile StreamObserver<AgentMessage> requestObserver;
 
-    public GrpcAgentClient(AgentConfig config, ClusterMarkFileReader identity, AdminCommandExecutor commandExecutor) {
+    public GrpcAgentClient(AgentConfig config, ClusterMarkFileReader identity, AdminCommandExecutor commandExecutor, StateChangeBuffer stateChangeBuffer) {
         this.config = config;
         this.identity = identity;
         this.commandExecutor = commandExecutor;
+        this.stateChangeBuffer = stateChangeBuffer;
     }
 
     /**
@@ -84,7 +86,7 @@ public class GrpcAgentClient {
 
         requestObserver = asyncStub.connect(responseObserver);
 
-        // Send registration
+        // Send registration with buffered state changes for catch-up
         requestObserver.onNext(AgentMessage.newBuilder()
                 .setRegistration(AgentRegistration.newBuilder()
                         .setNodeId(identity.nodeId())
@@ -92,6 +94,8 @@ public class GrpcAgentClient {
                         .setAgentId(config.agentId)
                         .setHostname(getHostname())
                         .setClusterId(config.clusterId)
+                        .addAllBufferedStateChanges(stateChangeBuffer.drainAndClear())
+                        .putAllCurrentCounterValues(stateChangeBuffer.getCurrentCounterValues())
                         .build())
                 .build());
 

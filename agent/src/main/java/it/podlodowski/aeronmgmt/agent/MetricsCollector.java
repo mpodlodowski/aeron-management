@@ -22,16 +22,18 @@ public class MetricsCollector {
     private final String agentMode;
     private final String clusterId;
     private final SpyRecordingManager spyRecordingManager;
+    private final StateChangeBuffer stateChangeBuffer;
 
     public MetricsCollector(CncReader cncReader, ArchiveMetricsCollector archiveCollector,
                             int nodeId, String agentMode, String clusterId,
-                            SpyRecordingManager spyRecordingManager) {
+                            SpyRecordingManager spyRecordingManager, StateChangeBuffer stateChangeBuffer) {
         this.cncReader = cncReader;
         this.archiveCollector = archiveCollector;
         this.nodeId = nodeId;
         this.agentMode = agentMode;
         this.clusterId = clusterId;
         this.spyRecordingManager = spyRecordingManager;
+        this.stateChangeBuffer = stateChangeBuffer;
     }
 
     public MetricsReport collect() {
@@ -44,7 +46,7 @@ public class MetricsCollector {
                     .build();
         }
 
-        return MetricsReport.newBuilder()
+        MetricsReport report = MetricsReport.newBuilder()
                 .setNodeId(nodeId)
                 .setTimestamp(System.currentTimeMillis())
                 .setCncAccessible(cnc.cncAccessible)
@@ -56,6 +58,14 @@ public class MetricsCollector {
                 .setClusterId(clusterId)
                 .setEgressRecording(spyRecordingManager.getStatus())
                 .build();
+
+        stateChangeBuffer.onMetrics(report);
+
+        return report;
+    }
+
+    public StateChangeBuffer getStateChangeBuffer() {
+        return stateChangeBuffer;
     }
 
     private SystemMetrics collectSystemMetrics() {
