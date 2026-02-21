@@ -1,12 +1,11 @@
 import { create } from 'zustand'
-import { MetricsReport, ClusterOverview, ClusterStats, Alert, ClusterSummary } from '../types'
+import { MetricsReport, ClusterOverview, ClusterStats, ClusterSummary } from '../types'
 
 interface SingleClusterState {
   nodes: Map<number, MetricsReport>
   leaderNodeId: number | null
   clusterState: string | null
   clusterStats: ClusterStats | null
-  alerts: Alert[]
 }
 
 interface ClusterStore {
@@ -17,13 +16,11 @@ interface ClusterStore {
   setClusterList: (list: ClusterSummary[]) => void
   updateClusterOverview: (clusterId: string, overview: ClusterOverview) => void
   updateNode: (clusterId: string, metrics: MetricsReport) => void
-  addAlert: (clusterId: string, alert: Alert) => void
-  setAlerts: (clusterId: string, alerts: Alert[]) => void
   setConnected: (connected: boolean) => void
 }
 
 function emptyCluster(): SingleClusterState {
-  return { nodes: new Map(), leaderNodeId: null, clusterState: null, clusterStats: null, alerts: [] }
+  return { nodes: new Map(), leaderNodeId: null, clusterState: null, clusterStats: null }
 }
 
 export const useClusterStore = create<ClusterStore>((set) => ({
@@ -57,25 +54,6 @@ export const useClusterStore = create<ClusterStore>((set) => ({
       const nodes = new Map(cluster.nodes)
       nodes.set(metrics.nodeId, metrics)
       clusters.set(clusterId, { ...cluster, nodes })
-      return { clusters }
-    }),
-
-  addAlert: (clusterId, alert) =>
-    set((state) => {
-      const clusters = new Map(state.clusters)
-      const cluster = clusters.get(clusterId) ?? emptyCluster()
-      clusters.set(clusterId, {
-        ...cluster,
-        alerts: [alert, ...cluster.alerts].slice(0, 200),
-      })
-      return { clusters }
-    }),
-
-  setAlerts: (clusterId, alerts) =>
-    set((state) => {
-      const clusters = new Map(state.clusters)
-      const cluster = clusters.get(clusterId) ?? emptyCluster()
-      clusters.set(clusterId, { ...cluster, alerts })
       return { clusters }
     }),
 
