@@ -9,12 +9,12 @@ import it.podlodowski.aeronmgmt.server.events.EventFactory;
 import it.podlodowski.aeronmgmt.server.events.EventLevel;
 import it.podlodowski.aeronmgmt.server.events.EventQuery;
 import it.podlodowski.aeronmgmt.server.events.EventService;
+import it.podlodowski.aeronmgmt.server.events.ReconciliationService;
 import jakarta.servlet.http.HttpServletResponse;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.PageRequest;
 import org.springframework.data.domain.Sort;
 import org.springframework.http.HttpHeaders;
-import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.*;
 
@@ -36,12 +36,15 @@ public class ClusterController {
     private final ClusterManager clusterManager;
     private final CommandRouter commandRouter;
     private final EventService eventService;
+    private final ReconciliationService reconciliationService;
 
     public ClusterController(ClusterManager clusterManager, CommandRouter commandRouter,
-                             EventService eventService) {
+                             EventService eventService,
+                             ReconciliationService reconciliationService) {
         this.clusterManager = clusterManager;
         this.commandRouter = commandRouter;
         this.eventService = eventService;
+        this.reconciliationService = reconciliationService;
     }
 
     @GetMapping
@@ -171,9 +174,8 @@ public class ClusterController {
         if (clusterManager.getCluster(clusterId) == null) {
             return ResponseEntity.notFound().build();
         }
-        Map<String, Object> body = new LinkedHashMap<>();
-        body.put("status", "started");
-        return ResponseEntity.status(HttpStatus.ACCEPTED).body(body);
+        reconciliationService.reconcile(clusterId);
+        return ResponseEntity.accepted().body(Map.of("status", "started"));
     }
 
     @GetMapping("/{clusterId}/membership")
