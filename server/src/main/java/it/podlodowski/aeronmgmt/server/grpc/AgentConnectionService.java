@@ -64,6 +64,13 @@ public class AgentConnectionService extends AgentServiceGrpc.AgentServiceImplBas
 
                 clusterManager.onAgentConnected(clusterId, nodeId, registration.getAgentMode());
 
+                if (registration.getBufferedStateChangesCount() > 0
+                        || !registration.getCurrentCounterValuesMap().isEmpty()) {
+                    clusterManager.processCatchUp(clusterId, nodeId,
+                            registration.getBufferedStateChangesList(),
+                            registration.getCurrentCounterValuesMap());
+                }
+
                 ServerMessage ack = ServerMessage.newBuilder()
                         .setAck(Ack.newBuilder()
                                 .setMessage("Registered node " + nodeId)

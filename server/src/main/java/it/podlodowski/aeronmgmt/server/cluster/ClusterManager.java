@@ -2,6 +2,7 @@ package it.podlodowski.aeronmgmt.server.cluster;
 
 import it.podlodowski.aeronmgmt.common.proto.CommandResult;
 import it.podlodowski.aeronmgmt.common.proto.MetricsReport;
+import it.podlodowski.aeronmgmt.common.proto.StateChangeEntry;
 import it.podlodowski.aeronmgmt.server.aggregator.ClusterStateAggregator;
 import it.podlodowski.aeronmgmt.server.aggregator.DiskUsageTracker;
 import it.podlodowski.aeronmgmt.server.events.EventService;
@@ -85,6 +86,13 @@ public class ClusterManager {
         getOrCreateCluster(clusterId).onAgentConnected(nodeId, agentMode);
         reconciliationService.autoReconcileIfNeeded(clusterId);
         pushClusterList();
+    }
+
+    public void processCatchUp(String clusterId, int nodeId,
+                               List<StateChangeEntry> buffer,
+                               Map<Integer, Long> currentCounters) {
+        ClusterStateAggregator agg = getOrCreateCluster(clusterId);
+        agg.processCatchUp(nodeId, buffer, currentCounters);
     }
 
     public void onAgentDisconnected(String clusterId, int nodeId) {

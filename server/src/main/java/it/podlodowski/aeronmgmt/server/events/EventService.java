@@ -41,6 +41,10 @@ public class EventService {
         this.objectMapper = objectMapper;
     }
 
+    public ClusterEvent findLatestForNode(String clusterId, int nodeId) {
+        return repository.findFirstByClusterIdAndNodeIdOrderByTimestampDesc(clusterId, nodeId);
+    }
+
     public void emit(ClusterEvent event) {
         serializeDetails(event);
         repository.save(event);
