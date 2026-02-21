@@ -157,3 +157,42 @@ export interface RecordingBytesResponse {
   totalSize: number
   data: string // base64-encoded bytes
 }
+
+export type EventLevel = 'CLUSTER' | 'NODE' | 'AGENT'
+export type EventSource = 'REALTIME' | 'RECONCILIATION' | 'CATCH_UP'
+
+export interface ClusterEvent {
+  id: string
+  clusterId: string
+  timestamp: number     // epoch millis
+  level: EventLevel
+  type: string
+  nodeId: number | null
+  agentId: string | null
+  message: string
+  username: string
+  source: EventSource
+  details: Record<string, unknown>
+  createdAt: number
+}
+
+export interface HistogramBucket {
+  from: number
+  to: number
+  cluster: number
+  node: number
+  agent: number
+}
+
+export interface EventHistogram {
+  bucketSize: number
+  buckets: HistogramBucket[]
+}
+
+export interface PaginatedEvents {
+  content: ClusterEvent[]
+  page: number
+  size: number
+  totalElements: number
+  totalPages: number
+}
