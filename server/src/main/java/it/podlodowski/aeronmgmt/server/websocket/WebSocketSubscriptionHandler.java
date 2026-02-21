@@ -3,15 +3,20 @@ package it.podlodowski.aeronmgmt.server.websocket;
 import it.podlodowski.aeronmgmt.common.proto.MetricsReport;
 import it.podlodowski.aeronmgmt.server.aggregator.ClusterStateAggregator;
 import it.podlodowski.aeronmgmt.server.cluster.ClusterManager;
+import it.podlodowski.aeronmgmt.server.events.ClusterEventRepository;
+import it.podlodowski.aeronmgmt.server.events.EventService;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.context.event.EventListener;
+import org.springframework.data.domain.PageRequest;
+import org.springframework.data.domain.Sort;
 import org.springframework.messaging.simp.SimpMessagingTemplate;
 import org.springframework.messaging.simp.stomp.StompHeaderAccessor;
 import org.springframework.stereotype.Component;
 import org.springframework.web.socket.messaging.SessionSubscribeEvent;
 
-import java.util.List;
+import java.time.Duration;
+import java.time.Instant;
 import java.util.Map;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
@@ -26,15 +31,22 @@ public class WebSocketSubscriptionHandler {
     private static final Logger LOGGER = LoggerFactory.getLogger(WebSocketSubscriptionHandler.class);
 
     private static final Pattern CLUSTER_OVERVIEW = Pattern.compile("^/topic/clusters/([^/]+)/cluster$");
-    private static final Pattern CLUSTER_ALERTS = Pattern.compile("^/topic/clusters/([^/]+)/alerts$");
+    private static final Pattern CLUSTER_EVENTS = Pattern.compile("^/topic/clusters/([^/]+)/events$");
     private static final Pattern CLUSTER_NODES = Pattern.compile("^/topic/clusters/([^/]+)/nodes$");
 
     private final ClusterManager clusterManager;
     private final SimpMessagingTemplate messagingTemplate;
+    private final ClusterEventRepository eventRepository;
+    private final EventService eventService;
 
-    public WebSocketSubscriptionHandler(ClusterManager clusterManager, SimpMessagingTemplate messagingTemplate) {
+    public WebSocketSubscriptionHandler(ClusterManager clusterManager,
+                                        SimpMessagingTemplate messagingTemplate,
+                                        ClusterEventRepository eventRepository,
+                                        EventService eventService) {
         this.clusterManager = clusterManager;
         this.messagingTemplate = messagingTemplate;
+        this.eventRepository = eventRepository;
+        this.eventService = eventService;
     }
 
     @EventListener
@@ -62,15 +74,14 @@ public class WebSocketSubscriptionHandler {
             return;
         }
 
-        matcher = CLUSTER_ALERTS.matcher(destination);
+        matcher = CLUSTER_EVENTS.matcher(destination);
         if (matcher.matches()) {
-            ClusterStateAggregator aggregator = clusterManager.getCluster(matcher.group(1));
-            if (aggregator != null) {
-                List<Map<String, Object>> events = aggregator.getRecentEvents();
-                for (Map<String, Object> alert : events) {
-                    messagingTemplate.convertAndSend(destination, alert);
-                }
-            }
+            String cid = matcher.group(1);
+            Instant now = Instant.now();
+            Instant oneDayAgo = now.minus(Duration.ofDays(1));
+            PageRequest page = PageRequest.of(0, 200, Sort.by(Sort.Direction.DESC, "timestamp"));
+            eventRepository.findByClusterIdAndTimestampBetween(cid, oneDayAgo, now, page)
+                    .forEach(e -> messagingTemplate.convertAndSend(destination, eventService.toMap(e)));
             return;
         }
 

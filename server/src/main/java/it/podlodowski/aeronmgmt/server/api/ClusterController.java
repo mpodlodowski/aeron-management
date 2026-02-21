@@ -5,6 +5,11 @@ import it.podlodowski.aeronmgmt.common.proto.MetricsReport;
 import it.podlodowski.aeronmgmt.server.aggregator.ClusterStateAggregator;
 import it.podlodowski.aeronmgmt.server.cluster.ClusterManager;
 import it.podlodowski.aeronmgmt.server.command.CommandRouter;
+import it.podlodowski.aeronmgmt.server.events.ClusterEvent;
+import it.podlodowski.aeronmgmt.server.events.ClusterEventRepository;
+import it.podlodowski.aeronmgmt.server.events.EventService;
+import org.springframework.data.domain.PageRequest;
+import org.springframework.data.domain.Sort;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.*;
 
@@ -20,10 +25,15 @@ public class ClusterController {
 
     private final ClusterManager clusterManager;
     private final CommandRouter commandRouter;
+    private final ClusterEventRepository eventRepository;
+    private final EventService eventService;
 
-    public ClusterController(ClusterManager clusterManager, CommandRouter commandRouter) {
+    public ClusterController(ClusterManager clusterManager, CommandRouter commandRouter,
+                             ClusterEventRepository eventRepository, EventService eventService) {
         this.clusterManager = clusterManager;
         this.commandRouter = commandRouter;
+        this.eventRepository = eventRepository;
+        this.eventService = eventService;
     }
 
     @GetMapping
@@ -44,11 +54,17 @@ public class ClusterController {
 
     @GetMapping("/{clusterId}/events")
     public ResponseEntity<List<Map<String, Object>>> getRecentEvents(@PathVariable String clusterId) {
-        ClusterStateAggregator aggregator = clusterManager.getCluster(clusterId);
-        if (aggregator == null) {
+        if (clusterManager.getCluster(clusterId) == null) {
             return ResponseEntity.notFound().build();
         }
-        return ResponseEntity.ok(aggregator.getRecentEvents());
+        java.time.Instant now = java.time.Instant.now();
+        java.time.Instant oneDayAgo = now.minus(java.time.Duration.ofDays(1));
+        PageRequest page = PageRequest.of(0, 200, Sort.by(Sort.Direction.DESC, "timestamp"));
+        List<Map<String, Object>> events = eventRepository
+                .findByClusterIdAndTimestampBetween(clusterId, oneDayAgo, now, page)
+                .map(eventService::toMap)
+                .getContent();
+        return ResponseEntity.ok(events);
     }
 
     @GetMapping("/{clusterId}/membership")

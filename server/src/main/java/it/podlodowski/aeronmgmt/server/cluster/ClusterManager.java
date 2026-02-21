@@ -4,6 +4,7 @@ import it.podlodowski.aeronmgmt.common.proto.CommandResult;
 import it.podlodowski.aeronmgmt.common.proto.MetricsReport;
 import it.podlodowski.aeronmgmt.server.aggregator.ClusterStateAggregator;
 import it.podlodowski.aeronmgmt.server.aggregator.DiskUsageTracker;
+import it.podlodowski.aeronmgmt.server.events.EventService;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.beans.factory.annotation.Autowired;
@@ -26,14 +27,17 @@ public class ClusterManager {
     private static final Logger LOGGER = LoggerFactory.getLogger(ClusterManager.class);
 
     private final SimpMessagingTemplate messagingTemplate;
+    private final EventService eventService;
     private final int historySeconds;
     private final ConcurrentHashMap<String, ClusterStateAggregator> clusters = new ConcurrentHashMap<>();
 
     @Autowired
     public ClusterManager(
             @Autowired(required = false) SimpMessagingTemplate messagingTemplate,
+            EventService eventService,
             @Value("${aeron.management.server.metrics-history-seconds:300}") int historySeconds) {
         this.messagingTemplate = messagingTemplate;
+        this.eventService = eventService;
         this.historySeconds = historySeconds;
     }
 
@@ -42,7 +46,7 @@ public class ClusterManager {
         ClusterStateAggregator aggregator = clusters.computeIfAbsent(clusterId, id -> {
             LOGGER.info("Creating new cluster aggregator for clusterId={}", id);
             created[0] = true;
-            return new ClusterStateAggregator(messagingTemplate, new DiskUsageTracker(), historySeconds, id);
+            return new ClusterStateAggregator(messagingTemplate, new DiskUsageTracker(), historySeconds, id, eventService);
         });
         if (created[0]) {
             pushClusterList();
