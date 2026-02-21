@@ -23,7 +23,7 @@ public class StateChangeBuffer {
         this.maxSize = maxSize;
     }
 
-    public void onMetrics(MetricsReport report) {
+    public synchronized void onMetrics(MetricsReport report) {
         for (AeronCounter counter : report.getCountersList()) {
             if (!TRACKED_COUNTERS.contains(counter.getTypeId())) continue;
 
@@ -42,13 +42,16 @@ public class StateChangeBuffer {
         }
     }
 
-    public List<StateChangeEntry> drainAndClear() {
+    /**
+     * Atomically drains the buffer and snapshots current counter values.
+     * Returns both pieces of data together to avoid race conditions.
+     */
+    public synchronized Snapshot drainAndSnapshot() {
         List<StateChangeEntry> entries = new ArrayList<>(buffer);
+        Map<Integer, Long> counterValues = Map.copyOf(previousValues);
         buffer.clear();
-        return entries;
+        return new Snapshot(entries, counterValues);
     }
 
-    public Map<Integer, Long> getCurrentCounterValues() {
-        return Map.copyOf(previousValues);
-    }
+    public record Snapshot(List<StateChangeEntry> entries, Map<Integer, Long> counterValues) {}
 }

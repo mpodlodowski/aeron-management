@@ -126,13 +126,6 @@ export interface ClusterSummary {
   nodes: Record<string, MetricsReport>
 }
 
-export interface Alert {
-  type: string
-  nodeId: number
-  timestamp: number
-  message?: string
-}
-
 export type RecordingType = string
 export type RecordingState = 'VALID' | 'INVALID' | 'DELETED'
 

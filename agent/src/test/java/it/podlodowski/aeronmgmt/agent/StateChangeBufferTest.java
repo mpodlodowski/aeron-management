@@ -21,7 +21,7 @@ class StateChangeBufferTest {
     void emptyBufferReturnsEmptyList() {
         StateChangeBuffer buffer = new StateChangeBuffer(100);
 
-        List<StateChangeEntry> entries = buffer.drainAndClear();
+        List<StateChangeEntry> entries = buffer.drainAndSnapshot().entries();
 
         assertThat(entries).isEmpty();
     }
@@ -38,7 +38,7 @@ class StateChangeBufferTest {
         buffer.onMetrics(metricsReport(2000L,
                 counter(CLUSTER_NODE_ROLE, 2)));  // LEADER
 
-        List<StateChangeEntry> entries = buffer.drainAndClear();
+        List<StateChangeEntry> entries = buffer.drainAndSnapshot().entries();
 
         assertThat(entries).hasSize(1);
         StateChangeEntry entry = entries.get(0);
@@ -57,7 +57,7 @@ class StateChangeBufferTest {
         buffer.onMetrics(metricsReport(2000L,
                 counter(COMMIT_POSITION, 200)));
 
-        List<StateChangeEntry> entries = buffer.drainAndClear();
+        List<StateChangeEntry> entries = buffer.drainAndSnapshot().entries();
 
         assertThat(entries).isEmpty();
     }
@@ -78,7 +78,7 @@ class StateChangeBufferTest {
         buffer.onMetrics(metricsReport(4000L, counter(CONSENSUS_MODULE_STATE, 1)));
         buffer.onMetrics(metricsReport(5000L, counter(ELECTION_STATE, 17)));
 
-        List<StateChangeEntry> entries = buffer.drainAndClear();
+        List<StateChangeEntry> entries = buffer.drainAndSnapshot().entries();
 
         assertThat(entries).hasSize(3);
         // Oldest entry (timestamp 2000) should have been evicted
@@ -94,10 +94,10 @@ class StateChangeBufferTest {
         buffer.onMetrics(metricsReport(1000L, counter(CLUSTER_NODE_ROLE, 0)));
         buffer.onMetrics(metricsReport(2000L, counter(CLUSTER_NODE_ROLE, 2)));
 
-        List<StateChangeEntry> first = buffer.drainAndClear();
+        List<StateChangeEntry> first = buffer.drainAndSnapshot().entries();
         assertThat(first).hasSize(1);
 
-        List<StateChangeEntry> second = buffer.drainAndClear();
+        List<StateChangeEntry> second = buffer.drainAndSnapshot().entries();
         assertThat(second).isEmpty();
     }
 
@@ -110,7 +110,7 @@ class StateChangeBufferTest {
                 counter(CONSENSUS_MODULE_STATE, 1),
                 counter(ELECTION_STATE, 17)));
 
-        Map<Integer, Long> values = buffer.getCurrentCounterValues();
+        Map<Integer, Long> values = buffer.drainAndSnapshot().counterValues();
 
         assertThat(values).containsExactlyInAnyOrderEntriesOf(Map.of(
                 CLUSTER_NODE_ROLE, 0L,
@@ -125,7 +125,7 @@ class StateChangeBufferTest {
         buffer.onMetrics(metricsReport(1000L, counter(CLUSTER_NODE_ROLE, 0)));
         buffer.onMetrics(metricsReport(2000L, counter(CLUSTER_NODE_ROLE, 0)));  // same value
 
-        List<StateChangeEntry> entries = buffer.drainAndClear();
+        List<StateChangeEntry> entries = buffer.drainAndSnapshot().entries();
 
         assertThat(entries).isEmpty();
     }
@@ -142,7 +142,7 @@ class StateChangeBufferTest {
                 counter(CLUSTER_NODE_ROLE, 2),
                 counter(ELECTION_STATE, 17)));
 
-        List<StateChangeEntry> entries = buffer.drainAndClear();
+        List<StateChangeEntry> entries = buffer.drainAndSnapshot().entries();
 
         assertThat(entries).hasSize(2);
         assertThat(entries).extracting(StateChangeEntry::getCounterTypeId)

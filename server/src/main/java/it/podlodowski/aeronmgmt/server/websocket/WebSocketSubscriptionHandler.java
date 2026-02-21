@@ -3,20 +3,14 @@ package it.podlodowski.aeronmgmt.server.websocket;
 import it.podlodowski.aeronmgmt.common.proto.MetricsReport;
 import it.podlodowski.aeronmgmt.server.aggregator.ClusterStateAggregator;
 import it.podlodowski.aeronmgmt.server.cluster.ClusterManager;
-import it.podlodowski.aeronmgmt.server.events.ClusterEventRepository;
-import it.podlodowski.aeronmgmt.server.events.EventService;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.context.event.EventListener;
-import org.springframework.data.domain.PageRequest;
-import org.springframework.data.domain.Sort;
 import org.springframework.messaging.simp.SimpMessagingTemplate;
 import org.springframework.messaging.simp.stomp.StompHeaderAccessor;
 import org.springframework.stereotype.Component;
 import org.springframework.web.socket.messaging.SessionSubscribeEvent;
 
-import java.time.Duration;
-import java.time.Instant;
 import java.util.Map;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
@@ -36,17 +30,11 @@ public class WebSocketSubscriptionHandler {
 
     private final ClusterManager clusterManager;
     private final SimpMessagingTemplate messagingTemplate;
-    private final ClusterEventRepository eventRepository;
-    private final EventService eventService;
 
     public WebSocketSubscriptionHandler(ClusterManager clusterManager,
-                                        SimpMessagingTemplate messagingTemplate,
-                                        ClusterEventRepository eventRepository,
-                                        EventService eventService) {
+                                        SimpMessagingTemplate messagingTemplate) {
         this.clusterManager = clusterManager;
         this.messagingTemplate = messagingTemplate;
-        this.eventRepository = eventRepository;
-        this.eventService = eventService;
     }
 
     @EventListener
@@ -76,12 +64,8 @@ public class WebSocketSubscriptionHandler {
 
         matcher = CLUSTER_EVENTS.matcher(destination);
         if (matcher.matches()) {
-            String cid = matcher.group(1);
-            Instant now = Instant.now();
-            Instant oneDayAgo = now.minus(Duration.ofDays(1));
-            PageRequest page = PageRequest.of(0, 200, Sort.by(Sort.Direction.DESC, "timestamp"));
-            eventRepository.findByClusterIdAndTimestampBetween(cid, oneDayAgo, now, page)
-                    .forEach(e -> messagingTemplate.convertAndSend(destination, eventService.toMap(e)));
+            // Events are loaded via REST API (loadEvents in EventsTimeline).
+            // WebSocket only pushes new real-time events after subscription.
             return;
         }
 
