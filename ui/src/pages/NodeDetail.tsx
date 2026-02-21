@@ -61,6 +61,8 @@ export default function NodeDetail() {
   const isBackup = metrics?.agentMode === 'backup'
   const [actionResult, setActionResult] = useState<ActionResult | null>(null)
   const [loading, setLoading] = useState<string | null>(null)
+  const [recordingStreamId, setRecordingStreamId] = useState('102')
+  const [recordingDuration, setRecordingDuration] = useState('60')
 
   // Initial node data is delivered via WebSocket on subscribe (see WebSocketSubscriptionHandler)
 
@@ -96,6 +98,7 @@ export default function NodeDetail() {
   }
 
   const { clusterMetrics, counters } = metrics
+  const isLeader = clusterMetrics?.nodeRole === 'LEADER'
   const c = counters ?? []
   const errors = totalErrors(c)
   const snapshots = counterByType(c, COUNTER_TYPE.SNAPSHOT_COUNT)?.value ?? 0
@@ -237,7 +240,7 @@ export default function NodeDetail() {
 
       {/* Admin Actions & Diagnostics */}
       {!isBackup && (
-        <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
+        <div className={`grid grid-cols-1 ${isLeader ? 'lg:grid-cols-3' : 'lg:grid-cols-2'} gap-4`}>
           <div className="rounded-lg border border-gray-800 bg-gray-900 p-4">
             <h3 className="text-xs font-medium text-gray-400 mb-2">Admin Actions</h3>
             <div className="flex flex-wrap gap-1.5">
@@ -270,6 +273,63 @@ export default function NodeDetail() {
               ))}
             </div>
           </div>
+          {isLeader && (
+            <div className="rounded-lg border border-gray-800 bg-gray-900 p-4">
+              <h3 className="text-xs font-medium text-gray-400 mb-2">Egress Recording</h3>
+              {metrics.egressRecording?.active ? (
+                <div className="space-y-2">
+                  <div className="flex items-center gap-2">
+                    <span className="inline-flex h-2 w-2 rounded-full bg-red-500 animate-pulse" />
+                    <span className="text-xs text-gray-300">
+                      Stream {metrics.egressRecording.streamId}
+                    </span>
+                  </div>
+                  <div className="text-xs text-gray-500 truncate" title={metrics.egressRecording.channel}>
+                    {new Date(metrics.egressRecording.startTimeMs).toLocaleTimeString()}
+                    {metrics.egressRecording.durationLimitSeconds > 0 &&
+                      ` \u2022 ${metrics.egressRecording.durationLimitSeconds}s limit`}
+                  </div>
+                  <button
+                    onClick={() => executeAction('Stop Recording', 'egress-recording/stop')}
+                    disabled={loading !== null}
+                    className="rounded px-2.5 py-1 text-xs font-medium text-white transition-colors disabled:opacity-50 disabled:cursor-not-allowed bg-red-600 hover:bg-red-500"
+                  >
+                    {loading === 'Stop Recording' ? '...' : 'Stop Recording'}
+                  </button>
+                </div>
+              ) : (
+                <div className="space-y-2">
+                  <div className="flex items-center gap-2">
+                    <label className="text-xs text-gray-500">Stream</label>
+                    <input
+                      type="number"
+                      value={recordingStreamId}
+                      onChange={(e) => setRecordingStreamId(e.target.value)}
+                      className="w-16 rounded border border-gray-700 bg-gray-800 px-2 py-1 text-xs text-gray-200"
+                    />
+                    <label className="text-xs text-gray-500">Duration</label>
+                    <input
+                      type="number"
+                      value={recordingDuration}
+                      onChange={(e) => setRecordingDuration(e.target.value)}
+                      className="w-16 rounded border border-gray-700 bg-gray-800 px-2 py-1 text-xs text-gray-200"
+                      placeholder="0"
+                    />
+                  </div>
+                  <button
+                    onClick={() => executeAction(
+                      'Start Recording',
+                      `egress-recording/start?streamId=${recordingStreamId}&durationSeconds=${recordingDuration}`
+                    )}
+                    disabled={loading !== null}
+                    className="rounded px-2.5 py-1 text-xs font-medium text-white transition-colors disabled:opacity-50 disabled:cursor-not-allowed bg-purple-600 hover:bg-purple-500"
+                  >
+                    {loading === 'Start Recording' ? '...' : 'Record Spy'}
+                  </button>
+                </div>
+              )}
+            </div>
+          )}
         </div>
       )}
       {actionResult && (

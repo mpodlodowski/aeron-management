@@ -44,6 +44,15 @@ export interface DiskGrowthStats {
   timeToFullSeconds: number | null
 }
 
+export interface EgressRecordingStatus {
+  active: boolean
+  recordingId: number
+  startTimeMs: number
+  durationLimitSeconds: number
+  channel: string
+  streamId: number
+}
+
 export interface MetricsReport {
   nodeId: number
   timestamp: number
@@ -59,6 +68,7 @@ export interface MetricsReport {
   diskGrowth?: DiskGrowthStats
   bytesSentPerSec?: number
   bytesRecvPerSec?: number
+  egressRecording?: EgressRecordingStatus
 }
 
 export interface ClusterStats {

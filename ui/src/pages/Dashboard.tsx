@@ -24,6 +24,8 @@ export default function Dashboard() {
   const [loading, setLoading] = useState<string | null>(null)
   const [actionResult, setActionResult] = useState<ActionResult | null>(null)
   const [confirmAction, setConfirmAction] = useState<{ label: string; fn: () => void } | null>(null)
+  const [recordingDuration, setRecordingDuration] = useState('60')
+  const [showRecordingDialog, setShowRecordingDialog] = useState(false)
 
   const sortedNodes = Array.from(nodes.values()).sort((a, b) => {
     const aIsBackup = a.agentMode === 'backup' ? 1 : 0
@@ -58,6 +60,57 @@ export default function Dashboard() {
 
   function withConfirm(label: string, fn: () => void) {
     setConfirmAction({ label, fn })
+  }
+
+  const anyNodeRecording = Array.from(nodes.values()).some(n => n.egressRecording?.active)
+
+  async function startClusterRecording() {
+    const duration = recordingDuration ? parseInt(recordingDuration) : 0
+    setShowRecordingDialog(false)
+    setLoading('Record')
+    setActionResult(null)
+    try {
+      const res = await fetch(
+        `/api/clusters/${clusterId}/egress-recording/start?durationSeconds=${duration}`,
+        { method: 'POST' }
+      )
+      const data = await res.json()
+      setActionResult({
+        action: 'Record Egress',
+        success: data.success !== false,
+        message: data.message ?? (data.success !== false ? 'Recording started on leader' : 'Failed to start recording'),
+      })
+    } catch (err) {
+      setActionResult({
+        action: 'Record Egress',
+        success: false,
+        message: err instanceof Error ? err.message : 'Network error',
+      })
+    } finally {
+      setLoading(null)
+    }
+  }
+
+  async function stopClusterRecording() {
+    setLoading('Stop Record')
+    setActionResult(null)
+    try {
+      const res = await fetch(`/api/clusters/${clusterId}/egress-recording/stop`, { method: 'POST' })
+      const data = await res.json()
+      setActionResult({
+        action: 'Stop Recording',
+        success: data.success !== false,
+        message: data.message ?? (data.success !== false ? 'Recording stopped' : 'Failed to stop recording'),
+      })
+    } catch (err) {
+      setActionResult({
+        action: 'Stop Recording',
+        success: false,
+        message: err instanceof Error ? err.message : 'Network error',
+      })
+    } finally {
+      setLoading(null)
+    }
   }
 
   return (
@@ -166,6 +219,26 @@ export default function Dashboard() {
             >
               Abort
             </button>
+            {anyNodeRecording ? (
+              <button
+                disabled={loading !== null}
+                onClick={stopClusterRecording}
+                title="Stop egress recording on the leader"
+                className="rounded px-2.5 py-1 text-xs font-medium text-white transition-colors disabled:opacity-50 disabled:cursor-not-allowed bg-purple-700 hover:bg-purple-600 flex items-center gap-1"
+              >
+                <span className="inline-flex h-1.5 w-1.5 rounded-full bg-red-400 animate-pulse" />
+                {loading === 'Stop Record' ? '...' : 'Stop Recording'}
+              </button>
+            ) : (
+              <button
+                disabled={loading !== null}
+                onClick={() => setShowRecordingDialog(true)}
+                title="Start spy recording of egress (stream 102) on the leader"
+                className="rounded px-2.5 py-1 text-xs font-medium text-white transition-colors disabled:opacity-50 disabled:cursor-not-allowed bg-purple-600 hover:bg-purple-500"
+              >
+                Record Egress
+              </button>
+            )}
           </div>
 
           {/* Confirm Dialog */}
@@ -183,6 +256,36 @@ export default function Dashboard() {
                 </button>
                 <button
                   onClick={() => setConfirmAction(null)}
+                  className="rounded-md bg-gray-700 px-3 py-1 text-xs font-medium text-gray-300 hover:bg-gray-600"
+                >
+                  Cancel
+                </button>
+              </div>
+            </div>
+          )}
+
+          {showRecordingDialog && (
+            <div className="mt-2 rounded-lg border border-purple-800 bg-purple-900/20 p-3">
+              <p className="text-sm text-purple-200 mb-2">Start egress recording on the leader node</p>
+              <div className="flex items-center gap-2">
+                <label className="text-xs text-gray-400">Duration (seconds, 0=unlimited):</label>
+                <input
+                  type="number"
+                  value={recordingDuration}
+                  onChange={(e) => setRecordingDuration(e.target.value)}
+                  placeholder="60"
+                  className="w-24 rounded border border-gray-700 bg-gray-800 px-2 py-1 text-xs text-gray-200"
+                />
+              </div>
+              <div className="mt-2 flex gap-2">
+                <button
+                  onClick={startClusterRecording}
+                  className="rounded-md bg-purple-700 px-3 py-1 text-xs font-medium text-white hover:bg-purple-600"
+                >
+                  Start
+                </button>
+                <button
+                  onClick={() => setShowRecordingDialog(false)}
                   className="rounded-md bg-gray-700 px-3 py-1 text-xs font-medium text-gray-300 hover:bg-gray-600"
                 >
                   Cancel
