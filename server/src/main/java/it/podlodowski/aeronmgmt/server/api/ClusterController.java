@@ -96,7 +96,27 @@ public class ClusterController {
         return sendToLeader(clusterId, "ABORT");
     }
 
+    @PostMapping("/{clusterId}/egress-recording/start")
+    public ResponseEntity<Map<String, Object>> startClusterEgressRecording(
+            @PathVariable String clusterId,
+            @RequestParam(defaultValue = "102") int streamId,
+            @RequestParam(defaultValue = "0") long durationSeconds) {
+        return sendToLeader(clusterId, "START_EGRESS_RECORDING",
+                Map.of("streamId", String.valueOf(streamId), "durationSeconds", String.valueOf(durationSeconds)));
+    }
+
+    @PostMapping("/{clusterId}/egress-recording/stop")
+    public ResponseEntity<Map<String, Object>> stopClusterEgressRecording(
+            @PathVariable String clusterId) {
+        return sendToLeader(clusterId, "STOP_EGRESS_RECORDING", Map.of());
+    }
+
     private ResponseEntity<Map<String, Object>> sendToLeader(String clusterId, String command) {
+        return sendToLeader(clusterId, command, Map.of());
+    }
+
+    private ResponseEntity<Map<String, Object>> sendToLeader(String clusterId, String command,
+                                                               Map<String, String> parameters) {
         ClusterStateAggregator aggregator = clusterManager.getCluster(clusterId);
         if (aggregator == null) {
             return ResponseEntity.notFound().build();
@@ -104,13 +124,32 @@ public class ClusterController {
         for (Map.Entry<Integer, MetricsReport> entry : aggregator.getLatestMetrics().entrySet()) {
             MetricsReport report = entry.getValue();
             if (report.hasClusterMetrics() && "LEADER".equals(report.getClusterMetrics().getNodeRole())) {
-                return ResponseEntity.ok(commandRouter.sendCommand(clusterId, entry.getKey(), command));
+                Map<String, Object> result = parameters.isEmpty()
+                        ? commandRouter.sendCommand(clusterId, entry.getKey(), command)
+                        : commandRouter.sendArchiveCommand(clusterId, entry.getKey(), command, parameters);
+                return ResponseEntity.ok(result);
             }
         }
         Map<String, Object> error = new LinkedHashMap<>();
         error.put("success", false);
         error.put("message", "No leader node available");
         return ResponseEntity.ok(error);
+    }
+
+    private ResponseEntity<List<Map<String, Object>>> sendToAll(String clusterId, String command,
+                                                                  Map<String, String> parameters) {
+        ClusterStateAggregator aggregator = clusterManager.getCluster(clusterId);
+        if (aggregator == null) {
+            return ResponseEntity.notFound().build();
+        }
+        List<Map<String, Object>> results = new ArrayList<>();
+        for (Map.Entry<Integer, MetricsReport> entry : aggregator.getLatestMetrics().entrySet()) {
+            Map<String, Object> result = commandRouter.sendArchiveCommand(
+                    clusterId, entry.getKey(), command, parameters);
+            result.put("nodeId", entry.getKey());
+            results.add(result);
+        }
+        return ResponseEntity.ok(results);
     }
 
     @GetMapping("/{clusterId}/recordings")

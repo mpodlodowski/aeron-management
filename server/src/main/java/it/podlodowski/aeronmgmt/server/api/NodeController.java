@@ -194,4 +194,24 @@ public class NodeController {
                        "offset", String.valueOf(offset),
                        "length", String.valueOf(length)));
     }
+
+    // --- Egress spy recording ---
+
+    @PostMapping("/{id}/egress-recording/start")
+    public Map<String, Object> startEgressRecording(
+            @PathVariable String clusterId,
+            @PathVariable int id,
+            @RequestParam(defaultValue = "102") int streamId,
+            @RequestParam(defaultValue = "0") long durationSeconds) {
+        return commandRouter.sendArchiveCommand(clusterId, id, "START_EGRESS_RECORDING",
+                Map.of("streamId", String.valueOf(streamId),
+                       "durationSeconds", String.valueOf(durationSeconds)));
+    }
+
+    @PostMapping("/{id}/egress-recording/stop")
+    public Map<String, Object> stopEgressRecording(
+            @PathVariable String clusterId,
+            @PathVariable int id) {
+        return commandRouter.sendArchiveCommand(clusterId, id, "STOP_EGRESS_RECORDING");
+    }
 }
