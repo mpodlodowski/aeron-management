@@ -5,12 +5,17 @@ import it.podlodowski.aeronmgmt.common.proto.ArchiveRecording;
 import it.podlodowski.aeronmgmt.common.proto.ClusterMetrics;
 import it.podlodowski.aeronmgmt.common.proto.CommandResult;
 import it.podlodowski.aeronmgmt.common.proto.MetricsReport;
+import it.podlodowski.aeronmgmt.common.proto.StateChangeEntry;
+import it.podlodowski.aeronmgmt.server.events.ClusterEvent;
 import it.podlodowski.aeronmgmt.server.events.EventFactory;
+import it.podlodowski.aeronmgmt.server.events.EventLevel;
 import it.podlodowski.aeronmgmt.server.events.EventService;
+import it.podlodowski.aeronmgmt.server.events.EventSource;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.messaging.simp.SimpMessagingTemplate;
 
+import java.time.Instant;
 import java.util.*;
 import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.ConcurrentHashMap;
@@ -52,6 +57,17 @@ public class ClusterStateAggregator {
         this.clusterId = clusterId;
         this.eventService = eventService;
     }
+
+    private static final Map<Long, String> ROLE_NAMES = Map.of(
+            0L, "FOLLOWER", 1L, "CANDIDATE", 2L, "LEADER"
+    );
+
+    private static final Map<Long, String> MODULE_STATE_NAMES = Map.of(
+            0L, "INIT", 1L, "ACTIVE", 2L, "SUSPENDED", 3L, "SNAPSHOT",
+            4L, "QUITTING", 5L, "TERMINATING", 6L, "CLOSED"
+    );
+
+    private static final long ELECTION_CLOSED = 17L;
 
     public String getClusterId() {
         return clusterId;
@@ -128,6 +144,115 @@ public class ClusterStateAggregator {
         reachableNodes.remove(nodeId);
         eventService.emit(EventFactory.agentDisconnected(clusterId, nodeId));
         pushToWebSocket("/topic/clusters/" + clusterId + "/cluster", buildClusterOverview());
+    }
+
+    public void processCatchUp(int nodeId, List<StateChangeEntry> buffer,
+                                Map<Integer, Long> currentCounters) {
+        LOGGER.info("Processing catch-up for node {} in cluster {}: {} buffered entries, {} current counters",
+                nodeId, clusterId, buffer.size(), currentCounters.size());
+
+        // Find the last known event for this node
+        ClusterEvent lastEvent = eventService.findLatestForNode(clusterId, nodeId);
+
+        long lastKnownTimestamp = 0;
+        if (lastEvent != null) {
+            lastKnownTimestamp = lastEvent.getTimestamp().toEpochMilli();
+
+            // Emit a MONITORING_GAP event from the last event to now
+            long now = System.currentTimeMillis();
+            eventService.emit(
+                    EventFactory.monitoringGap(clusterId, nodeId, lastKnownTimestamp, now));
+        }
+
+        // Replay buffered state changes
+        for (StateChangeEntry entry : buffer) {
+            if (entry.getTimestamp() <= lastKnownTimestamp) {
+                continue; // Skip entries older than the last known event
+            }
+
+            replayCatchUpEntry(nodeId, entry);
+        }
+
+        LOGGER.info("Catch-up complete for node {} in cluster {}", nodeId, clusterId);
+    }
+
+    private void replayCatchUpEntry(int nodeId, StateChangeEntry entry) {
+        Instant timestamp = Instant.ofEpochMilli(entry.getTimestamp());
+
+        switch (entry.getCounterTypeId()) {
+            case 201 -> { // Role change
+                String from = ROLE_NAMES.getOrDefault(entry.getOldValue(), String.valueOf(entry.getOldValue()));
+                String to = ROLE_NAMES.getOrDefault(entry.getNewValue(), String.valueOf(entry.getNewValue()));
+                ClusterEvent event = ClusterEvent.builder()
+                        .clusterId(clusterId)
+                        .timestamp(timestamp)
+                        .level(EventLevel.NODE)
+                        .type("ROLE_CHANGE")
+                        .nodeId(nodeId)
+                        .message("Node " + nodeId + " role changed: " + from + " \u2192 " + to)
+                        .source(EventSource.CATCH_UP)
+                        .details(Map.of("from", from, "to", to))
+                        .build();
+                eventService.emit(event);
+
+                if (entry.getNewValue() == 2L) { // LEADER
+                    ClusterEvent leaderEvent = ClusterEvent.builder()
+                            .clusterId(clusterId)
+                            .timestamp(timestamp)
+                            .level(EventLevel.NODE)
+                            .type("LEADER_ELECTED")
+                            .nodeId(nodeId)
+                            .message("Node " + nodeId + " elected as leader")
+                            .source(EventSource.CATCH_UP)
+                            .details(Map.of("termId", -1L, "previousLeaderId", -1))
+                            .build();
+                    eventService.emit(leaderEvent);
+                }
+            }
+            case 200 -> { // Module state change
+                String from = MODULE_STATE_NAMES.getOrDefault(entry.getOldValue(), String.valueOf(entry.getOldValue()));
+                String to = MODULE_STATE_NAMES.getOrDefault(entry.getNewValue(), String.valueOf(entry.getNewValue()));
+                ClusterEvent event = ClusterEvent.builder()
+                        .clusterId(clusterId)
+                        .timestamp(timestamp)
+                        .level(EventLevel.NODE)
+                        .type("MODULE_STATE_CHANGE")
+                        .nodeId(nodeId)
+                        .message("Node " + nodeId + " module state: " + from + " \u2192 " + to)
+                        .source(EventSource.CATCH_UP)
+                        .details(Map.of("from", from, "to", to))
+                        .build();
+                eventService.emit(event);
+            }
+            case 207 -> { // Election state
+                if (entry.getOldValue() == ELECTION_CLOSED && entry.getNewValue() != ELECTION_CLOSED) {
+                    ClusterEvent event = ClusterEvent.builder()
+                            .clusterId(clusterId)
+                            .timestamp(timestamp)
+                            .level(EventLevel.NODE)
+                            .type("ELECTION_STARTED")
+                            .nodeId(nodeId)
+                            .message("Election started on node " + nodeId + " (state: " + entry.getNewValue() + ")")
+                            .source(EventSource.CATCH_UP)
+                            .details(Map.of("electionState", String.valueOf(entry.getNewValue())))
+                            .build();
+                    eventService.emit(event);
+                } else if (entry.getOldValue() != ELECTION_CLOSED && entry.getNewValue() == ELECTION_CLOSED) {
+                    ClusterEvent event = ClusterEvent.builder()
+                            .clusterId(clusterId)
+                            .timestamp(timestamp)
+                            .level(EventLevel.NODE)
+                            .type("ELECTION_COMPLETED")
+                            .nodeId(nodeId)
+                            .message("Election completed on node " + nodeId)
+                            .source(EventSource.CATCH_UP)
+                            .details(Map.of("electionCount", -1L, "durationMs", -1L))
+                            .build();
+                    eventService.emit(event);
+                }
+            }
+            default -> LOGGER.debug("Ignoring catch-up entry for counter type {} on node {}", entry.getCounterTypeId(), nodeId);
+        }
     }
 
     private void detectStateChanges(int nodeId, MetricsReport previous, MetricsReport current) {
