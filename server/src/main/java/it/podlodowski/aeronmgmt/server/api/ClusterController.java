@@ -7,12 +7,14 @@ import it.podlodowski.aeronmgmt.server.cluster.ClusterManager;
 import it.podlodowski.aeronmgmt.server.command.CommandRouter;
 import it.podlodowski.aeronmgmt.server.events.ClusterEvent;
 import it.podlodowski.aeronmgmt.server.events.ClusterEventRepository;
+import it.podlodowski.aeronmgmt.server.events.EventFactory;
 import it.podlodowski.aeronmgmt.server.events.EventService;
 import org.springframework.data.domain.PageRequest;
 import org.springframework.data.domain.Sort;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.*;
 
+import java.security.Principal;
 import java.util.*;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
@@ -88,28 +90,43 @@ public class ClusterController {
     // --- Cluster-level admin actions (auto-routed to leader) ---
 
     @PostMapping("/{clusterId}/snapshot")
-    public ResponseEntity<Map<String, Object>> snapshot(@PathVariable String clusterId) {
-        return sendToLeader(clusterId, "SNAPSHOT");
+    public ResponseEntity<Map<String, Object>> snapshot(@PathVariable String clusterId, Principal principal) {
+        ResponseEntity<Map<String, Object>> response = sendToLeader(clusterId, "SNAPSHOT");
+        String username = principal != null ? principal.getName() : "anonymous";
+        eventService.emit(EventFactory.clusterAction(clusterId, "SNAPSHOT", username));
+        return response;
     }
 
     @PostMapping("/{clusterId}/suspend")
-    public ResponseEntity<Map<String, Object>> suspend(@PathVariable String clusterId) {
-        return sendToLeader(clusterId, "SUSPEND");
+    public ResponseEntity<Map<String, Object>> suspend(@PathVariable String clusterId, Principal principal) {
+        ResponseEntity<Map<String, Object>> response = sendToLeader(clusterId, "SUSPEND");
+        String username = principal != null ? principal.getName() : "anonymous";
+        eventService.emit(EventFactory.clusterAction(clusterId, "SUSPEND", username));
+        return response;
     }
 
     @PostMapping("/{clusterId}/resume")
-    public ResponseEntity<Map<String, Object>> resume(@PathVariable String clusterId) {
-        return sendToLeader(clusterId, "RESUME");
+    public ResponseEntity<Map<String, Object>> resume(@PathVariable String clusterId, Principal principal) {
+        ResponseEntity<Map<String, Object>> response = sendToLeader(clusterId, "RESUME");
+        String username = principal != null ? principal.getName() : "anonymous";
+        eventService.emit(EventFactory.clusterAction(clusterId, "RESUME", username));
+        return response;
     }
 
     @PostMapping("/{clusterId}/shutdown")
-    public ResponseEntity<Map<String, Object>> shutdown(@PathVariable String clusterId) {
-        return sendToLeader(clusterId, "SHUTDOWN");
+    public ResponseEntity<Map<String, Object>> shutdown(@PathVariable String clusterId, Principal principal) {
+        ResponseEntity<Map<String, Object>> response = sendToLeader(clusterId, "SHUTDOWN");
+        String username = principal != null ? principal.getName() : "anonymous";
+        eventService.emit(EventFactory.clusterAction(clusterId, "SHUTDOWN", username));
+        return response;
     }
 
     @PostMapping("/{clusterId}/abort")
-    public ResponseEntity<Map<String, Object>> abort(@PathVariable String clusterId) {
-        return sendToLeader(clusterId, "ABORT");
+    public ResponseEntity<Map<String, Object>> abort(@PathVariable String clusterId, Principal principal) {
+        ResponseEntity<Map<String, Object>> response = sendToLeader(clusterId, "ABORT");
+        String username = principal != null ? principal.getName() : "anonymous";
+        eventService.emit(EventFactory.clusterAction(clusterId, "ABORT", username));
+        return response;
     }
 
     @PostMapping("/{clusterId}/egress-recording/start")

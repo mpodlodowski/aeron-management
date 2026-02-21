@@ -4,9 +4,12 @@ import it.podlodowski.aeronmgmt.common.proto.MetricsReport;
 import it.podlodowski.aeronmgmt.server.aggregator.ClusterStateAggregator;
 import it.podlodowski.aeronmgmt.server.cluster.ClusterManager;
 import it.podlodowski.aeronmgmt.server.command.CommandRouter;
+import it.podlodowski.aeronmgmt.server.events.EventFactory;
+import it.podlodowski.aeronmgmt.server.events.EventService;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.*;
 
+import java.security.Principal;
 import java.util.ArrayList;
 import java.util.LinkedHashMap;
 import java.util.List;
@@ -18,10 +21,12 @@ public class NodeController {
 
     private final ClusterManager clusterManager;
     private final CommandRouter commandRouter;
+    private final EventService eventService;
 
-    public NodeController(ClusterManager clusterManager, CommandRouter commandRouter) {
+    public NodeController(ClusterManager clusterManager, CommandRouter commandRouter, EventService eventService) {
         this.clusterManager = clusterManager;
         this.commandRouter = commandRouter;
+        this.eventService = eventService;
     }
 
     @GetMapping
@@ -53,44 +58,84 @@ public class NodeController {
     }
 
     @PostMapping("/{id}/snapshot")
-    public Map<String, Object> triggerSnapshot(@PathVariable String clusterId, @PathVariable int id) {
-        return commandRouter.sendCommand(clusterId, id, "SNAPSHOT");
+    public Map<String, Object> triggerSnapshot(@PathVariable String clusterId, @PathVariable int id, Principal principal) {
+        Map<String, Object> result = commandRouter.sendCommand(clusterId, id, "SNAPSHOT");
+        String username = principal != null ? principal.getName() : "anonymous";
+        boolean success = Boolean.TRUE.equals(result.get("success"));
+        String output = (String) result.getOrDefault("output", "");
+        eventService.emit(EventFactory.nodeAction(clusterId, id, "SNAPSHOT", username, success, output));
+        return result;
     }
 
     @PostMapping("/{id}/suspend")
-    public Map<String, Object> suspendNode(@PathVariable String clusterId, @PathVariable int id) {
-        return commandRouter.sendCommand(clusterId, id, "SUSPEND");
+    public Map<String, Object> suspendNode(@PathVariable String clusterId, @PathVariable int id, Principal principal) {
+        Map<String, Object> result = commandRouter.sendCommand(clusterId, id, "SUSPEND");
+        String username = principal != null ? principal.getName() : "anonymous";
+        boolean success = Boolean.TRUE.equals(result.get("success"));
+        String output = (String) result.getOrDefault("output", "");
+        eventService.emit(EventFactory.nodeAction(clusterId, id, "SUSPEND", username, success, output));
+        return result;
     }
 
     @PostMapping("/{id}/resume")
-    public Map<String, Object> resumeNode(@PathVariable String clusterId, @PathVariable int id) {
-        return commandRouter.sendCommand(clusterId, id, "RESUME");
+    public Map<String, Object> resumeNode(@PathVariable String clusterId, @PathVariable int id, Principal principal) {
+        Map<String, Object> result = commandRouter.sendCommand(clusterId, id, "RESUME");
+        String username = principal != null ? principal.getName() : "anonymous";
+        boolean success = Boolean.TRUE.equals(result.get("success"));
+        String output = (String) result.getOrDefault("output", "");
+        eventService.emit(EventFactory.nodeAction(clusterId, id, "RESUME", username, success, output));
+        return result;
     }
 
     @PostMapping("/{id}/shutdown")
-    public Map<String, Object> shutdownNode(@PathVariable String clusterId, @PathVariable int id) {
-        return commandRouter.sendCommand(clusterId, id, "SHUTDOWN");
+    public Map<String, Object> shutdownNode(@PathVariable String clusterId, @PathVariable int id, Principal principal) {
+        Map<String, Object> result = commandRouter.sendCommand(clusterId, id, "SHUTDOWN");
+        String username = principal != null ? principal.getName() : "anonymous";
+        boolean success = Boolean.TRUE.equals(result.get("success"));
+        String output = (String) result.getOrDefault("output", "");
+        eventService.emit(EventFactory.nodeAction(clusterId, id, "SHUTDOWN", username, success, output));
+        return result;
     }
 
     @PostMapping("/{id}/abort")
-    public Map<String, Object> abortNode(@PathVariable String clusterId, @PathVariable int id) {
-        return commandRouter.sendCommand(clusterId, id, "ABORT");
+    public Map<String, Object> abortNode(@PathVariable String clusterId, @PathVariable int id, Principal principal) {
+        Map<String, Object> result = commandRouter.sendCommand(clusterId, id, "ABORT");
+        String username = principal != null ? principal.getName() : "anonymous";
+        boolean success = Boolean.TRUE.equals(result.get("success"));
+        String output = (String) result.getOrDefault("output", "");
+        eventService.emit(EventFactory.nodeAction(clusterId, id, "ABORT", username, success, output));
+        return result;
     }
 
     @PostMapping("/{id}/invalidate-snapshot")
-    public Map<String, Object> invalidateSnapshot(@PathVariable String clusterId, @PathVariable int id) {
-        return commandRouter.sendCommand(clusterId, id, "INVALIDATE_SNAPSHOT");
+    public Map<String, Object> invalidateSnapshot(@PathVariable String clusterId, @PathVariable int id, Principal principal) {
+        Map<String, Object> result = commandRouter.sendCommand(clusterId, id, "INVALIDATE_SNAPSHOT");
+        String username = principal != null ? principal.getName() : "anonymous";
+        boolean success = Boolean.TRUE.equals(result.get("success"));
+        String output = (String) result.getOrDefault("output", "");
+        eventService.emit(EventFactory.nodeAction(clusterId, id, "INVALIDATE_SNAPSHOT", username, success, output));
+        return result;
     }
 
     @PostMapping("/{id}/seed-recording-log")
-    public Map<String, Object> seedRecordingLog(@PathVariable String clusterId, @PathVariable int id) {
-        return commandRouter.sendCommand(clusterId, id, "SEED_RECORDING_LOG");
+    public Map<String, Object> seedRecordingLog(@PathVariable String clusterId, @PathVariable int id, Principal principal) {
+        Map<String, Object> result = commandRouter.sendCommand(clusterId, id, "SEED_RECORDING_LOG");
+        String username = principal != null ? principal.getName() : "anonymous";
+        boolean success = Boolean.TRUE.equals(result.get("success"));
+        String output = (String) result.getOrDefault("output", "");
+        eventService.emit(EventFactory.nodeAction(clusterId, id, "SEED_RECORDING_LOG", username, success, output));
+        return result;
     }
 
-    /** Backwards-compatible alias for {@link #shutdownNode(String, int)}. */
+    /** Backwards-compatible alias for {@link #shutdownNode(String, int, Principal)}. */
     @PostMapping("/{id}/step-down")
-    public Map<String, Object> stepDown(@PathVariable String clusterId, @PathVariable int id) {
-        return commandRouter.sendCommand(clusterId, id, "SHUTDOWN");
+    public Map<String, Object> stepDown(@PathVariable String clusterId, @PathVariable int id, Principal principal) {
+        Map<String, Object> result = commandRouter.sendCommand(clusterId, id, "SHUTDOWN");
+        String username = principal != null ? principal.getName() : "anonymous";
+        boolean success = Boolean.TRUE.equals(result.get("success"));
+        String output = (String) result.getOrDefault("output", "");
+        eventService.emit(EventFactory.nodeAction(clusterId, id, "STEP_DOWN", username, success, output));
+        return result;
     }
 
     // --- Read-only diagnostics (GET) ---
@@ -143,13 +188,23 @@ public class NodeController {
     }
 
     @PostMapping("/{id}/archive/compact")
-    public Map<String, Object> archiveCompact(@PathVariable String clusterId, @PathVariable int id) {
-        return commandRouter.sendArchiveCommand(clusterId, id, "ARCHIVE_COMPACT");
+    public Map<String, Object> archiveCompact(@PathVariable String clusterId, @PathVariable int id, Principal principal) {
+        Map<String, Object> result = commandRouter.sendArchiveCommand(clusterId, id, "ARCHIVE_COMPACT");
+        String username = principal != null ? principal.getName() : "anonymous";
+        boolean success = Boolean.TRUE.equals(result.get("success"));
+        String output = (String) result.getOrDefault("output", "");
+        eventService.emit(EventFactory.nodeAction(clusterId, id, "ARCHIVE_COMPACT", username, success, output));
+        return result;
     }
 
     @PostMapping("/{id}/archive/delete-orphaned")
-    public Map<String, Object> archiveDeleteOrphaned(@PathVariable String clusterId, @PathVariable int id) {
-        return commandRouter.sendArchiveCommand(clusterId, id, "ARCHIVE_DELETE_ORPHANED");
+    public Map<String, Object> archiveDeleteOrphaned(@PathVariable String clusterId, @PathVariable int id, Principal principal) {
+        Map<String, Object> result = commandRouter.sendArchiveCommand(clusterId, id, "ARCHIVE_DELETE_ORPHANED");
+        String username = principal != null ? principal.getName() : "anonymous";
+        boolean success = Boolean.TRUE.equals(result.get("success"));
+        String output = (String) result.getOrDefault("output", "");
+        eventService.emit(EventFactory.nodeAction(clusterId, id, "ARCHIVE_DELETE_ORPHANED", username, success, output));
+        return result;
     }
 
     @GetMapping("/{id}/archive/recordings/{rid}/describe")
@@ -165,21 +220,36 @@ public class NodeController {
     }
 
     @PostMapping("/{id}/archive/recordings/{rid}/mark-invalid")
-    public Map<String, Object> archiveMarkInvalid(@PathVariable String clusterId, @PathVariable int id, @PathVariable long rid) {
-        return commandRouter.sendArchiveCommand(clusterId, id, "ARCHIVE_MARK_INVALID",
+    public Map<String, Object> archiveMarkInvalid(@PathVariable String clusterId, @PathVariable int id, @PathVariable long rid, Principal principal) {
+        Map<String, Object> result = commandRouter.sendArchiveCommand(clusterId, id, "ARCHIVE_MARK_INVALID",
                 Map.of("recordingId", String.valueOf(rid)));
+        String username = principal != null ? principal.getName() : "anonymous";
+        boolean success = Boolean.TRUE.equals(result.get("success"));
+        String output = (String) result.getOrDefault("output", "");
+        eventService.emit(EventFactory.nodeAction(clusterId, id, "ARCHIVE_MARK_INVALID", username, success, output));
+        return result;
     }
 
     @PostMapping("/{id}/archive/recordings/{rid}/mark-valid")
-    public Map<String, Object> archiveMarkValid(@PathVariable String clusterId, @PathVariable int id, @PathVariable long rid) {
-        return commandRouter.sendArchiveCommand(clusterId, id, "ARCHIVE_MARK_VALID",
+    public Map<String, Object> archiveMarkValid(@PathVariable String clusterId, @PathVariable int id, @PathVariable long rid, Principal principal) {
+        Map<String, Object> result = commandRouter.sendArchiveCommand(clusterId, id, "ARCHIVE_MARK_VALID",
                 Map.of("recordingId", String.valueOf(rid)));
+        String username = principal != null ? principal.getName() : "anonymous";
+        boolean success = Boolean.TRUE.equals(result.get("success"));
+        String output = (String) result.getOrDefault("output", "");
+        eventService.emit(EventFactory.nodeAction(clusterId, id, "ARCHIVE_MARK_VALID", username, success, output));
+        return result;
     }
 
     @PostMapping("/{id}/archive/recordings/{rid}/delete")
-    public Map<String, Object> archiveDeleteRecording(@PathVariable String clusterId, @PathVariable int id, @PathVariable long rid) {
-        return commandRouter.sendArchiveCommand(clusterId, id, "ARCHIVE_DELETE_RECORDING",
+    public Map<String, Object> archiveDeleteRecording(@PathVariable String clusterId, @PathVariable int id, @PathVariable long rid, Principal principal) {
+        Map<String, Object> result = commandRouter.sendArchiveCommand(clusterId, id, "ARCHIVE_DELETE_RECORDING",
                 Map.of("recordingId", String.valueOf(rid)));
+        String username = principal != null ? principal.getName() : "anonymous";
+        boolean success = Boolean.TRUE.equals(result.get("success"));
+        String output = (String) result.getOrDefault("output", "");
+        eventService.emit(EventFactory.nodeAction(clusterId, id, "ARCHIVE_DELETE_RECORDING", username, success, output));
+        return result;
     }
 
     @GetMapping("/{id}/archive/recordings/{rid}/bytes")
