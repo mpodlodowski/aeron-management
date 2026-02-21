@@ -5,6 +5,7 @@ import { ClusterSummary } from './types'
 import Dashboard from './pages/Dashboard'
 import NodeDetail from './pages/NodeDetail'
 import Archive from './pages/Archive'
+import { SettingsMenu } from './components/SettingsMenu'
 
 function PageTitle() {
   const location = useLocation()
@@ -194,6 +195,7 @@ function Header() {
         >
           Archive
         </Link>
+        {clusterId && <SettingsMenu clusterId={clusterId} />}
         <span
           className={`inline-block h-2 w-2 rounded-full ${connected ? 'bg-green-500' : 'bg-red-500'}`}
           title={connected ? 'WebSocket connected' : 'WebSocket disconnected'}
