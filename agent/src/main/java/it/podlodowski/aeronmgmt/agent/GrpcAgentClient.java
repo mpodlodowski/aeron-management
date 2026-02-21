@@ -87,6 +87,7 @@ public class GrpcAgentClient {
         requestObserver = asyncStub.connect(responseObserver);
 
         // Send registration with buffered state changes for catch-up
+        StateChangeBuffer.Snapshot snapshot = stateChangeBuffer.drainAndSnapshot();
         requestObserver.onNext(AgentMessage.newBuilder()
                 .setRegistration(AgentRegistration.newBuilder()
                         .setNodeId(identity.nodeId())
@@ -94,8 +95,8 @@ public class GrpcAgentClient {
                         .setAgentId(config.agentId)
                         .setHostname(getHostname())
                         .setClusterId(config.clusterId)
-                        .addAllBufferedStateChanges(stateChangeBuffer.drainAndClear())
-                        .putAllCurrentCounterValues(stateChangeBuffer.getCurrentCounterValues())
+                        .addAllBufferedStateChanges(snapshot.entries())
+                        .putAllCurrentCounterValues(snapshot.counterValues())
                         .build())
                 .build());
 

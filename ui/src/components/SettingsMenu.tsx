@@ -1,9 +1,18 @@
-import { useState } from 'react'
+import { useState, useEffect, useRef } from 'react'
 import { triggerReconcile } from '../api/events'
 
 export function SettingsMenu({ clusterId }: { clusterId: string }) {
   const [open, setOpen] = useState(false)
   const [reconciling, setReconciling] = useState(false)
+  const ref = useRef<HTMLDivElement>(null)
+
+  useEffect(() => {
+    const handleClick = (e: MouseEvent) => {
+      if (ref.current && !ref.current.contains(e.target as Node)) setOpen(false)
+    }
+    document.addEventListener('mousedown', handleClick)
+    return () => document.removeEventListener('mousedown', handleClick)
+  }, [])
 
   const handleReconcile = async () => {
     if (!confirm('Reconcile events from Aeron artifacts? This may take a moment.')) return
@@ -17,7 +26,7 @@ export function SettingsMenu({ clusterId }: { clusterId: string }) {
   }
 
   return (
-    <div className="relative">
+    <div ref={ref} className="relative">
       <button
         onClick={() => setOpen(!open)}
         className="text-gray-400 hover:text-gray-200 transition-colors p-1"
