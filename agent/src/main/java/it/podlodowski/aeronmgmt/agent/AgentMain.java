@@ -41,11 +41,12 @@ public class AgentMain {
         ArchiveMetricsCollector archiveCollector = new ArchiveMetricsCollector(clusterDir);
         SpyRecordingManager spyRecordingManager = new SpyRecordingManager(identity.aeronDir(), cncReader);
         spyRecordingManager.connect();
+        StateChangeBuffer stateChangeBuffer = new StateChangeBuffer(config.stateBufferSize);
         MetricsCollector metricsCollector = new MetricsCollector(
                 cncReader, archiveCollector, identity.nodeId(), identity.agentMode(), config.clusterId,
-                spyRecordingManager);
+                spyRecordingManager, stateChangeBuffer);
         AdminCommandExecutor commandExecutor = new AdminCommandExecutor(clusterDir, archiveCollector, spyRecordingManager);
-        GrpcAgentClient grpcClient = new GrpcAgentClient(config, identity, commandExecutor);
+        GrpcAgentClient grpcClient = new GrpcAgentClient(config, identity, commandExecutor, stateChangeBuffer);
         HealthEndpoint healthEndpoint = new HealthEndpoint(7070);
 
         grpcClient.connect();
