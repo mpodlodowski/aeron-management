@@ -5,19 +5,27 @@ import it.podlodowski.aeronmgmt.common.proto.MetricsReport;
 import it.podlodowski.aeronmgmt.server.aggregator.ClusterStateAggregator;
 import it.podlodowski.aeronmgmt.server.cluster.ClusterManager;
 import it.podlodowski.aeronmgmt.server.command.CommandRouter;
-import it.podlodowski.aeronmgmt.server.events.ClusterEvent;
-import it.podlodowski.aeronmgmt.server.events.ClusterEventRepository;
 import it.podlodowski.aeronmgmt.server.events.EventFactory;
+import it.podlodowski.aeronmgmt.server.events.EventLevel;
+import it.podlodowski.aeronmgmt.server.events.EventQuery;
 import it.podlodowski.aeronmgmt.server.events.EventService;
+import jakarta.servlet.http.HttpServletResponse;
+import org.springframework.data.domain.Page;
 import org.springframework.data.domain.PageRequest;
 import org.springframework.data.domain.Sort;
+import org.springframework.http.HttpHeaders;
+import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.*;
 
+import java.io.IOException;
 import java.security.Principal;
+import java.time.Duration;
+import java.time.Instant;
 import java.util.*;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
+import java.util.stream.Collectors;
 
 @RestController
 @RequestMapping("/api/clusters")
@@ -27,14 +35,12 @@ public class ClusterController {
 
     private final ClusterManager clusterManager;
     private final CommandRouter commandRouter;
-    private final ClusterEventRepository eventRepository;
     private final EventService eventService;
 
     public ClusterController(ClusterManager clusterManager, CommandRouter commandRouter,
-                             ClusterEventRepository eventRepository, EventService eventService) {
+                             EventService eventService) {
         this.clusterManager = clusterManager;
         this.commandRouter = commandRouter;
-        this.eventRepository = eventRepository;
         this.eventService = eventService;
     }
 
@@ -55,18 +61,119 @@ public class ClusterController {
     }
 
     @GetMapping("/{clusterId}/events")
-    public ResponseEntity<List<Map<String, Object>>> getRecentEvents(@PathVariable String clusterId) {
+    public ResponseEntity<Map<String, Object>> queryEvents(
+            @PathVariable String clusterId,
+            @RequestParam(required = false) Long from,
+            @RequestParam(required = false) Long to,
+            @RequestParam(required = false) List<String> levels,
+            @RequestParam(required = false) List<String> types,
+            @RequestParam(required = false) Integer nodeId,
+            @RequestParam(required = false) String agentId,
+            @RequestParam(required = false) String search,
+            @RequestParam(defaultValue = "desc") String sort,
+            @RequestParam(defaultValue = "0") int page,
+            @RequestParam(defaultValue = "50") int size) {
         if (clusterManager.getCluster(clusterId) == null) {
             return ResponseEntity.notFound().build();
         }
-        java.time.Instant now = java.time.Instant.now();
-        java.time.Instant oneDayAgo = now.minus(java.time.Duration.ofDays(1));
-        PageRequest page = PageRequest.of(0, 200, Sort.by(Sort.Direction.DESC, "timestamp"));
-        List<Map<String, Object>> events = eventRepository
-                .findByClusterIdAndTimestampBetween(clusterId, oneDayAgo, now, page)
-                .map(eventService::toMap)
-                .getContent();
-        return ResponseEntity.ok(events);
+
+        Instant now = Instant.now();
+        Instant fromInstant = from != null ? Instant.ofEpochMilli(from) : now.minus(Duration.ofDays(1));
+        Instant toInstant = to != null ? Instant.ofEpochMilli(to) : now;
+
+        List<EventLevel> eventLevels = levels != null
+                ? levels.stream().map(EventLevel::valueOf).collect(Collectors.toList())
+                : null;
+
+        Sort.Direction direction = "asc".equalsIgnoreCase(sort)
+                ? Sort.Direction.ASC : Sort.Direction.DESC;
+        PageRequest pageable = PageRequest.of(page, size, Sort.by(direction, "timestamp"));
+
+        EventQuery query = new EventQuery(clusterId, fromInstant, toInstant,
+                eventLevels, types, nodeId, agentId, search, sort);
+        Page<Map<String, Object>> result = eventService.query(query, pageable);
+
+        Map<String, Object> response = new LinkedHashMap<>();
+        response.put("content", result.getContent());
+        response.put("page", result.getNumber());
+        response.put("size", result.getSize());
+        response.put("totalElements", result.getTotalElements());
+        response.put("totalPages", result.getTotalPages());
+        return ResponseEntity.ok(response);
+    }
+
+    @GetMapping("/{clusterId}/events/histogram")
+    public ResponseEntity<Map<String, Object>> getEventHistogram(
+            @PathVariable String clusterId,
+            @RequestParam(required = false) Long from,
+            @RequestParam(required = false) Long to,
+            @RequestParam(defaultValue = "100") int buckets,
+            @RequestParam(required = false) List<String> levels,
+            @RequestParam(required = false) Integer nodeId) {
+        if (clusterManager.getCluster(clusterId) == null) {
+            return ResponseEntity.notFound().build();
+        }
+
+        Instant now = Instant.now();
+        Instant fromInstant = from != null ? Instant.ofEpochMilli(from) : now.minus(Duration.ofDays(1));
+        Instant toInstant = to != null ? Instant.ofEpochMilli(to) : now;
+
+        List<EventLevel> eventLevels = levels != null
+                ? levels.stream().map(EventLevel::valueOf).collect(Collectors.toList())
+                : null;
+
+        Map<String, Object> histogram = eventService.getHistogram(
+                clusterId, fromInstant, toInstant, buckets, eventLevels, nodeId);
+        return ResponseEntity.ok(histogram);
+    }
+
+    @GetMapping("/{clusterId}/events/export")
+    public void exportEvents(
+            @PathVariable String clusterId,
+            @RequestParam(defaultValue = "json") String format,
+            @RequestParam(required = false) Long from,
+            @RequestParam(required = false) Long to,
+            @RequestParam(required = false) List<String> levels,
+            @RequestParam(required = false) List<String> types,
+            @RequestParam(required = false) Integer nodeId,
+            @RequestParam(required = false) String agentId,
+            @RequestParam(required = false) String search,
+            @RequestParam(defaultValue = "desc") String sort,
+            HttpServletResponse response) throws IOException {
+        if (clusterManager.getCluster(clusterId) == null) {
+            response.setStatus(HttpServletResponse.SC_NOT_FOUND);
+            return;
+        }
+
+        Instant now = Instant.now();
+        Instant fromInstant = from != null ? Instant.ofEpochMilli(from) : now.minus(Duration.ofDays(1));
+        Instant toInstant = to != null ? Instant.ofEpochMilli(to) : now;
+
+        List<EventLevel> eventLevels = levels != null
+                ? levels.stream().map(EventLevel::valueOf).collect(Collectors.toList())
+                : null;
+
+        EventQuery query = new EventQuery(clusterId, fromInstant, toInstant,
+                eventLevels, types, nodeId, agentId, search, sort);
+
+        String extension = "csv".equalsIgnoreCase(format) ? "csv" : "json";
+        String contentType = "csv".equalsIgnoreCase(format) ? "text/csv" : "application/json";
+
+        response.setContentType(contentType);
+        response.setHeader(HttpHeaders.CONTENT_DISPOSITION,
+                "attachment; filename=\"events-" + clusterId + "." + extension + "\"");
+
+        eventService.exportEvents(query, format, response.getOutputStream());
+    }
+
+    @PostMapping("/{clusterId}/events/reconcile")
+    public ResponseEntity<Map<String, Object>> triggerReconcile(@PathVariable String clusterId) {
+        if (clusterManager.getCluster(clusterId) == null) {
+            return ResponseEntity.notFound().build();
+        }
+        Map<String, Object> body = new LinkedHashMap<>();
+        body.put("status", "started");
+        return ResponseEntity.status(HttpStatus.ACCEPTED).body(body);
     }
 
     @GetMapping("/{clusterId}/membership")
