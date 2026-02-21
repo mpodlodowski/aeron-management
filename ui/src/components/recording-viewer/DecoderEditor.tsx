@@ -1,8 +1,12 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
+import * as prettier from 'prettier/standalone'
+import * as babelPlugin from 'prettier/plugins/babel'
+import * as estreePlugin from 'prettier/plugins/estree'
 import type { CustomDecoderConfig, DecodedMessage } from '../../lib/decoder/types'
 import { DecoderRegistry } from '../../lib/decoder/registry'
 import { FRAME_HEADER_LENGTH } from '../../lib/decoder/builtins/frameDecoder'
 import { SBE_HEADER_LENGTH } from '../../lib/decoder/builtins/sbeHeaderDecoder'
+import { parseSbeXml } from '../../lib/decoder/sbeXmlParser'
 
 interface Props {
   registry: DecoderRegistry
@@ -38,6 +42,11 @@ export default function DecoderEditor({ registry, onClose, onUpdate, data, messa
   const [importJson, setImportJson] = useState('')
   const [importError, setImportError] = useState<string | null>(null)
   const [confirmDeleteAll, setConfirmDeleteAll] = useState(false)
+  const [showSbeImport, setShowSbeImport] = useState(false)
+  const [sbeError, setSbeError] = useState<string | null>(null)
+  const [sbePreview, setSbePreview] = useState<CustomDecoderConfig[] | null>(null)
+  const sbeRef = useRef<HTMLDivElement>(null)
+  const sbeFileRef = useRef<HTMLInputElement>(null)
 
   // Live test: run decoder against real data on every change
   const liveResult = useMemo<{ result?: TestResult; error?: string; noMatch?: boolean } | null>(() => {
@@ -104,6 +113,83 @@ export default function DecoderEditor({ registry, onClose, onUpdate, data, messa
     if (showImport) importRef.current?.scrollIntoView({ behavior: 'smooth', block: 'start' })
   }, [showImport])
 
+  useEffect(() => {
+    if (showSbeImport) sbeRef.current?.scrollIntoView({ behavior: 'smooth', block: 'start' })
+  }, [showSbeImport])
+
+  function handleSbeFile(e: React.ChangeEvent<HTMLInputElement>) {
+    const file = e.target.files?.[0]
+    if (!file) return
+    const reader = new FileReader()
+    reader.onload = () => {
+      try {
+        const configs = parseSbeXml(reader.result as string)
+        setSbePreview(configs)
+        setSbeError(null)
+      } catch (err) {
+        setSbeError(err instanceof Error ? err.message : 'Failed to parse XML')
+        setSbePreview(null)
+      }
+    }
+    reader.readAsText(file)
+  }
+
+  function handleSbeImportAll() {
+    if (!sbePreview) return
+    const errors: string[] = []
+    for (const config of sbePreview) {
+      try {
+        registry.addCustomDecoder(config)
+      } catch (e) {
+        errors.push(`${config.name}: ${e instanceof Error ? e.message : 'unknown error'}`)
+      }
+    }
+    setConfigs(registry.getCustomConfigs())
+    if (errors.length > 0) {
+      setSbeError(`Imported ${sbePreview.length - errors.length}/${sbePreview.length} decoders. Failed: ${errors.join('; ')}`)
+      setSbePreview(null)
+    } else {
+      setShowSbeImport(false)
+      setSbePreview(null)
+      setSbeError(null)
+      if (sbeFileRef.current) sbeFileRef.current.value = ''
+    }
+    onUpdate()
+  }
+
+  function cancelSbeImport() {
+    setShowSbeImport(false)
+    setSbePreview(null)
+    setSbeError(null)
+    if (sbeFileRef.current) sbeFileRef.current.value = ''
+  }
+
+  function formatCode() {
+    // Wrap in a function so Prettier can parse it as valid JS, then unwrap
+    const wrapped = `function _f(view, offset, length) {\n${code}\n}`
+    prettier
+      .format(wrapped, {
+        parser: 'babel',
+        plugins: [babelPlugin, estreePlugin],
+        printWidth: 100,
+        semi: true,
+        singleQuote: true,
+        tabWidth: 2,
+      })
+      .then((formatted) => {
+        // Strip the wrapper function
+        const lines = formatted.split('\n')
+        // Remove first line "function _f(...) {" and last line "}"
+        const body = lines.slice(1, -2)
+        // Remove one level of indentation
+        const dedented = body.map((l) => (l.startsWith('  ') ? l.slice(2) : l))
+        setCode(dedented.join('\n').trimEnd())
+      })
+      .catch(() => {
+        // If parsing fails, leave code unchanged
+      })
+  }
+
   function cancelForm() {
     setShowForm(false)
     setName('')
@@ -169,6 +255,7 @@ export default function DecoderEditor({ registry, onClose, onUpdate, data, messa
               {exportStatus ?? 'Export'}
             </button>
             <button onClick={() => { setShowImport(true); setImportError(null) }} className="text-xs text-gray-400 hover:text-gray-200">Import</button>
+            <button onClick={() => setShowSbeImport(true)} className="text-xs text-gray-400 hover:text-gray-200">Import SBE XML</button>
             {configs.length > 0 && !confirmDeleteAll && (
               <button onClick={() => setConfirmDeleteAll(true)} className="text-xs text-red-400 hover:text-red-300">Delete All</button>
             )}
@@ -213,6 +300,46 @@ export default function DecoderEditor({ registry, onClose, onUpdate, data, messa
                   Import
                 </button>
                 <button onClick={() => { setShowImport(false); setImportJson(''); setImportError(null) }} className="rounded bg-gray-800 px-3 py-1 text-xs text-gray-400 hover:bg-gray-700">
+                  Cancel
+                </button>
+              </div>
+            </div>
+          )}
+
+          {/* SBE XML import panel */}
+          {showSbeImport && (
+            <div ref={sbeRef} className="space-y-2 border border-gray-800 rounded-lg p-3">
+              <div className="text-xs text-gray-400">Select an SBE XML schema file:</div>
+              <input
+                ref={sbeFileRef}
+                type="file"
+                accept=".xml"
+                onChange={handleSbeFile}
+                className="block w-full text-xs text-gray-400 file:mr-2 file:rounded file:border-0 file:bg-gray-800 file:px-3 file:py-1 file:text-xs file:text-gray-300 hover:file:bg-gray-700"
+              />
+              {sbeError && (
+                <div className="text-xs text-red-400">{sbeError}</div>
+              )}
+              {sbePreview && (
+                <div className="space-y-2">
+                  <div className="text-xs text-gray-300">{sbePreview.length} decoder{sbePreview.length !== 1 ? 's' : ''} found:</div>
+                  <div className="max-h-40 overflow-auto rounded bg-gray-950 border border-gray-700 p-2 space-y-1">
+                    {sbePreview.map((c) => (
+                      <div key={`${c.schemaId}:${c.templateId}`} className="flex items-baseline gap-2 text-xs font-mono">
+                        <span className="text-gray-200">{c.name}</span>
+                        <span className="text-gray-500">schema={c.schemaId} template={c.templateId}</span>
+                      </div>
+                    ))}
+                  </div>
+                </div>
+              )}
+              <div className="flex gap-2">
+                {sbePreview && sbePreview.length > 0 && (
+                  <button onClick={handleSbeImportAll} className="rounded bg-blue-600 px-3 py-1 text-xs text-white hover:bg-blue-500">
+                    Import All
+                  </button>
+                )}
+                <button onClick={cancelSbeImport} className="rounded bg-gray-800 px-3 py-1 text-xs text-gray-400 hover:bg-gray-700">
                   Cancel
                 </button>
               </div>
@@ -326,7 +453,10 @@ export default function DecoderEditor({ registry, onClose, onUpdate, data, messa
                 spellCheck={false}
                 className="w-full rounded bg-gray-950 border border-gray-700 px-3 py-2 font-mono text-xs text-gray-200 resize-y"
               />
-              <div className="text-xs text-gray-500">&#125;</div>
+              <div className="flex items-center justify-between">
+                <div className="text-xs text-gray-500">&#125;</div>
+                <button onClick={formatCode} className="text-[10px] text-gray-500 hover:text-gray-300">Format</button>
+              </div>
 
               {/* Live results */}
               {liveResult && (

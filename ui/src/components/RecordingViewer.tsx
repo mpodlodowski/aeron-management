@@ -318,7 +318,7 @@ export default function RecordingViewer({ clusterId, nodeId, recordingId, totalS
           <DecoderEditor
             registry={registry}
             onClose={() => setShowDecoders(false)}
-            onUpdate={() => { setDecoderVersion((v) => v + 1); setShowDecoders(false) }}
+            onUpdate={() => setDecoderVersion((v) => v + 1)}
             data={data}
             messages={decodedMessages}
           />
