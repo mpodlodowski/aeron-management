@@ -35,8 +35,11 @@ public class ClusterStateAggregator {
     private final ConcurrentHashMap<String, CompletableFuture<CommandResult>> pendingCommands = new ConcurrentHashMap<>();
     private final ConcurrentHashMap<Integer, String> nodeAgentModes = new ConcurrentHashMap<>();
     private final ConcurrentHashMap<Integer, double[]> trafficRates = new ConcurrentHashMap<>();
+    private final ConcurrentHashMap<Integer, Long> lastSnapshotCounts = new ConcurrentHashMap<>();
+    private final ConcurrentHashMap<Integer, Long> electionStartTimes = new ConcurrentHashMap<>();
     private final Set<Integer> connectedNodes = ConcurrentHashMap.newKeySet();
     private final Set<Integer> reachableNodes = ConcurrentHashMap.newKeySet();
+    private boolean consensusEstablished = false;
 
     public ClusterStateAggregator(SimpMessagingTemplate messagingTemplate,
                                   DiskUsageTracker diskUsageTracker,
@@ -81,6 +84,19 @@ public class ClusterStateAggregator {
 
         detectStateChanges(nodeId, previous, report);
         detectNodeReachability(nodeId, report);
+
+        // Detect snapshot taken
+        long snapshotCount = counterValue(report, 205);
+        if (snapshotCount >= 0) {
+            Long prevSnapshot = lastSnapshotCounts.put(nodeId, snapshotCount);
+            if (prevSnapshot != null && snapshotCount > prevSnapshot) {
+                long termId = counterValue(report, 239);
+                long logPos = report.hasClusterMetrics() ? report.getClusterMetrics().getLogPosition() : -1;
+                eventService.emit(EventFactory.snapshotTaken(clusterId, nodeId, termId, logPos));
+            }
+        }
+
+        detectConsensusChange();
 
         LOGGER.debug("Metrics received from node {}", nodeId);
 
@@ -141,10 +157,19 @@ public class ClusterStateAggregator {
                     prev.getConsensusModuleState(), curr.getConsensusModuleState()));
         }
 
-        // Election state change (anything != CLOSED means election in progress)
-        if (!prev.getElectionState().equals(curr.getElectionState())
-                && !"17".equals(curr.getElectionState())) {
-            eventService.emit(EventFactory.electionStarted(clusterId, nodeId, curr.getElectionState()));
+        // Election state changes
+        if (!prev.getElectionState().equals(curr.getElectionState())) {
+            if (!"17".equals(curr.getElectionState())) {
+                // Election started
+                electionStartTimes.put(nodeId, System.currentTimeMillis());
+                eventService.emit(EventFactory.electionStarted(clusterId, nodeId, curr.getElectionState()));
+            } else {
+                // Election completed (returned to CLOSED=17)
+                Long startTime = electionStartTimes.remove(nodeId);
+                long durationMs = startTime != null ? System.currentTimeMillis() - startTime : 0;
+                long electionCount = counterValue(current, 238);
+                eventService.emit(EventFactory.electionCompleted(clusterId, nodeId, electionCount, durationMs));
+            }
         }
     }
 
@@ -158,6 +183,30 @@ public class ClusterStateAggregator {
         } else if (!isReachable && wasReachable) {
             reachableNodes.remove(nodeId);
             eventService.emit(EventFactory.nodeDown(clusterId, nodeId));
+        }
+    }
+
+    private void detectConsensusChange() {
+        int clusterNodeCount = 0;
+        int activeCount = 0;
+        for (Map.Entry<Integer, MetricsReport> entry : latestMetrics.entrySet()) {
+            if ("backup".equals(nodeAgentModes.get(entry.getKey()))) continue;
+            clusterNodeCount++;
+            MetricsReport r = entry.getValue();
+            if (r.hasClusterMetrics() && "ACTIVE".equals(r.getClusterMetrics().getConsensusModuleState())
+                    && connectedNodes.contains(entry.getKey())) {
+                activeCount++;
+            }
+        }
+        int majority = clusterNodeCount / 2 + 1;
+        boolean hasConsensus = activeCount >= majority && clusterNodeCount > 0;
+
+        if (hasConsensus && !consensusEstablished) {
+            consensusEstablished = true;
+            eventService.emit(EventFactory.consensusEstablished(clusterId));
+        } else if (!hasConsensus && consensusEstablished) {
+            consensusEstablished = false;
+            eventService.emit(EventFactory.consensusLost(clusterId));
         }
     }
 
