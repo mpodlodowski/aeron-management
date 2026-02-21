@@ -39,9 +39,12 @@ public class AgentMain {
 
         CncReader cncReader = new CncReader(identity.aeronDir());
         ArchiveMetricsCollector archiveCollector = new ArchiveMetricsCollector(clusterDir);
+        SpyRecordingManager spyRecordingManager = new SpyRecordingManager(identity.aeronDir(), cncReader);
+        spyRecordingManager.connect();
         MetricsCollector metricsCollector = new MetricsCollector(
-                cncReader, archiveCollector, identity.nodeId(), identity.agentMode(), config.clusterId);
-        AdminCommandExecutor commandExecutor = new AdminCommandExecutor(clusterDir, archiveCollector);
+                cncReader, archiveCollector, identity.nodeId(), identity.agentMode(), config.clusterId,
+                spyRecordingManager);
+        AdminCommandExecutor commandExecutor = new AdminCommandExecutor(clusterDir, archiveCollector, spyRecordingManager);
         GrpcAgentClient grpcClient = new GrpcAgentClient(config, identity, commandExecutor);
         HealthEndpoint healthEndpoint = new HealthEndpoint(7070);
 
@@ -73,6 +76,7 @@ public class AgentMain {
             LOGGER.info("Shutting down agent {}...", config.agentId);
             scheduler.shutdown();
             grpcClient.shutdown();
+            spyRecordingManager.close();
             healthEndpoint.stop();
         }));
 

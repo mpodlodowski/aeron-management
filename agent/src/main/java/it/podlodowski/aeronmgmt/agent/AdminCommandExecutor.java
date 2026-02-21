@@ -33,12 +33,15 @@ public class AdminCommandExecutor {
     private final File archiveDir;
     private final ArchiveMetricsCollector archiveMetrics;
     private final RecordingBytesReader bytesReader;
+    private final SpyRecordingManager spyRecordingManager;
 
-    public AdminCommandExecutor(String clusterDirPath, ArchiveMetricsCollector archiveMetrics) {
+    public AdminCommandExecutor(String clusterDirPath, ArchiveMetricsCollector archiveMetrics,
+                                SpyRecordingManager spyRecordingManager) {
         this.clusterDir = new File(clusterDirPath);
         this.archiveDir = new File(clusterDir.getParentFile(), "archive");
         this.archiveMetrics = archiveMetrics;
         this.bytesReader = new RecordingBytesReader(archiveDir);
+        this.spyRecordingManager = spyRecordingManager;
     }
 
     /**
@@ -188,6 +191,21 @@ public class AdminCommandExecutor {
                     out.print(serializeMembership(membership));
                 }
                 return ok;
+            }
+
+            case "START_EGRESS_RECORDING": {
+                int streamId = Integer.parseInt(command.getParametersOrDefault("streamId", "102"));
+                long durationSeconds = Long.parseLong(command.getParametersOrDefault("durationSeconds", "0"));
+                String result = spyRecordingManager.startRecording(streamId, durationSeconds);
+                out.print(result);
+                return !result.startsWith("AeronArchive not connected")
+                        && !result.startsWith("Recording already active")
+                        && !result.startsWith("No publication found");
+            }
+            case "STOP_EGRESS_RECORDING": {
+                String result = spyRecordingManager.stopRecording();
+                out.print(result);
+                return !result.startsWith("No active recording") && !result.startsWith("Recording stop failed");
             }
 
             default:
