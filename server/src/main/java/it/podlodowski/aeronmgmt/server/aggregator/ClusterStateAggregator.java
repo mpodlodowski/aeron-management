@@ -390,6 +390,17 @@ public class ClusterStateAggregator {
             }
         }
 
+        if (report.hasEgressRecording() && report.getEgressRecording().getActive()) {
+            Map<String, Object> egressRec = new LinkedHashMap<>();
+            egressRec.put("active", true);
+            egressRec.put("recordingId", report.getEgressRecording().getRecordingId());
+            egressRec.put("startTimeMs", report.getEgressRecording().getStartTimeMs());
+            egressRec.put("durationLimitSeconds", report.getEgressRecording().getDurationLimitSeconds());
+            egressRec.put("channel", report.getEgressRecording().getChannel());
+            egressRec.put("streamId", report.getEgressRecording().getStreamId());
+            result.put("egressRecording", egressRec);
+        }
+
         return result;
     }
 
