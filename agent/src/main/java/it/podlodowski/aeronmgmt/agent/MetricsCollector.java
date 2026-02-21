@@ -21,13 +21,17 @@ public class MetricsCollector {
     private final int nodeId;
     private final String agentMode;
     private final String clusterId;
+    private final SpyRecordingManager spyRecordingManager;
 
-    public MetricsCollector(CncReader cncReader, ArchiveMetricsCollector archiveCollector, int nodeId, String agentMode, String clusterId) {
+    public MetricsCollector(CncReader cncReader, ArchiveMetricsCollector archiveCollector,
+                            int nodeId, String agentMode, String clusterId,
+                            SpyRecordingManager spyRecordingManager) {
         this.cncReader = cncReader;
         this.archiveCollector = archiveCollector;
         this.nodeId = nodeId;
         this.agentMode = agentMode;
         this.clusterId = clusterId;
+        this.spyRecordingManager = spyRecordingManager;
     }
 
     public MetricsReport collect() {
@@ -50,6 +54,7 @@ public class MetricsCollector {
                 .addAllRecordings(archiveCollector.collectRecordings())
                 .setSystemMetrics(collectSystemMetrics())
                 .setClusterId(clusterId)
+                .setEgressRecording(spyRecordingManager.getStatus())
                 .build();
     }
 

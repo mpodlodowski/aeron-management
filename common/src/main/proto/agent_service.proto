@@ -37,6 +37,7 @@ message MetricsReport {
   bool node_reachable = 7;           // true if the media driver heartbeat is active
   bool cnc_accessible = 8;           // true if the CnC file exists and is readable
   string cluster_id = 9;  // cluster slug, e.g. "production" (default: "default")
+  EgressRecordingStatus egress_recording = 10;
 }
 
 message ClusterMetrics {
@@ -79,6 +80,15 @@ message SystemMetrics {
   int64 archive_disk_total_bytes = 8;
 }
 
+message EgressRecordingStatus {
+  bool active = 1;
+  int64 recording_id = 2;
+  int64 start_time_ms = 3;
+  int64 duration_limit_seconds = 4;
+  string channel = 5;
+  int32 stream_id = 6;
+}
+
 message CommandResult {
   string command_id = 1;
   bool success = 2;
@@ -100,6 +110,7 @@ message AdminCommand {
   string command_id = 1;
   string type = 2;   // Mutating: SNAPSHOT, SUSPEND, RESUME, SHUTDOWN, ABORT, INVALIDATE_SNAPSHOT, SEED_RECORDING_LOG
                      // Diagnostic: DESCRIBE, PID, RECOVERY_PLAN, RECORDING_LOG, ERRORS, LIST_MEMBERS, IS_LEADER, DESCRIBE_SNAPSHOT
+                     // Recording: START_EGRESS_RECORDING, STOP_EGRESS_RECORDING
   map<string, string> parameters = 3;
 }
 

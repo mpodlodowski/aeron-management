@@ -11,7 +11,8 @@ class MetricsCollectorTest {
     void backupModeInjectsBackupRole() {
         CncReader cncReader = new CncReader("/tmp/nonexistent-aeron-dir");
         ArchiveMetricsCollector archiveCollector = new ArchiveMetricsCollector("/tmp/nonexistent-cluster-dir");
-        MetricsCollector collector = new MetricsCollector(cncReader, archiveCollector, 99, "backup", "test-cluster");
+        SpyRecordingManager spyRecordingManager = new SpyRecordingManager("/tmp/nonexistent-aeron-dir", cncReader);
+        MetricsCollector collector = new MetricsCollector(cncReader, archiveCollector, 99, "backup", "test-cluster", spyRecordingManager);
 
         MetricsReport report = collector.collect();
 
@@ -24,7 +25,8 @@ class MetricsCollectorTest {
     void clusterModeDoesNotOverrideRole() {
         CncReader cncReader = new CncReader("/tmp/nonexistent-aeron-dir");
         ArchiveMetricsCollector archiveCollector = new ArchiveMetricsCollector("/tmp/nonexistent-cluster-dir");
-        MetricsCollector collector = new MetricsCollector(cncReader, archiveCollector, 0, "cluster", "default");
+        SpyRecordingManager spyRecordingManager = new SpyRecordingManager("/tmp/nonexistent-aeron-dir", cncReader);
+        MetricsCollector collector = new MetricsCollector(cncReader, archiveCollector, 0, "cluster", "default", spyRecordingManager);
 
         MetricsReport report = collector.collect();
 
