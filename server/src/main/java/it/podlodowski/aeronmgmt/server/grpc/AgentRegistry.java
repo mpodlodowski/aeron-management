@@ -9,6 +9,7 @@ import org.springframework.stereotype.Component;
 
 import java.util.Collection;
 import java.util.Collections;
+import java.util.List;
 import java.util.concurrent.ConcurrentHashMap;
 
 @Component
@@ -55,6 +56,14 @@ public class AgentRegistry {
             return Collections.emptyList();
         }
         return Collections.unmodifiableCollection(clusterConnections.values());
+    }
+
+    public List<Integer> getNodeIds(String clusterId) {
+        ConcurrentHashMap<Integer, AgentConnection> clusterConnections = connections.get(clusterId);
+        if (clusterConnections == null) {
+            return List.of();
+        }
+        return List.copyOf(clusterConnections.keySet());
     }
 
     public static class AgentConnection {

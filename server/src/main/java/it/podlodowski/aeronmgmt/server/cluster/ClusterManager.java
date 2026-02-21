@@ -5,10 +5,12 @@ import it.podlodowski.aeronmgmt.common.proto.MetricsReport;
 import it.podlodowski.aeronmgmt.server.aggregator.ClusterStateAggregator;
 import it.podlodowski.aeronmgmt.server.aggregator.DiskUsageTracker;
 import it.podlodowski.aeronmgmt.server.events.EventService;
+import it.podlodowski.aeronmgmt.server.events.ReconciliationService;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.beans.factory.annotation.Value;
+import org.springframework.context.annotation.Lazy;
 import org.springframework.messaging.simp.SimpMessagingTemplate;
 import org.springframework.stereotype.Component;
 
@@ -28,6 +30,7 @@ public class ClusterManager {
 
     private final SimpMessagingTemplate messagingTemplate;
     private final EventService eventService;
+    private final ReconciliationService reconciliationService;
     private final int historySeconds;
     private final ConcurrentHashMap<String, ClusterStateAggregator> clusters = new ConcurrentHashMap<>();
 
@@ -35,9 +38,11 @@ public class ClusterManager {
     public ClusterManager(
             @Autowired(required = false) SimpMessagingTemplate messagingTemplate,
             EventService eventService,
+            @Lazy ReconciliationService reconciliationService,
             @Value("${aeron.management.server.metrics-history-seconds:300}") int historySeconds) {
         this.messagingTemplate = messagingTemplate;
         this.eventService = eventService;
+        this.reconciliationService = reconciliationService;
         this.historySeconds = historySeconds;
     }
 
@@ -78,6 +83,7 @@ public class ClusterManager {
 
     public void onAgentConnected(String clusterId, int nodeId, String agentMode) {
         getOrCreateCluster(clusterId).onAgentConnected(nodeId, agentMode);
+        reconciliationService.autoReconcileIfNeeded(clusterId);
         pushClusterList();
     }
 
