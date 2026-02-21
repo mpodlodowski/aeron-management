@@ -4,7 +4,7 @@ export interface DecodedField {
   type: string    // 'uint8','uint16','int32','int64','string','enum','bytes','hex'
   offset: number  // byte offset relative to chunk start
   size: number    // byte length of this field
-  layer: 'frame' | 'sbe' | 'payload'
+  layer: 'frame' | 'sbe' | 'payload' | 'nested-sbe'
 }
 
 export interface DecodedMessage {

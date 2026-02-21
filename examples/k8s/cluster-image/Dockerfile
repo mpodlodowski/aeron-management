@@ -2,8 +2,8 @@
 FROM eclipse-temurin:17-jdk-jammy AS build
 WORKDIR /build
 ADD https://repo1.maven.org/maven2/io/aeron/aeron-all/1.46.5/aeron-all-1.46.5.jar lib/aeron-all.jar
-COPY ClusterNode.java BackupNode.java src/
-RUN javac -cp lib/aeron-all.jar -d classes src/ClusterNode.java src/BackupNode.java \
+COPY ClusterNode.java BackupNode.java SampleClient.java src/
+RUN javac -cp lib/aeron-all.jar -d classes src/ClusterNode.java src/BackupNode.java src/SampleClient.java \
     && jar cf app.jar -C classes .
 
 # Stage 2: Runtime

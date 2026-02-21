@@ -60,6 +60,23 @@ services:
     networks:
       - net
 
+  # === Sample Client (sends messages to cluster every second) ===
+  sample-client:
+    image: ${CLUSTER_IMAGE:-aeron-cluster-demo:local}
+    build:
+      context: ../k8s/cluster-image
+    hostname: sample-client
+    command: ["SampleClient"]
+    environment:
+      CLUSTER_ADDRESSES: node0,node1,node2
+    depends_on:
+      - node0
+      - node1
+      - node2
+    restart: always
+    networks:
+      - net
+
   # === Management Server (UI + gRPC aggregator) ===
   management-server:
     image: ${SERVER_IMAGE:-aeron-management-server:local}

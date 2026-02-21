@@ -40,6 +40,12 @@ function buildGroups(msg: DecodedMessage): FieldGroup[] {
     })
   }
 
+  const nestedFields = msg.fields.filter((f) => f.layer === 'nested-sbe')
+  if (nestedFields.length > 0) {
+    const nestedLabel = msg.label.includes(' > ') ? msg.label.split(' > ')[1] : 'Application Payload'
+    groups.push({ title: nestedLabel, fields: nestedFields })
+  }
+
   return groups
 }
 

@@ -10,11 +10,17 @@ import io.aeron.ExclusivePublication;
 import io.aeron.Image;
 import io.aeron.samples.cluster.ClusterConfig;
 import org.agrona.DirectBuffer;
+import org.agrona.ExpandableDirectByteBuffer;
+import org.agrona.MutableDirectBuffer;
 import org.agrona.concurrent.ShutdownSignalBarrier;
+
+import java.nio.ByteOrder;
+import java.nio.charset.StandardCharsets;
 
 import java.net.InetAddress;
 import java.util.Arrays;
 import java.util.List;
+import java.util.concurrent.ThreadLocalRandom;
 import java.util.stream.Collectors;
 
 /**
@@ -89,7 +95,25 @@ public class ClusterNode {
         return v != null ? v : def;
     }
 
+    /**
+     * Simulated order-fill service. Receives a symbol name (plain text) and responds
+     * with an SBE-encoded OrderFill message (schema=200, template=1).
+     *
+     * Wire format (little-endian):
+     *   SBE Header (8B): blockLength(u16)=20, templateId(u16)=1, schemaId(u16)=200, version(u16)=0
+     *   symbol   (8B):  ASCII, right-padded with spaces
+     *   price    (8B):  double
+     *   quantity (4B):  int32
+     */
     static class EchoService implements ClusteredService {
+        private static final int SBE_HEADER_SIZE = 8;
+        private static final int BLOCK_LENGTH = 20; // symbol(8) + price(8) + quantity(4)
+        private static final int TEMPLATE_ID = 1;
+        private static final int SCHEMA_ID = 200;
+        private static final int RESPONSE_SIZE = SBE_HEADER_SIZE + BLOCK_LENGTH; // 28 bytes
+
+        private final MutableDirectBuffer responseBuffer = new ExpandableDirectByteBuffer(256);
+
         @Override public void onStart(Cluster cluster, Image snapshotImage) {
             System.out.println("[EchoService] Started, role=" + cluster.role());
         }
@@ -97,7 +121,30 @@ public class ClusterNode {
         @Override public void onSessionClose(ClientSession session, long timestamp, CloseReason closeReason) {}
         @Override public void onSessionMessage(ClientSession session, long timestamp,
                 DirectBuffer buffer, int offset, int length, Header header) {
-            session.offer(buffer, offset, length);
+            final String symbol = buffer.getStringWithoutLengthAscii(offset, length).toUpperCase();
+
+            // SBE header
+            responseBuffer.putShort(0, (short) BLOCK_LENGTH, ByteOrder.LITTLE_ENDIAN);
+            responseBuffer.putShort(2, (short) TEMPLATE_ID, ByteOrder.LITTLE_ENDIAN);
+            responseBuffer.putShort(4, (short) SCHEMA_ID, ByteOrder.LITTLE_ENDIAN);
+            responseBuffer.putShort(6, (short) 0, ByteOrder.LITTLE_ENDIAN); // version
+
+            // symbol: 8 bytes, right-padded with spaces
+            final byte[] symbolBytes = symbol.getBytes(StandardCharsets.US_ASCII);
+            final byte[] padded = new byte[8];
+            Arrays.fill(padded, (byte) ' ');
+            System.arraycopy(symbolBytes, 0, padded, 0, Math.min(symbolBytes.length, 8));
+            responseBuffer.putBytes(SBE_HEADER_SIZE, padded);
+
+            // price: random 90.0–110.0
+            final double price = 90.0 + ThreadLocalRandom.current().nextDouble() * 20.0;
+            responseBuffer.putDouble(SBE_HEADER_SIZE + 8, price, ByteOrder.LITTLE_ENDIAN);
+
+            // quantity: random 1–1000
+            final int quantity = ThreadLocalRandom.current().nextInt(1, 1001);
+            responseBuffer.putInt(SBE_HEADER_SIZE + 16, quantity, ByteOrder.LITTLE_ENDIAN);
+
+            session.offer(responseBuffer, 0, RESPONSE_SIZE);
         }
         @Override public void onTimerEvent(long correlationId, long timestamp) {}
         @Override public void onTakeSnapshot(ExclusivePublication snapshotPublication) {}
