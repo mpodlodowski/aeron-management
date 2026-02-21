@@ -2,6 +2,17 @@ server:
   port: 8080
   address: ${AERON_MANAGEMENT_SERVER_HOST:0.0.0.0}
 
+spring:
+  datasource:
+    url: ${AERON_MANAGEMENT_DB_URL:jdbc:h2:mem:aeronmgmt;DB_CLOSE_DELAY=-1}
+    driver-class-name: ${AERON_MANAGEMENT_DB_DRIVER:org.h2.Driver}
+    username: ${AERON_MANAGEMENT_DB_USER:sa}
+    password: ${AERON_MANAGEMENT_DB_PASSWORD:}
+  jpa:
+    hibernate:
+      ddl-auto: update
+    open-in-view: false
+
 aeron:
   management:
     server:
@@ -9,3 +20,6 @@ aeron:
       metrics-history-seconds: 300
       auth:
         type: none
+    events:
+      retention-days: ${AERON_MANAGEMENT_EVENTS_RETENTION_DAYS:7}
+      max-count: ${AERON_MANAGEMENT_EVENTS_MAX_COUNT:10000}
