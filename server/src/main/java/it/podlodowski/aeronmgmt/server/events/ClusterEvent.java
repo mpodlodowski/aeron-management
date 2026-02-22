@@ -146,7 +146,7 @@ public class ClusterEvent {
         private Integer nodeId;
         private String agentId;
         private String message;
-        private String username = "anonymous";
+        private String username = "system";
         private EventSource source = EventSource.REALTIME;
         private String detailsJson;
         private Instant createdAt = Instant.now();

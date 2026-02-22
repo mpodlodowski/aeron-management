@@ -32,7 +32,7 @@ public final class EventFactory {
         return ClusterEvent.builder()
                 .clusterId(clusterId)
                 .timestamp(Instant.now())
-                .level(EventLevel.CLUSTER)
+                .level(EventLevel.NODE)
                 .type("SNAPSHOT_TAKEN")
                 .nodeId(nodeId)
                 .message("Snapshot taken on node " + nodeId + " at term " + termId + ", position " + logPosition)
@@ -61,7 +61,15 @@ public final class EventFactory {
     }
 
     public static ClusterEvent clusterAction(String clusterId, String action, String username) {
+        return clusterAction(clusterId, action, username, Map.of());
+    }
+
+    public static ClusterEvent clusterAction(String clusterId, String action, String username,
+                                              Map<String, Object> extraDetails) {
         String type = mapClusterActionType(action);
+        Map<String, Object> details = new LinkedHashMap<>();
+        details.put("action", action);
+        details.putAll(extraDetails);
 
         return ClusterEvent.builder()
                 .clusterId(clusterId)
@@ -70,7 +78,7 @@ public final class EventFactory {
                 .type(type)
                 .message("Cluster action: " + action.toLowerCase())
                 .username(username)
-                .details(Map.of("action", action))
+                .details(details)
                 .build();
     }
 
@@ -259,9 +267,12 @@ public final class EventFactory {
 
     private static String mapClusterActionType(String action) {
         return switch (action.toUpperCase()) {
+            case "SNAPSHOT" -> "SNAPSHOT_REQUESTED";
             case "SUSPEND" -> "CLUSTER_SUSPENDED";
             case "RESUME" -> "CLUSTER_RESUMED";
             case "SHUTDOWN" -> "CLUSTER_SHUTDOWN";
+            case "START_EGRESS_RECORDING" -> "EGRESS_RECORD_STARTED";
+            case "STOP_EGRESS_RECORDING" -> "EGRESS_RECORD_STOPPED";
             default -> "CLUSTER_ACTION_" + action.toUpperCase();
         };
     }

@@ -172,9 +172,10 @@ export interface ClusterEvent {
 export interface HistogramBucket {
   from: number
   to: number
-  cluster: number
-  node: number
-  agent: number
+  error: number
+  warning: number
+  info: number
+  success: number
 }
 
 export interface EventHistogram {

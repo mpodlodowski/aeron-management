@@ -1,12 +1,7 @@
 import { useState } from 'react'
 import { useEventStore } from '../../stores/eventStore'
 import { ClusterEvent } from '../../types'
-
-const LEVEL_COLORS: Record<string, string> = {
-  CLUSTER: 'bg-red-600',
-  NODE: 'bg-blue-600',
-  AGENT: 'bg-green-600',
-}
+import { getEventSeverity, SEVERITY_BADGE } from '../../utils/eventSeverity'
 
 const SOURCE_LABELS: Record<string, string> = {
   REALTIME: '',
@@ -72,18 +67,18 @@ function EventRow({ event, expanded, onToggle }: { event: ClusterEvent; expanded
         <span className="font-mono text-gray-600 text-xs shrink-0 w-20">
           {new Date(event.timestamp).toLocaleTimeString()}
         </span>
-        <span className="text-gray-500 text-xs w-8 text-center shrink-0">
-          {event.nodeId != null ? event.nodeId : '-'}
+        <span className={`inline-flex rounded px-1.5 py-0.5 text-[10px] font-medium shrink-0 ${SEVERITY_BADGE[getEventSeverity(event.type)]}`}>
+          {event.type.replace(/_/g, ' ')}
         </span>
-        <span className={`inline-flex rounded-full px-1.5 py-0.5 text-[10px] font-medium text-white shrink-0 ${LEVEL_COLORS[event.level] ?? 'bg-gray-600'}`}>
-          {event.level}
-        </span>
-        <span className="text-xs text-gray-500 font-mono shrink-0 w-32 truncate">
-          {event.type}
+        <span className="text-[10px] text-gray-600 shrink-0">
+          {event.level}{event.nodeId != null ? ` ${event.nodeId}` : ''}
         </span>
         <span className="text-gray-300 text-xs truncate flex-1">
           {event.message}
         </span>
+        {event.username && event.username !== 'system' && (
+          <span className="text-[10px] text-gray-500 shrink-0">{event.username}</span>
+        )}
         {sourceLabel && (
           <span className="text-[10px] text-gray-600 shrink-0">{sourceLabel}</span>
         )}
@@ -94,7 +89,9 @@ function EventRow({ event, expanded, onToggle }: { event: ClusterEvent; expanded
           <div className="grid grid-cols-2 gap-x-6 gap-y-1 text-xs mb-2">
             <div><span className="text-gray-600">ID:</span> <span className="text-gray-400 font-mono">{event.id}</span></div>
             <div><span className="text-gray-600">Source:</span> <span className="text-gray-400">{event.source}</span></div>
-            <div><span className="text-gray-600">User:</span> <span className="text-gray-400">{event.username}</span></div>
+            {event.username && event.username !== 'system' && (
+              <div><span className="text-gray-600">User:</span> <span className="text-gray-400">{event.username}</span></div>
+            )}
             <div><span className="text-gray-600">Created:</span> <span className="text-gray-400 font-mono">{new Date(event.createdAt).toLocaleString()}</span></div>
           </div>
           {Object.keys(event.details).length > 0 && (
