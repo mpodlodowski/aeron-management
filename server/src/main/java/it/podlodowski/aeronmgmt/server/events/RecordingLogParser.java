@@ -14,7 +14,8 @@ import java.util.regex.Pattern;
  */
 public final class RecordingLogParser {
 
-    private static final Pattern KEY_VALUE_PATTERN = Pattern.compile("(\\w+)=(\\w+)");
+    private static final Pattern ENTRY_PATTERN = Pattern.compile("Entry\\{([^}]+)}");
+    private static final Pattern KEY_VALUE_PATTERN = Pattern.compile("(\\w+)=(-?\\w+)");
 
     private RecordingLogParser() {
     }
@@ -25,14 +26,14 @@ public final class RecordingLogParser {
             long termBaseLogPosition,
             long logPosition,
             long timestamp,
-            int memberId,
+            int serviceId,
             String type
     ) {
     }
 
     /**
      * Parses the raw recording log output into a list of entries.
-     * Lines that cannot be parsed (missing required fields) are silently skipped.
+     * Handles both one-entry-per-line format and the RecordingLog{entries=[...]} toString() format.
      */
     public static List<Entry> parse(String output) {
         if (output == null || output.isBlank()) {
@@ -40,13 +41,10 @@ public final class RecordingLogParser {
         }
 
         List<Entry> entries = new ArrayList<>();
-        for (String line : output.lines().toList()) {
-            String trimmed = line.trim();
-            if (trimmed.isEmpty()) {
-                continue;
-            }
-
-            Map<String, String> fields = extractKeyValuePairs(trimmed);
+        Matcher entryMatcher = ENTRY_PATTERN.matcher(output);
+        while (entryMatcher.find()) {
+            String entryContent = entryMatcher.group(1);
+            Map<String, String> fields = extractKeyValuePairs(entryContent);
             if (!hasRequiredFields(fields)) {
                 continue;
             }
@@ -58,12 +56,12 @@ public final class RecordingLogParser {
                         Long.parseLong(fields.get("termBaseLogPosition")),
                         Long.parseLong(fields.get("logPosition")),
                         Long.parseLong(fields.get("timestamp")),
-                        Integer.parseInt(fields.get("memberId")),
+                        Integer.parseInt(fields.get("serviceId")),
                         fields.get("type")
                 );
                 entries.add(entry);
             } catch (NumberFormatException e) {
-                // Skip lines with unparseable numeric fields
+                // Skip entries with unparseable numeric fields
             }
         }
 
@@ -76,7 +74,7 @@ public final class RecordingLogParser {
      * <ul>
      *   <li>A single {@code CLUSTER_START} event using the earliest timestamp</li>
      *   <li>{@code LEADER_ELECTED} events for each TERM entry</li>
-     *   <li>{@code SNAPSHOT_TAKEN} events for each SNAPSHOT entry</li>
+     *   <li>{@code SNAPSHOT_TAKEN} events for each SNAPSHOT entry (serviceId=-1 only, to avoid duplicates)</li>
      * </ul>
      */
     public static List<ClusterEvent> toEvents(String clusterId, String output) {
@@ -111,7 +109,6 @@ public final class RecordingLogParser {
                         .timestamp(Instant.ofEpochMilli(e.timestamp))
                         .level(EventLevel.NODE)
                         .type("LEADER_ELECTED")
-                        .nodeId(e.memberId)
                         .message("leader elected (term " + e.leadershipTermId + ")")
                         .source(EventSource.RECONCILIATION)
                         .details(details)
@@ -120,9 +117,9 @@ public final class RecordingLogParser {
             }
         }
 
-        // Convert SNAPSHOT entries to SNAPSHOT_TAKEN events
+        // Convert SNAPSHOT entries to SNAPSHOT_TAKEN events (only serviceId=-1 to avoid duplicates)
         for (Entry e : entries) {
-            if ("SNAPSHOT".equals(e.type)) {
+            if ("SNAPSHOT".equals(e.type) && e.serviceId == -1) {
                 Map<String, Object> details = new LinkedHashMap<>();
                 details.put("termId", e.leadershipTermId);
                 details.put("logPosition", e.logPosition);
@@ -131,9 +128,8 @@ public final class RecordingLogParser {
                 ClusterEvent event = ClusterEvent.builder()
                         .clusterId(clusterId)
                         .timestamp(Instant.ofEpochMilli(e.timestamp))
-                        .level(EventLevel.CLUSTER)
+                        .level(EventLevel.NODE)
                         .type("SNAPSHOT_TAKEN")
-                        .nodeId(e.memberId)
                         .message("snapshot taken (term " + e.leadershipTermId + ")")
                         .source(EventSource.RECONCILIATION)
                         .details(details)
@@ -145,9 +141,9 @@ public final class RecordingLogParser {
         return events;
     }
 
-    private static Map<String, String> extractKeyValuePairs(String line) {
+    private static Map<String, String> extractKeyValuePairs(String text) {
         Map<String, String> fields = new LinkedHashMap<>();
-        Matcher matcher = KEY_VALUE_PATTERN.matcher(line);
+        Matcher matcher = KEY_VALUE_PATTERN.matcher(text);
         while (matcher.find()) {
             fields.put(matcher.group(1), matcher.group(2));
         }
@@ -160,7 +156,7 @@ public final class RecordingLogParser {
                 && fields.containsKey("termBaseLogPosition")
                 && fields.containsKey("logPosition")
                 && fields.containsKey("timestamp")
-                && fields.containsKey("memberId")
+                && fields.containsKey("serviceId")
                 && fields.containsKey("type");
     }
 }

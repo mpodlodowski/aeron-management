@@ -2,10 +2,9 @@ import { useState, useEffect, useRef } from 'react'
 import { BrowserRouter, Routes, Route, Link, Navigate, useLocation, useNavigate, useMatch } from 'react-router-dom'
 import { useClusterStore } from './stores/clusterStore'
 import { ClusterSummary } from './types'
-import Dashboard from './pages/Dashboard'
+import Cluster from './pages/Dashboard'
 import NodeDetail from './pages/NodeDetail'
 import Archive from './pages/Archive'
-import { SettingsMenu } from './components/SettingsMenu'
 
 function PageTitle() {
   const location = useLocation()
@@ -14,7 +13,7 @@ function PageTitle() {
   const nodes = useClusterStore((s) => s.clusters.get(clusterId ?? '')?.nodes ?? new Map())
 
   const isHome = location.pathname === '/' || location.pathname === '/clusters' || (match && !match.params['*'])
-  if (isHome) return <>Dashboard</>
+  if (isHome) return <>Cluster</>
   if (match?.params['*'] === 'archive') return <>Archive</>
 
   const nodeMatch = match?.params['*']?.match(/^nodes\/(-?\d+)$/)
@@ -187,7 +186,7 @@ function Header() {
           to={clusterId ? `/clusters/${clusterId}` : '/clusters'}
           className={`transition-colors ${isHome ? 'text-gray-200' : 'text-gray-400 hover:text-gray-200'}`}
         >
-          Dashboard
+          Cluster
         </Link>
         <Link
           to={clusterId ? `/clusters/${clusterId}/archive` : '/clusters'}
@@ -195,12 +194,11 @@ function Header() {
         >
           Archive
         </Link>
-        {clusterId && <SettingsMenu clusterId={clusterId} />}
+        <AuthBadge />
         <span
           className={`inline-block h-2 w-2 rounded-full ${connected ? 'bg-green-500' : 'bg-red-500'}`}
           title={connected ? 'WebSocket connected' : 'WebSocket disconnected'}
         />
-        <AuthBadge />
       </nav>
     </header>
   )
@@ -215,7 +213,7 @@ export default function App() {
           <Routes>
             <Route path="/" element={<Navigate to="/clusters" replace />} />
             <Route path="/clusters" element={<ClusterRedirect />} />
-            <Route path="/clusters/:clusterId" element={<Dashboard />} />
+            <Route path="/clusters/:clusterId" element={<Cluster />} />
             <Route path="/clusters/:clusterId/nodes/:nodeId" element={<NodeDetail />} />
             <Route path="/clusters/:clusterId/archive" element={<Archive />} />
           </Routes>

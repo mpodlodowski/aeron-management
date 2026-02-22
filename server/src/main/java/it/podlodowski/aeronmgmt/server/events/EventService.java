@@ -145,20 +145,21 @@ public class EventService {
         for (int i = 0; i < buckets; i++) {
             long bucketFrom = fromMs + (long) i * bucketSizeMs;
             long bucketTo = (i == buckets - 1) ? toMs : bucketFrom + bucketSizeMs;
-            int cluster = 0, node = 0, agent = 0;
+            int error = 0, warning = 0, info = 0, success = 0;
             for (ClusterEvent e : events) {
                 long ts = e.getTimestamp().toEpochMilli();
                 if (ts >= bucketFrom && ts < bucketTo) {
-                    switch (e.getLevel()) {
-                        case CLUSTER -> cluster++;
-                        case NODE -> node++;
-                        case AGENT -> agent++;
+                    switch (EventSeverity.fromType(e.getType())) {
+                        case ERROR -> error++;
+                        case WARNING -> warning++;
+                        case INFO -> info++;
+                        case SUCCESS -> success++;
                     }
                 }
             }
             bucketList.add(Map.of(
                     "from", bucketFrom, "to", bucketTo,
-                    "cluster", cluster, "node", node, "agent", agent));
+                    "error", error, "warning", warning, "info", info, "success", success));
         }
 
         Map<String, Object> result = new LinkedHashMap<>();
