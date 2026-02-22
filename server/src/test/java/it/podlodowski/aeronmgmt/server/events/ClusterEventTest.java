@@ -47,7 +47,7 @@ class ClusterEventTest {
     }
 
     @Test
-    void shouldDefaultUsernameToAnonymous() {
+    void shouldDefaultUsernameToSystem() {
         ClusterEvent event = ClusterEvent.builder()
                 .clusterId("cluster-1")
                 .timestamp(Instant.now())
@@ -56,7 +56,7 @@ class ClusterEventTest {
                 .message("Snapshot requested for cluster")
                 .build();
 
-        assertEquals("anonymous", event.getUsername());
+        assertEquals("system", event.getUsername());
         assertEquals(EventSource.REALTIME, event.getSource());
         assertNotNull(event.getId());
         assertNotNull(event.getCreatedAt());

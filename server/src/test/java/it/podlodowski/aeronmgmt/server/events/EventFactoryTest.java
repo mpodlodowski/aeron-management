@@ -85,7 +85,7 @@ class EventFactoryTest {
     void shouldCreateSnapshotTakenEvent() {
         ClusterEvent event = EventFactory.snapshotTaken("cluster-1", 1, 3L, 1024L);
 
-        assertEquals(EventLevel.CLUSTER, event.getLevel());
+        assertEquals(EventLevel.NODE, event.getLevel());
         assertEquals("SNAPSHOT_TAKEN", event.getType());
         assertEquals("cluster-1", event.getClusterId());
         assertEquals(1, event.getNodeId());
@@ -235,8 +235,8 @@ class EventFactoryTest {
     }
 
     @Test
-    void shouldDefaultUsernameToAnonymous() {
+    void shouldDefaultUsernameToSystem() {
         ClusterEvent event = EventFactory.nodeUp("cluster-1", 0);
-        assertEquals("anonymous", event.getUsername());
+        assertEquals("system", event.getUsername());
     }
 }
