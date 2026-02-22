@@ -183,7 +183,7 @@ export function EventFilters({ clusterId }: { clusterId: string }) {
 
         {/* Level toggles */}
         {LEVELS.map((level) => {
-          const isActive = filters.levels.length === 0 || filters.levels.includes(level)
+          const isActive = filters.levels.includes(level)
           const colors = LEVEL_COLORS[level]
           return (
             <button
@@ -202,7 +202,7 @@ export function EventFilters({ clusterId }: { clusterId: string }) {
 
         {/* Severity toggles */}
         {SEVERITIES.map((sev) => {
-          const isActive = filters.severities.length === 0 || filters.severities.includes(sev)
+          const isActive = filters.severities.includes(sev)
           const colors = SEVERITY_COLORS[sev]
           return (
             <button

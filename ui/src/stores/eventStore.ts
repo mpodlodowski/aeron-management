@@ -172,9 +172,22 @@ export const useEventStore = create<EventStore>((set, get) => ({
     if (filters.severities.length > 0 && !filters.severities.includes(getEventSeverity(event.type))) return s
     if (filters.nodeId != null && event.nodeId !== filters.nodeId) return s
     if (filters.search && event.message && !event.message.toLowerCase().includes(filters.search.toLowerCase())) return s
+
+    // Update histogram: increment the last bucket for this event's severity
+    let histogram = s.histogram
+    if (histogram && histogram.buckets.length > 0) {
+      const buckets = [...histogram.buckets]
+      const last = { ...buckets[buckets.length - 1] }
+      const sev = getEventSeverity(event.type)
+      last[sev] = (last[sev] || 0) + 1
+      buckets[buckets.length - 1] = last
+      histogram = { ...histogram, buckets }
+    }
+
     return {
       events: [event, ...s.events].slice(0, 200),
       totalElements: s.totalElements + 1,
+      histogram,
     }
   }),
 
