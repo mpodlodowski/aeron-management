@@ -53,7 +53,7 @@ public class ReconciliationService {
                 String output = (String) result.get("output");
                 if (output == null || output.isEmpty()) continue;
 
-                List<ClusterEvent> events = RecordingLogParser.toEvents(clusterId, output);
+                List<ClusterEvent> events = RecordingLogParser.toEvents(clusterId, nodeId, output);
 
                 for (ClusterEvent event : events) {
                     Instant from = event.getTimestamp().minusSeconds(1);

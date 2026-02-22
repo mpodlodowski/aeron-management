@@ -77,7 +77,7 @@ public final class RecordingLogParser {
      *   <li>{@code SNAPSHOT_TAKEN} events for each SNAPSHOT entry (serviceId=-1 only, to avoid duplicates)</li>
      * </ul>
      */
-    public static List<ClusterEvent> toEvents(String clusterId, String output) {
+    public static List<ClusterEvent> toEvents(String clusterId, int nodeId, String output) {
         List<Entry> entries = parse(output);
         if (entries.isEmpty()) {
             return List.of();
@@ -130,7 +130,8 @@ public final class RecordingLogParser {
                         .timestamp(Instant.ofEpochMilli(e.timestamp))
                         .level(EventLevel.NODE)
                         .type("SNAPSHOT_TAKEN")
-                        .message("snapshot taken (term " + e.leadershipTermId + ")")
+                        .nodeId(nodeId)
+                        .message("snapshot taken (term " + e.leadershipTermId + ") on node " + nodeId)
                         .source(EventSource.RECONCILIATION)
                         .details(details)
                         .build();

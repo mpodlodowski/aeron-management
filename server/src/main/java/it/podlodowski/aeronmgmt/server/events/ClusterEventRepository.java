@@ -38,7 +38,8 @@ public interface ClusterEventRepository extends JpaRepository<ClusterEvent, UUID
 
     @Query("SELECT e FROM ClusterEvent e WHERE e.clusterId = :clusterId " +
            "AND e.timestamp BETWEEN :from AND :to " +
-           "AND e.type = :type AND e.nodeId = :nodeId")
+           "AND e.type = :type " +
+           "AND (e.nodeId = :nodeId OR (e.nodeId IS NULL AND :nodeId IS NULL))")
     List<ClusterEvent> findForDedup(String clusterId, Instant from, Instant to,
                                      String type, Integer nodeId);
 

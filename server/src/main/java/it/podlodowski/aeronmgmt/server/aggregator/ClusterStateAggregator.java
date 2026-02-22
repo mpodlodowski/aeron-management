@@ -101,14 +101,16 @@ public class ClusterStateAggregator {
         detectStateChanges(nodeId, previous, report);
         detectNodeReachability(nodeId, report);
 
-        // Detect snapshot taken
+        // Detect snapshot taken — emit only from leader to avoid duplicates
         long snapshotCount = counterValue(report, 205);
         if (snapshotCount >= 0) {
             Long prevSnapshot = lastSnapshotCounts.put(nodeId, snapshotCount);
-            if (prevSnapshot != null && snapshotCount > prevSnapshot) {
+            if (prevSnapshot != null && snapshotCount > prevSnapshot
+                    && report.hasClusterMetrics()
+                    && "LEADER".equals(report.getClusterMetrics().getNodeRole())) {
                 long termId = counterValue(report, 239);
-                long logPos = report.hasClusterMetrics() ? report.getClusterMetrics().getLogPosition() : -1;
-                eventService.emit(EventFactory.snapshotTaken(clusterId, nodeId, termId, logPos));
+                long commitPos = report.getClusterMetrics().getCommitPosition();
+                eventService.emit(EventFactory.snapshotTaken(clusterId, nodeId, termId, commitPos));
             }
         }
 
