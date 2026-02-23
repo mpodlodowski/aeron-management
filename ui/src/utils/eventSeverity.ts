@@ -38,15 +38,15 @@ export function getEventSeverity(eventType: string): EventSeverity {
 }
 
 export const SEVERITY_BADGE: Record<EventSeverity, string> = {
-  error: 'bg-red-900/50 text-red-300',
-  warning: 'bg-yellow-900/50 text-yellow-300',
-  info: 'bg-blue-900/50 text-blue-300',
-  success: 'bg-green-900/50 text-green-300',
+  error: 'bg-critical-surface text-critical-text',
+  warning: 'bg-warning-surface text-warning-text',
+  info: 'bg-elevated text-text-secondary',
+  success: 'bg-elevated text-text-secondary',
 }
 
 export const SEVERITY_FILL: Record<EventSeverity, string> = {
-  error: '#ef4444',
-  warning: '#eab308',
-  info: '#3b82f6',
-  success: '#22c55e',
+  error: 'var(--critical-text)',
+  warning: 'var(--warning-text)',
+  info: 'var(--info-text)',
+  success: 'var(--success-text)',
 }

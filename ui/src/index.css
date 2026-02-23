@@ -4,56 +4,72 @@
 
 @layer base {
   :root {
-    --background: 0 0% 100%;
-    --foreground: 0 0% 3.9%;
-    --card: 0 0% 100%;
-    --card-foreground: 0 0% 3.9%;
-    --popover: 0 0% 100%;
-    --popover-foreground: 0 0% 3.9%;
-    --primary: 0 0% 9%;
-    --primary-foreground: 0 0% 98%;
-    --secondary: 0 0% 96.1%;
-    --secondary-foreground: 0 0% 9%;
-    --muted: 0 0% 96.1%;
-    --muted-foreground: 0 0% 45.1%;
-    --accent: 0 0% 96.1%;
-    --accent-foreground: 0 0% 9%;
-    --destructive: 0 84.2% 60.2%;
-    --destructive-foreground: 0 0% 98%;
-    --border: 0 0% 89.8%;
-    --input: 0 0% 89.8%;
-    --ring: 0 0% 3.9%;
-    --chart-1: 12 76% 61%;
-    --chart-2: 173 58% 39%;
-    --chart-3: 197 37% 24%;
-    --chart-4: 43 74% 66%;
-    --chart-5: 27 87% 67%;
-    --radius: 0.5rem
+    --radius: 0.375rem;
+
+    /* Base palette */
+    --canvas: #111113;
+    --surface: #1a1a1f;
+    --elevated: #232329;
+    --border-subtle: #2e2e36;
+    --border-medium: #4a4a55;
+    --text-primary: #dddde4;
+    --text-secondary: #8b8b9a;
+    --text-muted: #5a5a6a;
+
+    /* Semantic: success/healthy */
+    --success-fill: #1a7f4b;
+    --success-text: #6ccf8e;
+    --success-surface: rgba(26, 127, 75, 0.12);
+
+    /* Semantic: warning */
+    --warning-fill: #b35c00;
+    --warning-text: #fbad37;
+    --warning-surface: rgba(179, 92, 0, 0.12);
+
+    /* Semantic: critical/error */
+    --critical-fill: #c0213a;
+    --critical-text: #ff5286;
+    --critical-surface: rgba(192, 33, 58, 0.12);
+
+    /* Semantic: info */
+    --info-fill: #2563a8;
+    --info-text: #6e9fff;
+    --info-surface: rgba(37, 99, 168, 0.12);
+
+    /* Role-specific */
+    --role-backup: #a78bfa;
+
+    /* Chart colors */
+    --chart-1: #6e9fff;
+    --chart-2: #6ccf8e;
+    --chart-3: #fbad37;
+    --chart-4: #a78bfa;
+    --chart-5: #ff5286;
+
+    /* shadcn compat (mapped to new tokens) */
+    --background: var(--canvas);
+    --foreground: var(--text-primary);
+    --card: var(--surface);
+    --card-foreground: var(--text-primary);
+    --popover: var(--elevated);
+    --popover-foreground: var(--text-primary);
+    --primary: var(--info-fill);
+    --primary-foreground: #ffffff;
+    --secondary: var(--elevated);
+    --secondary-foreground: var(--text-primary);
+    --muted: var(--surface);
+    --muted-foreground: var(--text-secondary);
+    --accent: var(--elevated);
+    --accent-foreground: var(--text-primary);
+    --destructive: var(--critical-fill);
+    --destructive-foreground: #ffffff;
+    --border: var(--border-subtle);
+    --input: var(--border-medium);
+    --ring: var(--info-fill);
   }
-  .dark {
-    --background: 0 0% 3.9%;
-    --foreground: 0 0% 98%;
-    --card: 0 0% 3.9%;
-    --card-foreground: 0 0% 98%;
-    --popover: 0 0% 3.9%;
-    --popover-foreground: 0 0% 98%;
-    --primary: 0 0% 98%;
-    --primary-foreground: 0 0% 9%;
-    --secondary: 0 0% 14.9%;
-    --secondary-foreground: 0 0% 98%;
-    --muted: 0 0% 14.9%;
-    --muted-foreground: 0 0% 63.9%;
-    --accent: 0 0% 14.9%;
-    --accent-foreground: 0 0% 98%;
-    --destructive: 0 62.8% 30.6%;
-    --destructive-foreground: 0 0% 98%;
-    --border: 0 0% 14.9%;
-    --input: 0 0% 14.9%;
-    --ring: 0 0% 83.1%;
-    --chart-1: 220 70% 50%;
-    --chart-2: 160 60% 45%;
-    --chart-3: 30 80% 55%;
-    --chart-4: 280 65% 60%;
-    --chart-5: 340 75% 55%
-  }
+}
+
+body {
+  background-color: var(--canvas);
+  color: var(--text-primary);
 }
