@@ -23,7 +23,7 @@ export function TimelineOverview() {
   const selectingRef = useRef(false)
 
   if (!histogram || histogram.buckets.length === 0) {
-    return <div className="h-10 bg-gray-900 rounded border border-gray-800 flex items-center justify-center text-xs text-gray-600">No events</div>
+    return <div className="h-10 bg-surface rounded border border-border-subtle flex items-center justify-center text-xs text-text-muted">No events</div>
   }
 
   const data = histogram.buckets.map((b) => ({
@@ -65,12 +65,12 @@ export function TimelineOverview() {
   return (
     <div className="relative">
       <div className="flex items-center justify-between mb-1">
-        <span className="text-xs text-gray-500">
+        <span className="text-xs text-text-muted">
           Overview
-          {isLive && <span className="ml-1.5 inline-block h-1.5 w-1.5 rounded-full bg-green-500" />}
+          {isLive && <span className="ml-1.5 inline-block h-1.5 w-1.5 rounded-full bg-success-text" />}
         </span>
       </div>
-      <div className="h-20 bg-gray-900 rounded border border-gray-800">
+      <div className="h-20 bg-surface rounded border border-border-subtle">
         <ResponsiveContainer width="100%" height="100%">
           <BarChart
             data={data}
@@ -82,13 +82,13 @@ export function TimelineOverview() {
             <XAxis
               dataKey="from"
               tickFormatter={formatTimeLabel}
-              tick={{ fontSize: 10, fill: '#6b7280' }}
-              axisLine={{ stroke: '#374151' }}
+              tick={{ fontSize: 10, fill: 'var(--text-muted)' }}
+              axisLine={{ stroke: 'var(--border-subtle)' }}
               tickLine={false}
             />
             <YAxis hide />
             <Tooltip
-              contentStyle={{ background: '#1f2937', border: '1px solid #374151', borderRadius: '6px', fontSize: '12px' }}
+              contentStyle={{ background: 'var(--elevated)', border: '1px solid var(--border-subtle)', borderRadius: '6px', fontSize: '12px' }}
               labelFormatter={(label) => new Date(label as number).toLocaleString()}
             />
             <Bar dataKey="error" stackId="a" fill={SEVERITY_FILL.error} name="Error" isAnimationActive={false} />

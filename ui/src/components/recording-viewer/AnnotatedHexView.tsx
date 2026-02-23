@@ -9,11 +9,11 @@ interface Props {
 const BYTES_PER_ROW = 16
 
 const LAYER_CLASSES: Record<string, string> = {
-  frame: 'text-blue-300',
-  sbe: 'text-yellow-300',
+  frame: 'text-info-text',
+  sbe: 'text-warning-text',
   payload: 'text-emerald-300',
 }
-const DEFAULT_CLASS = 'text-gray-500'
+const DEFAULT_CLASS = 'text-text-muted'
 
 interface ByteAnnotation {
   layer: DecodedField['layer']
@@ -87,9 +87,9 @@ export default function AnnotatedHexView({ data, baseOffset, messages }: Props) 
   const separatorLine = '\u2500'.repeat(75)
 
   return (
-    <pre className="font-mono text-xs leading-5 text-gray-300 select-text">
+    <pre className="font-mono text-xs leading-5 text-text-secondary select-text">
       {/* Column header */}
-      <span className="text-gray-600">
+      <span className="text-text-muted">
         {'Offset    '}
         {'00 01 02 03 04 05 06 07 08 09 0A 0B 0C 0D 0E 0F'}
         {'  ASCII\n'}
@@ -141,9 +141,9 @@ export default function AnnotatedHexView({ data, baseOffset, messages }: Props) 
         return (
           <span key={rowIdx}>
             {boundaryRows.has(rowIdx) && (
-              <span className="text-gray-700">{separatorLine}{'\n'}</span>
+              <span className="text-text-muted">{separatorLine}{'\n'}</span>
             )}
-            <span className="text-blue-400">{addr}</span>
+            <span className="text-info-text">{addr}</span>
             {'  '}
             {hexSpans}
             {'  '}

@@ -60,7 +60,7 @@ function CollapsibleGroup({ group, schemaId, templateId }: {
     <div className="mb-2">
       <button
         onClick={() => setOpen(!open)}
-        className="flex items-center gap-1.5 text-xs font-semibold text-gray-400 hover:text-gray-200 py-1"
+        className="flex items-center gap-1.5 text-xs font-semibold text-text-secondary hover:text-text-primary py-1"
       >
         <span className="w-3 text-center">{open ? '\u25BC' : '\u25B6'}</span>
         {group.title}
@@ -70,15 +70,15 @@ function CollapsibleGroup({ group, schemaId, templateId }: {
           {group.fields.length > 0 ? (
             group.fields.map((field, i) => (
               <div key={i} className="flex items-baseline gap-2 text-xs font-mono">
-                <span className="text-gray-500 min-w-[120px] shrink-0">{field.name}</span>
-                <span className="text-gray-200">{formatValue(field.value)}</span>
-                <span className="text-gray-600 text-[10px]">
+                <span className="text-text-muted min-w-[120px] shrink-0">{field.name}</span>
+                <span className="text-text-primary">{formatValue(field.value)}</span>
+                <span className="text-text-muted text-[10px]">
                   {field.type} ({field.size}B)
                 </span>
               </div>
             ))
           ) : (
-            <div className="text-xs text-gray-500 italic">
+            <div className="text-xs text-text-muted italic">
               No payload decoder registered for schema {schemaId ?? '?'} / template {templateId ?? '?'}
             </div>
           )}
@@ -93,7 +93,7 @@ export default function TreeView({ messages, initialSelectedIndex }: Props) {
 
   if (messages.length === 0) {
     return (
-      <div className="flex items-center justify-center py-12 text-gray-500 text-sm">
+      <div className="flex items-center justify-center py-12 text-text-muted text-sm">
         No messages decoded in this chunk
       </div>
     )
@@ -105,22 +105,22 @@ export default function TreeView({ messages, initialSelectedIndex }: Props) {
   return (
     <div className="flex h-full min-h-[300px]">
       {/* Left panel: message list */}
-      <div className="w-72 shrink-0 overflow-y-auto border-r border-gray-800 pr-2">
+      <div className="w-72 shrink-0 overflow-y-auto border-r border-border-subtle pr-2">
         {messages.map((msg, i) => (
           <button
             key={i}
             onClick={() => setSelectedIndex(i)}
             className={`w-full text-left px-2 py-1.5 text-xs font-mono rounded transition-colors ${
               i === selectedIndex
-                ? 'bg-gray-800 text-gray-200'
-                : 'text-gray-400 hover:bg-gray-800/50 hover:text-gray-300'
+                ? 'bg-elevated text-text-primary'
+                : 'text-text-secondary hover:bg-elevated/50 hover:text-text-secondary'
             }`}
           >
-            <span className="text-gray-600">[{i + 1}]</span>{' '}
-            <span className="text-blue-400">0x{msg.offset.toString(16).padStart(8, '0')}</span>{' '}
+            <span className="text-text-muted">[{i + 1}]</span>{' '}
+            <span className="text-info-text">0x{msg.offset.toString(16).padStart(8, '0')}</span>{' '}
             <span>{msg.label}</span>
             {msg.schemaId != null && msg.templateId != null && (
-              <span className="text-gray-600"> ({msg.schemaId}/{msg.templateId})</span>
+              <span className="text-text-muted"> ({msg.schemaId}/{msg.templateId})</span>
             )}
           </button>
         ))}
@@ -128,7 +128,7 @@ export default function TreeView({ messages, initialSelectedIndex }: Props) {
 
       {/* Right panel: field tree */}
       <div className="flex-1 overflow-y-auto pl-4">
-        <div className="mb-3 text-xs text-gray-500">
+        <div className="mb-3 text-xs text-text-muted">
           Message {selectedIndex + 1} &mdash; {selected.label} &mdash; {selected.frameLength} bytes at offset 0x{selected.offset.toString(16).padStart(8, '0')}
         </div>
         {groups.map((group, i) => (

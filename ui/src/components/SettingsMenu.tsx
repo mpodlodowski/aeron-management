@@ -29,7 +29,7 @@ export function SettingsMenu({ clusterId }: { clusterId: string }) {
     <div ref={ref} className="relative">
       <button
         onClick={() => setOpen(!open)}
-        className="text-gray-400 hover:text-gray-200 transition-colors p-1"
+        className="text-text-secondary hover:text-text-primary transition-colors p-1"
         title="Settings"
       >
         <svg xmlns="http://www.w3.org/2000/svg" className="h-4 w-4" viewBox="0 0 20 20" fill="currentColor">
@@ -37,11 +37,11 @@ export function SettingsMenu({ clusterId }: { clusterId: string }) {
         </svg>
       </button>
       {open && (
-        <div className="absolute right-0 top-full mt-1 bg-gray-800 border border-gray-700 rounded shadow-lg py-1 min-w-[180px] z-50">
+        <div className="absolute right-0 top-full mt-1 bg-elevated border border-border-medium rounded shadow-lg py-1 min-w-[180px] z-50">
           <button
             onClick={handleReconcile}
             disabled={reconciling}
-            className="w-full text-left px-3 py-1.5 text-sm text-gray-200 hover:bg-gray-700 transition-colors disabled:opacity-50"
+            className="w-full text-left px-3 py-1.5 text-sm text-text-primary hover:bg-elevated transition-colors disabled:opacity-50"
           >
             {reconciling ? 'Reconciling...' : 'Reconcile Events'}
           </button>

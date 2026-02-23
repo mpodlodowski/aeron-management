@@ -38,15 +38,16 @@ function PageTitle() {
 }
 
 function RoleBadge({ role }: { role: string }) {
-  const color = role === 'OFFLINE' ? 'bg-gray-500' :
-    role === 'DETACHED' ? 'bg-yellow-500' :
-    role === 'DOWN' ? 'bg-red-500' :
-    role === 'BACKUP' ? 'bg-purple-500' :
-    role === 'LEADER' ? 'bg-green-500' :
-    role === 'FOLLOWER' ? 'bg-blue-500' :
-    role === 'CANDIDATE' ? 'bg-yellow-500' : 'bg-red-500'
+  const dotColor = role === 'OFFLINE' ? 'bg-text-muted' :
+    role === 'DETACHED' ? 'bg-warning-text' :
+    role === 'DOWN' ? 'bg-critical-text' :
+    role === 'BACKUP' ? 'bg-role-backup' :
+    role === 'LEADER' ? 'bg-success-text' :
+    role === 'FOLLOWER' ? 'bg-info-text' :
+    role === 'CANDIDATE' ? 'bg-warning-text' : 'bg-text-muted'
   return (
-    <span className={`inline-flex items-center rounded-full px-2 py-0.5 text-xs font-medium ${color} text-white align-middle`}>
+    <span className="inline-flex items-center gap-1.5 text-xs text-text-secondary align-middle">
+      <span className={`inline-block h-2 w-2 rounded-full ${dotColor}`} />
       {role}
     </span>
   )
@@ -92,17 +93,17 @@ function AuthBadge() {
     <div ref={ref} className="relative">
       <button
         onClick={() => setOpen(!open)}
-        className="h-7 w-7 rounded-full bg-blue-600 text-white text-xs font-bold flex items-center justify-center hover:bg-blue-500 transition-colors"
+        className="h-7 w-7 rounded-full bg-info-fill text-white text-xs font-bold flex items-center justify-center hover:bg-info-fill/80 transition-colors"
         title={username}
       >
         {username[0].toUpperCase()}
       </button>
       {open && (
-        <div className="absolute right-0 top-full mt-1 bg-gray-800 border border-gray-700 rounded shadow-lg py-1 min-w-[140px] z-50">
-          <div className="px-3 py-1.5 text-xs text-gray-400 border-b border-gray-700">{username}</div>
+        <div className="absolute right-0 top-full mt-1 bg-elevated border border-border-subtle rounded shadow-lg py-1 min-w-[140px] z-50">
+          <div className="px-3 py-1.5 text-xs text-text-secondary border-b border-border-subtle">{username}</div>
           <button
             onClick={handleLogout}
-            className="w-full text-left px-3 py-1.5 text-sm text-gray-200 hover:bg-gray-700 transition-colors"
+            className="w-full text-left px-3 py-1.5 text-sm text-text-primary hover:bg-elevated transition-colors"
           >
             Logout
           </button>
@@ -128,8 +129,8 @@ function ClusterRedirect() {
       .catch(() => setLoading(false))
   }, [navigate])
 
-  if (loading) return <div className="text-gray-500 p-6">Loading clusters...</div>
-  return <div className="text-gray-500 p-6">No clusters connected. Waiting for agents...</div>
+  if (loading) return <div className="text-text-muted p-6">Loading clusters...</div>
+  return <div className="text-text-muted p-6">No clusters connected. Waiting for agents...</div>
 }
 
 function ClusterSelector() {
@@ -148,7 +149,7 @@ function ClusterSelector() {
         const path = subPath ? `/clusters/${e.target.value}/${subPath}` : `/clusters/${e.target.value}`
         navigate(path)
       }}
-      className="bg-gray-800 text-gray-200 text-sm rounded px-2 py-1 border border-gray-700 focus:outline-none focus:border-gray-500"
+      className="bg-elevated text-text-primary text-sm rounded px-2 py-1 border border-border-subtle focus:outline-none focus:border-border-subtle"
     >
       {clusterList.map((c) => (
         <option key={c.clusterId} value={c.clusterId}>{c.clusterId}</option>
@@ -165,38 +166,38 @@ function Header() {
   const connected = useClusterStore((s) => s.connected)
 
   return (
-    <header className="border-b border-gray-800 px-6 py-3 flex items-center gap-4">
+    <header className="border-b border-border-subtle px-6 py-3 flex items-center gap-4">
       <div className="w-6">
         {!isHome && (
-          <Link to={clusterId ? `/clusters/${clusterId}` : '/clusters'} className="text-gray-400 hover:text-gray-200 transition-colors">
+          <Link to={clusterId ? `/clusters/${clusterId}` : '/clusters'} className="text-text-secondary hover:text-text-primary transition-colors">
             &larr;
           </Link>
         )}
       </div>
-      <Link to={clusterId ? `/clusters/${clusterId}` : '/clusters'} className="text-lg font-semibold hover:text-gray-200 transition-colors">
+      <Link to={clusterId ? `/clusters/${clusterId}` : '/clusters'} className="text-lg font-semibold hover:text-text-primary transition-colors">
         Aeron Management
       </Link>
       <ClusterSelector />
-      <span className="text-gray-600">|</span>
-      <span className="text-sm text-gray-300">
+      <span className="text-text-muted">|</span>
+      <span className="text-sm text-text-secondary">
         <PageTitle />
       </span>
       <nav className="ml-auto flex items-center gap-4 text-sm">
         <Link
           to={clusterId ? `/clusters/${clusterId}` : '/clusters'}
-          className={`transition-colors ${isHome ? 'text-gray-200' : 'text-gray-400 hover:text-gray-200'}`}
+          className={`transition-colors ${isHome ? 'text-text-primary' : 'text-text-secondary hover:text-text-primary'}`}
         >
           Cluster
         </Link>
         <Link
           to={clusterId ? `/clusters/${clusterId}/archive` : '/clusters'}
-          className={`transition-colors ${match?.params['*'] === 'archive' ? 'text-gray-200' : 'text-gray-400 hover:text-gray-200'}`}
+          className={`transition-colors ${match?.params['*'] === 'archive' ? 'text-text-primary' : 'text-text-secondary hover:text-text-primary'}`}
         >
           Archive
         </Link>
         <AuthBadge />
         <span
-          className={`inline-block h-2 w-2 rounded-full ${connected ? 'bg-green-500' : 'bg-red-500'}`}
+          className={`inline-block h-2 w-2 rounded-full ${connected ? 'bg-success-text' : 'bg-critical-text'}`}
           title={connected ? 'WebSocket connected' : 'WebSocket disconnected'}
         />
       </nav>
@@ -207,7 +208,7 @@ function Header() {
 export default function App() {
   return (
     <BrowserRouter>
-      <div className="min-h-screen bg-gray-950 text-gray-100">
+      <div className="min-h-screen bg-canvas text-text-primary">
         <Header />
         <main className="p-6">
           <Routes>

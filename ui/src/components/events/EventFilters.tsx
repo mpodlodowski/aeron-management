@@ -3,22 +3,20 @@ import { useEventStore } from '../../stores/eventStore'
 import { EventLevel } from '../../types'
 import { EventSeverity } from '../../utils/eventSeverity'
 import { exportEventsUrl, triggerReconcile } from '../../api/events'
+import {
+  DropdownMenu, DropdownMenuTrigger, DropdownMenuContent,
+  DropdownMenuCheckboxItem,
+} from '@/components/ui/dropdown-menu'
 
 const LEVELS: EventLevel[] = ['CLUSTER', 'NODE', 'AGENT']
 
-const LEVEL_COLORS: Record<string, { active: string; inactive: string }> = {
-  CLUSTER: { active: 'bg-purple-600 text-white', inactive: 'bg-gray-800 text-purple-400 border-purple-800' },
-  NODE: { active: 'bg-blue-600 text-white', inactive: 'bg-gray-800 text-blue-400 border-blue-800' },
-  AGENT: { active: 'bg-slate-500 text-white', inactive: 'bg-gray-800 text-slate-400 border-slate-700' },
-}
-
 const SEVERITIES: EventSeverity[] = ['error', 'warning', 'info', 'success']
 
-const SEVERITY_COLORS: Record<EventSeverity, { active: string; inactive: string }> = {
-  error: { active: 'bg-red-600 text-white', inactive: 'bg-gray-800 text-red-400 border-red-800' },
-  warning: { active: 'bg-yellow-600 text-white', inactive: 'bg-gray-800 text-yellow-400 border-yellow-800' },
-  info: { active: 'bg-blue-600 text-white', inactive: 'bg-gray-800 text-blue-400 border-blue-800' },
-  success: { active: 'bg-green-600 text-white', inactive: 'bg-gray-800 text-green-400 border-green-800' },
+const SEVERITY_DOT: Record<EventSeverity, string> = {
+  error: 'bg-critical-text',
+  warning: 'bg-warning-text',
+  info: 'bg-info-text',
+  success: 'bg-success-text',
 }
 
 const RELATIVE_RANGES: { label: string; ms: number }[] = [
@@ -137,24 +135,25 @@ export function EventFilters({ clusterId }: { clusterId: string }) {
         {/* Auto-refresh toggle */}
         <button
           onClick={() => setAutoRefresh(!autoRefresh)}
-          className={`rounded px-2 py-1 text-xs transition-colors ${
-            autoRefresh ? 'bg-green-800 text-green-300 hover:bg-green-700' : 'bg-gray-800 text-gray-500 hover:text-gray-300'
+          className={`rounded px-2 py-1 text-xs transition-colors inline-flex items-center gap-1.5 ${
+            autoRefresh ? 'text-text-primary' : 'text-text-muted hover:text-text-secondary'
           }`}
           title={autoRefresh ? 'Auto-refresh on' : 'Auto-refresh off'}
         >
+          {autoRefresh && <span className="inline-block h-1.5 w-1.5 rounded-full bg-success-text" />}
           {autoRefresh ? 'Live' : 'Paused'}
         </button>
 
-        <div className="w-px h-5 bg-gray-700" />
+        <div className="w-px h-5 bg-border-subtle" />
 
         {/* Range selector */}
-        <div className="flex items-center gap-0.5 rounded bg-gray-800 p-0.5">
+        <div className="flex items-center gap-0.5 rounded bg-surface p-0.5">
           {RELATIVE_RANGES.map((r) => (
             <button
               key={r.label}
               onClick={() => selectRelative(r)}
               className={`rounded px-2 py-0.5 text-xs transition-colors ${
-                isRelative(r.ms) ? 'bg-gray-600 text-gray-100' : 'text-gray-400 hover:text-gray-200'
+                isRelative(r.ms) ? 'bg-elevated text-text-primary' : 'text-text-secondary hover:text-text-primary'
               }`}
             >
               {r.label}
@@ -163,7 +162,7 @@ export function EventFilters({ clusterId }: { clusterId: string }) {
           <button
             onClick={selectAll}
             className={`rounded px-2 py-0.5 text-xs transition-colors ${
-              rangeMode.type === 'all' ? 'bg-gray-600 text-gray-100' : 'text-gray-400 hover:text-gray-200'
+              rangeMode.type === 'all' ? 'bg-elevated text-text-primary' : 'text-text-secondary hover:text-text-primary'
             }`}
           >
             All
@@ -171,7 +170,7 @@ export function EventFilters({ clusterId }: { clusterId: string }) {
           <button
             onClick={openAbsolute}
             className={`rounded px-2 py-0.5 text-xs transition-colors ${
-              rangeMode.type === 'absolute' ? 'bg-gray-600 text-gray-100' : 'text-gray-400 hover:text-gray-200'
+              rangeMode.type === 'absolute' ? 'bg-elevated text-text-primary' : 'text-text-secondary hover:text-text-primary'
             }`}
           >
             Custom
@@ -179,39 +178,48 @@ export function EventFilters({ clusterId }: { clusterId: string }) {
         </div>
 
         {/* Separator */}
-        <div className="w-px h-5 bg-gray-700" />
+        <div className="w-px h-5 bg-border-subtle" />
 
-        {/* Level toggles */}
-        {LEVELS.map((level) => {
-          const isActive = filters.levels.includes(level)
-          const colors = LEVEL_COLORS[level]
-          return (
-            <button
-              key={level}
-              onClick={() => { toggleLevel(level); setTimeout(() => applyFilters(), 0) }}
-              className={`rounded-full px-2.5 py-0.5 text-xs font-medium border transition-colors ${
-                isActive ? colors.active + ' border-transparent' : colors.inactive
-              }`}
-            >
-              {level}
+        {/* Source filter dropdown */}
+        <DropdownMenu>
+          <DropdownMenuTrigger asChild>
+            <button className="rounded border border-border-subtle px-2.5 py-1 text-xs text-text-secondary hover:text-text-primary transition-colors flex items-center gap-1.5">
+              Source
+              {filters.levels.length > 0 && filters.levels.length < LEVELS.length && (
+                <span className="rounded-full bg-info-fill/20 text-info-text px-1.5 text-[10px]">{filters.levels.length}</span>
+              )}
             </button>
-          )
-        })}
+          </DropdownMenuTrigger>
+          <DropdownMenuContent align="start" className="bg-elevated border-border-subtle">
+            {LEVELS.map((level) => (
+              <DropdownMenuCheckboxItem
+                key={level}
+                checked={filters.levels.includes(level)}
+                onCheckedChange={() => { toggleLevel(level); setTimeout(() => applyFilters(), 0) }}
+                className="text-text-primary text-xs"
+              >
+                {level}
+              </DropdownMenuCheckboxItem>
+            ))}
+          </DropdownMenuContent>
+        </DropdownMenu>
 
-        <div className="w-px h-5 bg-gray-700" />
+        <div className="w-px h-5 bg-border-subtle" />
 
         {/* Severity toggles */}
         {SEVERITIES.map((sev) => {
           const isActive = filters.severities.includes(sev)
-          const colors = SEVERITY_COLORS[sev]
           return (
             <button
               key={sev}
               onClick={() => { toggleSeverity(sev); setTimeout(() => applyFilters(), 0) }}
-              className={`rounded-full px-2.5 py-0.5 text-xs font-medium border transition-colors ${
-                isActive ? colors.active + ' border-transparent' : colors.inactive
+              className={`rounded-full px-2.5 py-0.5 text-xs font-medium border transition-colors inline-flex items-center gap-1.5 ${
+                isActive
+                  ? 'bg-elevated text-text-primary border-border-medium'
+                  : 'border-border-subtle text-text-secondary hover:text-text-primary'
               }`}
             >
+              <span className={`inline-block h-1.5 w-1.5 rounded-full ${SEVERITY_DOT[sev]}`} />
               {sev}
             </button>
           )
@@ -224,12 +232,12 @@ export function EventFilters({ clusterId }: { clusterId: string }) {
           value={filters.search}
           onChange={handleSearch}
           onKeyDown={(e) => { if (e.key === 'Enter') applyFilters() }}
-          className="rounded bg-gray-800 border border-gray-700 px-2.5 py-1 text-xs text-gray-200 placeholder-gray-500 focus:outline-none focus:border-gray-500 w-40"
+          className="rounded bg-surface border border-border-subtle px-2.5 py-1 text-xs text-text-primary placeholder-text-muted focus:outline-none focus:border-border-medium w-40"
         />
 
         <button
           onClick={applyFilters}
-          className="rounded bg-gray-700 px-2.5 py-1 text-xs text-gray-300 hover:bg-gray-600 transition-colors"
+          className="rounded bg-elevated px-2.5 py-1 text-xs text-text-primary hover:bg-border-subtle transition-colors"
         >
           Apply
         </button>
@@ -238,21 +246,21 @@ export function EventFilters({ clusterId }: { clusterId: string }) {
         <div className="ml-auto flex items-center gap-1">
           <button
             onClick={() => handleExport('csv')}
-            className="rounded bg-gray-800 px-2 py-1 text-xs text-gray-400 hover:text-gray-200 transition-colors"
+            className="rounded px-2 py-1 text-xs text-text-secondary hover:text-text-primary transition-colors"
           >
             CSV
           </button>
           <button
             onClick={() => handleExport('json')}
-            className="rounded bg-gray-800 px-2 py-1 text-xs text-gray-400 hover:text-gray-200 transition-colors"
+            className="rounded px-2 py-1 text-xs text-text-secondary hover:text-text-primary transition-colors"
           >
             JSON
           </button>
-          <div className="w-px h-4 bg-gray-700" />
+          <div className="w-px h-4 bg-border-subtle" />
           <button
             onClick={handleReconcile}
             disabled={reconciling}
-            className="rounded bg-gray-800 px-2 py-1 text-xs text-gray-400 hover:text-gray-200 transition-colors disabled:opacity-50"
+            className="rounded px-2 py-1 text-xs text-text-secondary hover:text-text-primary transition-colors disabled:opacity-50"
             title="Reconcile events from Aeron recording log"
           >
             {reconciling ? 'Reconciling...' : 'Reconcile'}
@@ -267,24 +275,24 @@ export function EventFilters({ clusterId }: { clusterId: string }) {
             type="datetime-local"
             value={absFrom}
             onChange={(e) => setAbsFrom(e.target.value)}
-            className="rounded bg-gray-800 border border-gray-700 px-2 py-1 text-xs text-gray-200 focus:outline-none focus:border-gray-500"
+            className="rounded bg-surface border border-border-subtle px-2 py-1 text-xs text-text-primary focus:outline-none focus:border-border-medium"
           />
-          <span className="text-xs text-gray-500">to</span>
+          <span className="text-xs text-text-muted">to</span>
           <input
             type="datetime-local"
             value={absTo}
             onChange={(e) => setAbsTo(e.target.value)}
-            className="rounded bg-gray-800 border border-gray-700 px-2 py-1 text-xs text-gray-200 focus:outline-none focus:border-gray-500"
+            className="rounded bg-surface border border-border-subtle px-2 py-1 text-xs text-text-primary focus:outline-none focus:border-border-medium"
           />
           <button
             onClick={applyAbsolute}
-            className="rounded bg-blue-600 px-2.5 py-1 text-xs text-white hover:bg-blue-500 transition-colors"
+            className="rounded bg-info-fill px-2.5 py-1 text-xs text-white hover:bg-info-fill/80 transition-colors"
           >
             Apply
           </button>
           <button
             onClick={() => setShowAbsolute(false)}
-            className="text-xs text-gray-500 hover:text-gray-300"
+            className="text-xs text-text-muted hover:text-text-primary"
           >
             Cancel
           </button>

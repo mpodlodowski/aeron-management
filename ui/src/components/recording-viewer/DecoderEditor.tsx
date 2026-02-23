@@ -247,17 +247,17 @@ export default function DecoderEditor({ registry, onClose, onUpdate, data, messa
 
   return (
     <div className="fixed inset-0 z-[60] flex items-center justify-center bg-black/60 backdrop-blur-sm">
-      <div className="w-full max-w-3xl max-h-[85vh] flex flex-col rounded-lg border border-gray-700 bg-gray-900 shadow-2xl">
-        <div className="flex items-center justify-between border-b border-gray-800 px-4 py-3">
-          <h2 className="text-sm font-semibold text-gray-200">Custom Decoders</h2>
+      <div className="w-full max-w-3xl max-h-[85vh] flex flex-col rounded-lg border border-border-medium bg-surface shadow-2xl">
+        <div className="flex items-center justify-between border-b border-border-subtle px-4 py-3">
+          <h2 className="text-sm font-semibold text-text-primary">Custom Decoders</h2>
           <div className="flex items-center gap-2">
-            <button onClick={handleExport} className="text-xs text-gray-400 hover:text-gray-200">
+            <button onClick={handleExport} className="text-xs text-text-secondary hover:text-text-primary">
               {exportStatus ?? 'Export'}
             </button>
-            <button onClick={() => { setShowImport(true); setImportError(null) }} className="text-xs text-gray-400 hover:text-gray-200">Import</button>
-            <button onClick={() => setShowSbeImport(true)} className="text-xs text-gray-400 hover:text-gray-200">Import SBE XML</button>
+            <button onClick={() => { setShowImport(true); setImportError(null) }} className="text-xs text-text-secondary hover:text-text-primary">Import</button>
+            <button onClick={() => setShowSbeImport(true)} className="text-xs text-text-secondary hover:text-text-primary">Import SBE XML</button>
             {configs.length > 0 && !confirmDeleteAll && (
-              <button onClick={() => setConfirmDeleteAll(true)} className="text-xs text-red-400 hover:text-red-300">Delete All</button>
+              <button onClick={() => setConfirmDeleteAll(true)} className="text-xs text-critical-text hover:text-critical-text">Delete All</button>
             )}
             {confirmDeleteAll && (
               <span className="flex items-center gap-1">
@@ -268,38 +268,38 @@ export default function DecoderEditor({ registry, onClose, onUpdate, data, messa
                     setConfirmDeleteAll(false)
                     onUpdate()
                   }}
-                  className="text-xs text-red-400 hover:text-red-300 font-medium"
+                  className="text-xs text-critical-text hover:text-critical-text font-medium"
                 >
                   Confirm
                 </button>
-                <button onClick={() => setConfirmDeleteAll(false)} className="text-xs text-gray-500 hover:text-gray-300">Cancel</button>
+                <button onClick={() => setConfirmDeleteAll(false)} className="text-xs text-text-muted hover:text-text-secondary">Cancel</button>
               </span>
             )}
-            <button onClick={onClose} className="text-xs text-gray-400 hover:text-gray-200">Close</button>
+            <button onClick={onClose} className="text-xs text-text-secondary hover:text-text-primary">Close</button>
           </div>
         </div>
 
         <div className="flex-1 overflow-auto p-4 space-y-4">
           {/* Import panel */}
           {showImport && (
-            <div ref={importRef} className="space-y-2 border border-gray-800 rounded-lg p-3">
-              <div className="text-xs text-gray-400">Paste decoder JSON array:</div>
+            <div ref={importRef} className="space-y-2 border border-border-subtle rounded-lg p-3">
+              <div className="text-xs text-text-secondary">Paste decoder JSON array:</div>
               <textarea
                 value={importJson}
                 onChange={(e) => { setImportJson(e.target.value); setImportError(null) }}
                 rows={6}
                 spellCheck={false}
                 placeholder='[{ "name": "...", "schemaId": 100, "templateId": 1, "code": "..." }]'
-                className="w-full rounded bg-gray-950 border border-gray-700 px-3 py-2 font-mono text-xs text-gray-200 resize-y"
+                className="w-full rounded bg-canvas border border-border-medium px-3 py-2 font-mono text-xs text-text-primary resize-y"
               />
               {importError && (
-                <div className="text-xs text-red-400">{importError}</div>
+                <div className="text-xs text-critical-text">{importError}</div>
               )}
               <div className="flex gap-2">
-                <button onClick={handleImportSubmit} className="rounded bg-blue-600 px-3 py-1 text-xs text-white hover:bg-blue-500">
+                <button onClick={handleImportSubmit} className="rounded bg-info-fill px-3 py-1 text-xs text-white hover:bg-info-fill/80">
                   Import
                 </button>
-                <button onClick={() => { setShowImport(false); setImportJson(''); setImportError(null) }} className="rounded bg-gray-800 px-3 py-1 text-xs text-gray-400 hover:bg-gray-700">
+                <button onClick={() => { setShowImport(false); setImportJson(''); setImportError(null) }} className="rounded bg-elevated px-3 py-1 text-xs text-text-secondary hover:bg-elevated">
                   Cancel
                 </button>
               </div>
@@ -308,26 +308,26 @@ export default function DecoderEditor({ registry, onClose, onUpdate, data, messa
 
           {/* SBE XML import panel */}
           {showSbeImport && (
-            <div ref={sbeRef} className="space-y-2 border border-gray-800 rounded-lg p-3">
-              <div className="text-xs text-gray-400">Select an SBE XML schema file:</div>
+            <div ref={sbeRef} className="space-y-2 border border-border-subtle rounded-lg p-3">
+              <div className="text-xs text-text-secondary">Select an SBE XML schema file:</div>
               <input
                 ref={sbeFileRef}
                 type="file"
                 accept=".xml"
                 onChange={handleSbeFile}
-                className="block w-full text-xs text-gray-400 file:mr-2 file:rounded file:border-0 file:bg-gray-800 file:px-3 file:py-1 file:text-xs file:text-gray-300 hover:file:bg-gray-700"
+                className="block w-full text-xs text-text-secondary file:mr-2 file:rounded file:border-0 file:bg-elevated file:px-3 file:py-1 file:text-xs file:text-text-secondary hover:file:bg-border-medium"
               />
               {sbeError && (
-                <div className="text-xs text-red-400">{sbeError}</div>
+                <div className="text-xs text-critical-text">{sbeError}</div>
               )}
               {sbePreview && (
                 <div className="space-y-2">
-                  <div className="text-xs text-gray-300">{sbePreview.length} decoder{sbePreview.length !== 1 ? 's' : ''} found:</div>
-                  <div className="max-h-40 overflow-auto rounded bg-gray-950 border border-gray-700 p-2 space-y-1">
+                  <div className="text-xs text-text-secondary">{sbePreview.length} decoder{sbePreview.length !== 1 ? 's' : ''} found:</div>
+                  <div className="max-h-40 overflow-auto rounded bg-canvas border border-border-medium p-2 space-y-1">
                     {sbePreview.map((c) => (
                       <div key={`${c.schemaId}:${c.templateId}`} className="flex items-baseline gap-2 text-xs font-mono">
-                        <span className="text-gray-200">{c.name}</span>
-                        <span className="text-gray-500">schema={c.schemaId} template={c.templateId}</span>
+                        <span className="text-text-primary">{c.name}</span>
+                        <span className="text-text-muted">schema={c.schemaId} template={c.templateId}</span>
                       </div>
                     ))}
                   </div>
@@ -335,11 +335,11 @@ export default function DecoderEditor({ registry, onClose, onUpdate, data, messa
               )}
               <div className="flex gap-2">
                 {sbePreview && sbePreview.length > 0 && (
-                  <button onClick={handleSbeImportAll} className="rounded bg-blue-600 px-3 py-1 text-xs text-white hover:bg-blue-500">
+                  <button onClick={handleSbeImportAll} className="rounded bg-info-fill px-3 py-1 text-xs text-white hover:bg-info-fill/80">
                     Import All
                   </button>
                 )}
-                <button onClick={cancelSbeImport} className="rounded bg-gray-800 px-3 py-1 text-xs text-gray-400 hover:bg-gray-700">
+                <button onClick={cancelSbeImport} className="rounded bg-elevated px-3 py-1 text-xs text-text-secondary hover:bg-elevated">
                   Cancel
                 </button>
               </div>
@@ -350,14 +350,14 @@ export default function DecoderEditor({ registry, onClose, onUpdate, data, messa
           {configs.length > 0 && (
             <div className="space-y-1">
               {configs.map((c) => (
-                <div key={`${c.schemaId}:${c.templateId}`} className="flex items-center justify-between rounded bg-gray-800 px-3 py-2">
+                <div key={`${c.schemaId}:${c.templateId}`} className="flex items-center justify-between rounded bg-elevated px-3 py-2">
                   <div>
-                    <span className="text-sm text-gray-200">{c.name}</span>
-                    <span className="ml-2 text-xs text-gray-500">schema={c.schemaId} template={c.templateId}</span>
+                    <span className="text-sm text-text-primary">{c.name}</span>
+                    <span className="ml-2 text-xs text-text-muted">schema={c.schemaId} template={c.templateId}</span>
                   </div>
                   <div className="flex gap-2">
-                    <button onClick={() => startEdit(c)} className="text-xs text-blue-400 hover:text-blue-300">Edit</button>
-                    <button onClick={() => remove(c)} className="text-xs text-red-400 hover:text-red-300">Delete</button>
+                    <button onClick={() => startEdit(c)} className="text-xs text-info-text hover:text-info-text">Edit</button>
+                    <button onClick={() => remove(c)} className="text-xs text-critical-text hover:text-critical-text">Delete</button>
                   </div>
                 </div>
               ))}
@@ -366,30 +366,30 @@ export default function DecoderEditor({ registry, onClose, onUpdate, data, messa
 
           {/* Editor form */}
           {showForm ? (
-            <div ref={formRef} className="space-y-3 border border-gray-800 rounded-lg p-3">
+            <div ref={formRef} className="space-y-3 border border-border-subtle rounded-lg p-3">
               <div className="flex gap-2">
                 <input
                   value={name}
                   onChange={(e) => setName(e.target.value)}
                   placeholder="Decoder name"
-                  className="flex-1 rounded bg-gray-800 border border-gray-700 px-2 py-1 text-sm text-gray-200"
+                  className="flex-1 rounded bg-elevated border border-border-medium px-2 py-1 text-sm text-text-primary"
                 />
                 <input
                   value={schemaId}
                   onChange={(e) => setSchemaId(e.target.value)}
                   placeholder="Schema ID"
                   type="number"
-                  className="w-24 rounded bg-gray-800 border border-gray-700 px-2 py-1 text-sm text-gray-200"
+                  className="w-24 rounded bg-elevated border border-border-medium px-2 py-1 text-sm text-text-primary"
                 />
                 <input
                   value={templateId}
                   onChange={(e) => setTemplateId(e.target.value)}
                   placeholder="Template ID"
                   type="number"
-                  className="w-24 rounded bg-gray-800 border border-gray-700 px-2 py-1 text-sm text-gray-200"
+                  className="w-24 rounded bg-elevated border border-border-medium px-2 py-1 text-sm text-text-primary"
                 />
                 {schemaId && templateId && (
-                  <span className="self-center text-xs text-gray-500 whitespace-nowrap">
+                  <span className="self-center text-xs text-text-muted whitespace-nowrap">
                     {matchCount > 0
                       ? `${matchCount} match${matchCount !== 1 ? 'es' : ''}`
                       : 'no matches'}
@@ -397,40 +397,40 @@ export default function DecoderEditor({ registry, onClose, onUpdate, data, messa
                 )}
               </div>
               <div className="flex items-center justify-between">
-                <div className="text-xs text-gray-500">
+                <div className="text-xs text-text-muted">
                   function(view: DataView, offset: number, length: number) &#123;
                 </div>
                 <button
                   onClick={toggleDocs}
-                  className="text-[10px] text-blue-400 hover:text-blue-300"
+                  className="text-[10px] text-info-text hover:text-info-text"
                 >
                   {showDocs ? 'Hide docs' : 'API reference'}
                 </button>
               </div>
               {showDocs && (
-                <div className="rounded border border-gray-800 bg-gray-950 px-3 py-2 text-[11px] text-gray-400 space-y-2 leading-relaxed">
+                <div className="rounded border border-border-subtle bg-canvas px-3 py-2 text-[11px] text-text-secondary space-y-2 leading-relaxed">
                   <div>
-                    <span className="text-gray-300 font-medium">Parameters</span>
+                    <span className="text-text-secondary font-medium">Parameters</span>
                     <div className="font-mono mt-0.5 space-y-0.5">
-                      <div><span className="text-blue-400">view</span>: DataView — raw recording bytes</div>
-                      <div><span className="text-blue-400">offset</span>: number — start of payload (after frame + SBE headers)</div>
-                      <div><span className="text-blue-400">length</span>: number — payload byte count</div>
+                      <div><span className="text-info-text">view</span>: DataView — raw recording bytes</div>
+                      <div><span className="text-info-text">offset</span>: number — start of payload (after frame + SBE headers)</div>
+                      <div><span className="text-info-text">length</span>: number — payload byte count</div>
                     </div>
                   </div>
                   <div>
-                    <span className="text-gray-300 font-medium">Return</span>
+                    <span className="text-text-secondary font-medium">Return</span>
                     <div className="font-mono mt-0.5">
                       {'Array<{ name: string, value: string|number|bigint|boolean, type: string, size: number }>'}
                     </div>
                   </div>
                   <div>
-                    <span className="text-gray-300 font-medium">Suggested type values</span>
+                    <span className="text-text-secondary font-medium">Suggested type values</span>
                     <div className="font-mono mt-0.5">
                       int8, uint8, int16, uint16, int32, uint32, int64, uint64, float, double, bool, uuid, enum, string
                     </div>
                   </div>
                   <div>
-                    <span className="text-gray-300 font-medium">DataView reads</span> <span className="text-gray-600">(all little-endian: pass true)</span>
+                    <span className="text-text-secondary font-medium">DataView reads</span> <span className="text-text-muted">(all little-endian: pass true)</span>
                     <div className="font-mono mt-0.5 grid grid-cols-2 gap-x-4 gap-y-0.5">
                       <div>getInt8(off)</div>
                       <div>getUint8(off)</div>
@@ -451,42 +451,42 @@ export default function DecoderEditor({ registry, onClose, onUpdate, data, messa
                 onChange={(e) => setCode(e.target.value)}
                 rows={8}
                 spellCheck={false}
-                className="w-full rounded bg-gray-950 border border-gray-700 px-3 py-2 font-mono text-xs text-gray-200 resize-y"
+                className="w-full rounded bg-canvas border border-border-medium px-3 py-2 font-mono text-xs text-text-primary resize-y"
               />
               <div className="flex items-center justify-between">
-                <div className="text-xs text-gray-500">&#125;</div>
-                <button onClick={formatCode} className="text-[10px] text-gray-500 hover:text-gray-300">Format</button>
+                <div className="text-xs text-text-muted">&#125;</div>
+                <button onClick={formatCode} className="text-[10px] text-text-muted hover:text-text-secondary">Format</button>
               </div>
 
               {/* Live results */}
               {liveResult && (
-                <div className="rounded border border-gray-800 bg-gray-950 p-3">
-                  <div className="text-[10px] uppercase tracking-wider text-gray-600 mb-2">
+                <div className="rounded border border-border-subtle bg-canvas p-3">
+                  <div className="text-[10px] uppercase tracking-wider text-text-muted mb-2">
                     Live Preview
                   </div>
                   {liveResult.error && (
-                    <div className="text-xs text-red-400 font-mono">{liveResult.error}</div>
+                    <div className="text-xs text-critical-text font-mono">{liveResult.error}</div>
                   )}
                   {liveResult.noMatch && (
-                    <div className="text-xs text-yellow-500">
+                    <div className="text-xs text-warning-text">
                       No messages with schema {schemaId} / template {templateId} in current chunk.
                       Navigate to a chunk containing matching messages to test.
                     </div>
                   )}
                   {liveResult.result && (
                     <div className="space-y-0.5">
-                      <div className="text-[10px] text-gray-600 mb-1">
+                      <div className="text-[10px] text-text-muted mb-1">
                         Testing against message #{liveResult.result.messageIndex + 1}
                       </div>
                       {liveResult.result.fields.map((f, i) => (
                         <div key={i} className="flex items-baseline gap-2 text-xs font-mono">
-                          <span className="text-gray-500 min-w-[100px] shrink-0">{f.name}</span>
+                          <span className="text-text-muted min-w-[100px] shrink-0">{f.name}</span>
                           <span className="text-emerald-400">{formatValue(f.value)}</span>
-                          <span className="text-gray-600 text-[10px]">{f.type} ({f.size}B)</span>
+                          <span className="text-text-muted text-[10px]">{f.type} ({f.size}B)</span>
                         </div>
                       ))}
                       {liveResult.result.fields.length === 0 && (
-                        <div className="text-xs text-gray-500 italic">Empty array returned</div>
+                        <div className="text-xs text-text-muted italic">Empty array returned</div>
                       )}
                     </div>
                   )}
@@ -494,10 +494,10 @@ export default function DecoderEditor({ registry, onClose, onUpdate, data, messa
               )}
 
               <div className="flex gap-2">
-                <button onClick={save} className="rounded bg-blue-600 px-3 py-1 text-xs text-white hover:bg-blue-500">
+                <button onClick={save} className="rounded bg-info-fill px-3 py-1 text-xs text-white hover:bg-info-fill/80">
                   Save
                 </button>
-                <button onClick={cancelForm} className="rounded bg-gray-800 px-3 py-1 text-xs text-gray-400 hover:bg-gray-700">
+                <button onClick={cancelForm} className="rounded bg-elevated px-3 py-1 text-xs text-text-secondary hover:bg-elevated">
                   Cancel
                 </button>
               </div>
@@ -505,7 +505,7 @@ export default function DecoderEditor({ registry, onClose, onUpdate, data, messa
           ) : (
             <button
               onClick={startNew}
-              className="w-full rounded border border-dashed border-gray-700 py-2 text-xs text-gray-500 hover:text-gray-300 hover:border-gray-500"
+              className="w-full rounded border border-dashed border-border-medium py-2 text-xs text-text-muted hover:text-text-secondary hover:border-border-medium"
             >
               + Add Custom Decoder
             </button>

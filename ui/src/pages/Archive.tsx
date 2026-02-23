@@ -6,23 +6,20 @@ import { RecordingRow, RecordingType, DiskGrowthStats } from '../types'
 import RecordingViewer from '../components/RecordingViewer'
 import type { ViewMode } from '../lib/decoder'
 import { formatBytes, formatGrowthRate, formatDuration } from '../utils/counters'
-
-interface ActionResult {
-  action: string
-  success: boolean
-  message: string
-  output?: string
-}
+import { toast } from 'sonner'
+import { ConfirmDialog } from '../components/ConfirmDialog'
+import { diskBarColor, ttfColor } from '../utils/statusColors'
+import {
+  DropdownMenu, DropdownMenuTrigger, DropdownMenuContent, DropdownMenuItem,
+} from '@/components/ui/dropdown-menu'
+import { MoreHorizontal } from 'lucide-react'
 
 function nodeName(nodeId: number, agentMode?: string) {
   return agentMode === 'backup' ? 'Backup' : `Node ${nodeId}`
 }
 
-const KNOWN_BADGE_CLASS: Record<string, string> = {
-  LOG: 'bg-blue-900/50 text-blue-300',
-  SNAPSHOT: 'bg-purple-900/50 text-purple-300',
-}
-const DEFAULT_BADGE_CLASS = 'bg-gray-700 text-gray-300'
+const KNOWN_BADGE_CLASS: Record<string, string> = {}
+const DEFAULT_BADGE_CLASS = 'bg-elevated text-text-secondary'
 
 function typeBadgeClass(type: string): string {
   return KNOWN_BADGE_CLASS[type] ?? DEFAULT_BADGE_CLASS
@@ -43,7 +40,7 @@ export default function Archive() {
   const nodes = useClusterStore((s) => s.clusters.get(clusterId ?? '')?.nodes ?? new Map())
 
   const [searchParams, setSearchParams] = useSearchParams()
-  const [actionResult, setActionResult] = useState<ActionResult | null>(null)
+  const [actionResult, setActionResult] = useState<{ action: string; output?: string } | null>(null)
   const [loading, setLoading] = useState<string | null>(null)
   const [confirmAction, setConfirmAction] = useState<{ label: string; fn: () => void } | null>(null)
   const pageSize = 100
@@ -138,21 +135,21 @@ export default function Archive() {
     try {
       const res = await fetch(`/api/clusters/${clusterId}/nodes/${nodeId}/${endpoint}`, { method })
       const data = await res.json()
-      setActionResult({
-        action: label,
-        success: data.success !== false,
-        message: data.message ?? (data.success !== false ? 'Action completed' : 'Action failed'),
-        output: data.output,
-      })
+      const success = data.success !== false
+      const message = data.message ?? (success ? 'Action completed' : 'Action failed')
+      if (success) {
+        toast.success(`${label}: ${message}`)
+        setActionResult(data.output ? { action: label, output: data.output } : null)
+      } else {
+        toast.error(`${label}: ${message}`)
+        setActionResult(null)
+      }
       fetchRecordings()
       // Agent needs a metrics cycle to reflect changes; refetch after delay
       setTimeout(fetchRecordings, 2000)
     } catch (err) {
-      setActionResult({
-        action: label,
-        success: false,
-        message: err instanceof Error ? err.message : 'Network error',
-      })
+      toast.error(`${label}: ${err instanceof Error ? err.message : 'Network error'}`)
+      setActionResult(null)
     } finally {
       setLoading(null)
     }
@@ -192,28 +189,28 @@ export default function Archive() {
             const rate = d.growth?.growthRate1h ?? d.growth?.growthRate5m ?? null
             const ttf = d.growth?.timeToFullSeconds ?? null
             return (
-              <div key={d.nodeId} className="flex-1 min-w-[240px] rounded-lg border border-gray-800 bg-gray-900 p-3">
+              <div key={d.nodeId} className="flex-1 min-w-[240px] rounded-lg border border-border-subtle bg-surface p-3">
                 <div className="flex items-center justify-between mb-1.5">
-                  <span className="text-xs font-medium text-gray-300">{d.name}</span>
+                  <span className="text-xs font-medium text-text-secondary">{d.name}</span>
                   <div className="flex items-center gap-2">
                     {rate !== null && rate !== 0 && (
-                      <span className={`text-xs ${rate > 0 ? 'text-yellow-400' : 'text-green-400'}`}>
+                      <span className={`text-xs ${rate > 0 ? 'text-warning-text' : 'text-success-text'}`}>
                         {formatGrowthRate(rate)}
                       </span>
                     )}
-                    <span className="text-xs text-gray-400">{usedPct}% used</span>
+                    <span className="text-xs text-text-secondary">{usedPct}% used</span>
                   </div>
                 </div>
-                <div className="flex h-2 rounded-full bg-gray-800 overflow-hidden">
-                  <div className="bg-blue-500" style={{ width: `${recPct}%` }} title={`Recordings: ${formatBytes(d.recordings)}`} />
-                  <div className={usedPct > 90 ? 'bg-red-500' : usedPct > 75 ? 'bg-yellow-500' : 'bg-amber-700'} style={{ width: `${otherPct}%` }} title={`Other: ${formatBytes(d.used - d.recordings)}`} />
+                <div className="flex h-2 rounded-full bg-elevated overflow-hidden">
+                  <div className="bg-info-fill" style={{ width: `${recPct}%` }} title={`Recordings: ${formatBytes(d.recordings)}`} />
+                  <div className={diskBarColor(usedPct)} style={{ width: `${otherPct}%` }} title={`Other: ${formatBytes(d.used - d.recordings)}`} />
                 </div>
-                <div className="mt-1.5 flex gap-3 text-xs text-gray-500">
-                  <span><span className="inline-block w-2 h-2 rounded-full bg-blue-500 mr-1" />Recordings {formatBytes(d.recordings)}</span>
-                  <span><span className={`inline-block w-2 h-2 rounded-full ${usedPct > 90 ? 'bg-red-500' : usedPct > 75 ? 'bg-yellow-500' : 'bg-amber-700'} mr-1`} />Other {formatBytes(Math.max(0, d.used - d.recordings))}</span>
+                <div className="mt-1.5 flex gap-3 text-xs text-text-muted">
+                  <span><span className="inline-block w-2 h-2 rounded-full bg-info-fill mr-1" />Recordings {formatBytes(d.recordings)}</span>
+                  <span><span className={`inline-block w-2 h-2 rounded-full ${diskBarColor(usedPct)} mr-1`} />Other {formatBytes(Math.max(0, d.used - d.recordings))}</span>
                   <span className="ml-auto flex gap-3">
                     {ttf !== null && (
-                      <span className={`${ttf < 3600 ? 'text-red-400' : ttf < 86400 ? 'text-yellow-400' : 'text-gray-500'}`}>
+                      <span className={ttfColor(ttf)}>
                         Full in {formatDuration(ttf)}
                       </span>
                     )}
@@ -229,15 +226,15 @@ export default function Archive() {
       {/* Filters */}
       <div className="space-y-2">
         <div className="flex items-center gap-2">
-          <span className="text-xs font-medium text-gray-500 w-10">Node</span>
+          <span className="text-xs font-medium text-text-muted w-10">Node</span>
           {nodeIds.map((id) => (
             <button
               key={id}
               onClick={() => updateParams({ node: filterNode === id ? null : String(id), page: null })}
               className={`rounded-md px-3 py-1.5 text-xs font-medium transition-colors ${
                 filterNode === id
-                  ? 'bg-blue-600 text-white'
-                  : 'bg-gray-800 text-gray-400 hover:text-gray-200'
+                  ? 'bg-elevated text-text-primary border border-border-medium'
+                  : 'bg-surface text-text-secondary border border-border-subtle hover:text-text-primary'
               }`}
             >
               {nodeName(id, nodes.get(id)?.agentMode)}
@@ -245,15 +242,15 @@ export default function Archive() {
           ))}
         </div>
         <div className="flex items-center gap-2">
-          <span className="text-xs font-medium text-gray-500 w-10">Type</span>
+          <span className="text-xs font-medium text-text-muted w-10">Type</span>
           {recordingTypes.map((t) => (
             <button
               key={t}
               onClick={() => updateParams({ type: filterType === t ? null : t, page: null })}
               className={`rounded-md px-3 py-1.5 text-xs font-medium transition-colors ${
                 filterType === t
-                  ? 'bg-blue-600 text-white'
-                  : 'bg-gray-800 text-gray-400 hover:text-gray-200'
+                  ? 'bg-elevated text-text-primary border border-border-medium'
+                  : 'bg-surface text-text-secondary border border-border-subtle hover:text-text-primary'
               }`}
             >
               {t}
@@ -261,15 +258,15 @@ export default function Archive() {
           ))}
         </div>
         <div className="flex items-center gap-2">
-          <span className="text-xs font-medium text-gray-500 w-10">Sort</span>
+          <span className="text-xs font-medium text-text-muted w-10">Sort</span>
           {([['desc', 'Newest first'], ['asc', 'Oldest first']] as const).map(([val, label]) => (
             <button
               key={val}
               onClick={() => val !== sortOrder && updateParams({ sort: val === 'desc' ? null : val, page: null })}
               className={`rounded-md px-3 py-1.5 text-xs font-medium transition-colors ${
                 sortOrder === val
-                  ? 'bg-blue-600 text-white'
-                  : 'bg-gray-800 text-gray-400 hover:text-gray-200'
+                  ? 'bg-elevated text-text-primary border border-border-medium'
+                  : 'bg-surface text-text-secondary border border-border-subtle hover:text-text-primary'
               }`}
             >
               {label}
@@ -279,86 +276,56 @@ export default function Archive() {
       </div>
 
       {/* Global Archive Actions */}
-      {filterNode !== null && (
-        <div className="flex flex-wrap gap-2">
-          <button
-            disabled={loading !== null}
-            onClick={() => executeAction('Verify Archive', filterNode, 'archive/verify', 'GET')}
-            title="Check archive integrity by verifying the catalog and all recording segment files"
-            className="rounded-md bg-gray-800 px-3 py-1.5 text-xs font-medium text-gray-300 hover:bg-gray-700 disabled:opacity-50"
-          >
-            {loading === 'Verify Archive' ? 'Verifying...' : 'Verify Archive'}
-          </button>
-          <button
-            disabled={loading !== null}
-            onClick={() => withConfirm('Compact Archive', () => executeAction('Compact Archive', filterNode, 'archive/compact'))}
-            title="Remove deleted and invalidated recording segments to reclaim disk space"
-            className="rounded-md bg-gray-800 px-3 py-1.5 text-xs font-medium text-gray-300 hover:bg-gray-700 disabled:opacity-50"
-          >
-            Compact
-          </button>
-          <button
-            disabled={loading !== null}
-            onClick={() => withConfirm('Delete Orphaned Segments', () => executeAction('Delete Orphaned', filterNode, 'archive/delete-orphaned'))}
-            title="Delete segment files on disk that are not referenced by any recording in the catalog"
-            className="rounded-md bg-gray-800 px-3 py-1.5 text-xs font-medium text-gray-300 hover:bg-gray-700 disabled:opacity-50"
-          >
-            Delete Orphaned
-          </button>
-        </div>
-      )}
+      <div className="flex flex-wrap gap-2">
+        <button
+          disabled={loading !== null || filterNode === null}
+          onClick={() => filterNode !== null && executeAction('Verify Archive', filterNode, 'archive/verify', 'GET')}
+          title={filterNode === null ? 'Select a node to verify its archive' : 'Check archive integrity by verifying the catalog and all recording segment files'}
+          className="rounded-md border border-border-medium px-3 py-1.5 text-xs font-medium text-text-primary hover:bg-elevated disabled:opacity-50 disabled:cursor-not-allowed"
+        >
+          {loading === 'Verify Archive' ? 'Verifying...' : 'Verify Archive'}
+        </button>
+        <button
+          disabled={loading !== null || filterNode === null}
+          onClick={() => filterNode !== null && withConfirm('Compact Archive', () => executeAction('Compact Archive', filterNode, 'archive/compact'))}
+          title={filterNode === null ? 'Select a node to compact its archive' : 'Remove deleted and invalidated recording segments to reclaim disk space'}
+          className="rounded-md border border-border-medium px-3 py-1.5 text-xs font-medium text-text-primary hover:bg-elevated disabled:opacity-50 disabled:cursor-not-allowed"
+        >
+          Compact
+        </button>
+        <button
+          disabled={loading !== null || filterNode === null}
+          onClick={() => filterNode !== null && withConfirm('Delete Orphaned Segments', () => executeAction('Delete Orphaned', filterNode, 'archive/delete-orphaned'))}
+          title={filterNode === null ? 'Select a node to delete orphaned segments' : 'Delete segment files on disk that are not referenced by any recording in the catalog'}
+          className="rounded-md border border-border-medium px-3 py-1.5 text-xs font-medium text-text-primary hover:bg-elevated disabled:opacity-50 disabled:cursor-not-allowed"
+        >
+          Delete Orphaned
+        </button>
+      </div>
 
       {/* Confirm Dialog */}
-      {confirmAction && (
-        <div className="rounded-lg border border-yellow-800 bg-yellow-900/20 p-4">
-          <p className="text-sm text-yellow-200">
-            Confirm: <strong>{confirmAction.label}</strong>?
-          </p>
-          <div className="mt-2 flex gap-2">
-            <button
-              onClick={() => { confirmAction.fn(); setConfirmAction(null) }}
-              className="rounded-md bg-yellow-700 px-3 py-1 text-xs font-medium text-white hover:bg-yellow-600"
-            >
-              Confirm
-            </button>
-            <button
-              onClick={() => setConfirmAction(null)}
-              className="rounded-md bg-gray-700 px-3 py-1 text-xs font-medium text-gray-300 hover:bg-gray-600"
-            >
-              Cancel
-            </button>
-          </div>
-        </div>
-      )}
+      <ConfirmDialog
+        open={confirmAction !== null}
+        title={`Confirm: ${confirmAction?.label}?`}
+        destructive={confirmAction?.label?.includes('Invalid') || confirmAction?.label?.includes('Delete') || false}
+        onConfirm={() => { confirmAction?.fn(); setConfirmAction(null) }}
+        onCancel={() => setConfirmAction(null)}
+      />
 
-      {/* Action Result */}
-      {actionResult && (
-        <div
-          className={`rounded-lg border p-4 ${
-            actionResult.success
-              ? 'border-green-800 bg-green-900/20'
-              : 'border-red-800 bg-red-900/20'
-          }`}
-        >
-          <div className="flex items-center justify-between">
-            <span className={`text-sm font-medium ${actionResult.success ? 'text-green-300' : 'text-red-300'}`}>
-              {actionResult.action}: {actionResult.message}
-            </span>
-            <button onClick={() => setActionResult(null)} className="text-gray-500 hover:text-gray-300 text-xs">
-              dismiss
-            </button>
+      {/* Action Output */}
+      {actionResult?.output && (
+        <pre className="rounded-md bg-canvas border border-border-subtle px-4 py-3 text-xs font-mono text-text-secondary overflow-x-auto whitespace-pre-wrap max-h-60">
+          <div className="flex justify-between items-center mb-2">
+            <span className="text-text-muted">{actionResult.action}</span>
+            <button onClick={() => setActionResult(null)} className="text-text-muted hover:text-text-primary text-xs">dismiss</button>
           </div>
-          {actionResult.output && (
-            <pre className="mt-2 max-h-60 overflow-auto rounded bg-gray-950 p-3 text-xs text-gray-300">
-              {actionResult.output}
-            </pre>
-          )}
-        </div>
+          {actionResult.output}
+        </pre>
       )}
 
       {/* Summary + Pagination */}
       <div className="flex items-center justify-between">
-        <span className="text-xs text-gray-400">
+        <span className="text-xs text-text-secondary">
           {fetchLoading ? 'Loading...' : `${totalElements.toLocaleString()} recordings`}
         </span>
         {totalPages > 1 && (
@@ -366,14 +333,14 @@ export default function Archive() {
             <button
               disabled={page === 0}
               onClick={() => goToPage(0)}
-              className="rounded-md bg-gray-800 px-2 py-1 text-xs text-gray-300 hover:bg-gray-700 disabled:opacity-30"
+              className="rounded-md bg-surface px-2 py-1 text-xs text-text-primary hover:bg-elevated disabled:opacity-30"
             >
               First
             </button>
             <button
               disabled={page === 0}
               onClick={() => goToPage(page - 1)}
-              className="rounded-md bg-gray-800 px-2 py-1 text-xs text-gray-300 hover:bg-gray-700 disabled:opacity-30"
+              className="rounded-md bg-surface px-2 py-1 text-xs text-text-primary hover:bg-elevated disabled:opacity-30"
             >
               Prev
             </button>
@@ -391,26 +358,26 @@ export default function Archive() {
                 name="pageInput"
                 key={page}
                 defaultValue={page + 1}
-                className="w-12 rounded bg-gray-800 border border-gray-700 px-1.5 py-1 text-xs text-gray-200 text-center"
+                className="w-12 rounded bg-elevated border border-border-medium px-1.5 py-1 text-xs text-text-primary text-center"
                 onBlur={(e) => {
                   const v = parseInt(e.target.value, 10)
                   if (!isNaN(v) && v >= 1 && v <= totalPages) goToPage(v - 1)
                   else e.target.value = String(page + 1)
                 }}
               />
-              <span className="text-xs text-gray-500">/ {totalPages}</span>
+              <span className="text-xs text-text-muted">/ {totalPages}</span>
             </form>
             <button
               disabled={page >= totalPages - 1}
               onClick={() => goToPage(page + 1)}
-              className="rounded-md bg-gray-800 px-2 py-1 text-xs text-gray-300 hover:bg-gray-700 disabled:opacity-30"
+              className="rounded-md bg-surface px-2 py-1 text-xs text-text-primary hover:bg-elevated disabled:opacity-30"
             >
               Next
             </button>
             <button
               disabled={page >= totalPages - 1}
               onClick={() => goToPage(totalPages - 1)}
-              className="rounded-md bg-gray-800 px-2 py-1 text-xs text-gray-300 hover:bg-gray-700 disabled:opacity-30"
+              className="rounded-md bg-surface px-2 py-1 text-xs text-text-primary hover:bg-elevated disabled:opacity-30"
             >
               Last
             </button>
@@ -419,52 +386,52 @@ export default function Archive() {
       </div>
 
       {/* Recordings Table */}
-      <div className="rounded-lg border border-gray-800 bg-gray-900 overflow-auto">
+      <div className="rounded-lg border border-border-subtle bg-surface overflow-auto">
         <table className="w-full text-sm">
-          <thead className="bg-gray-900 border-b border-gray-800">
+          <thead className="bg-surface border-b border-border-subtle">
             <tr>
-              <th className="px-4 py-3 text-left text-xs font-medium text-gray-400 uppercase tracking-wider">
+              <th className="px-4 py-3 text-left text-xs font-medium text-text-muted uppercase tracking-wider">
                 Node
               </th>
-              <th className="px-4 py-3 text-left text-xs font-medium text-gray-400 uppercase tracking-wider">
+              <th className="px-4 py-3 text-left text-xs font-medium text-text-muted uppercase tracking-wider">
                 Recording ID
               </th>
-              <th className="px-4 py-3 text-left text-xs font-medium text-gray-400 uppercase tracking-wider">
+              <th className="px-4 py-3 text-left text-xs font-medium text-text-muted uppercase tracking-wider">
                 Type
               </th>
-              <th className="px-4 py-3 text-left text-xs font-medium text-gray-400 uppercase tracking-wider">
+              <th className="px-4 py-3 text-left text-xs font-medium text-text-muted uppercase tracking-wider">
                 Stream
               </th>
-              <th className="px-4 py-3 text-left text-xs font-medium text-gray-400 uppercase tracking-wider">
+              <th className="px-4 py-3 text-left text-xs font-medium text-text-muted uppercase tracking-wider">
                 Channel
               </th>
-              <th className="px-4 py-3 text-left text-xs font-medium text-gray-400 uppercase tracking-wider">
+              <th className="px-4 py-3 text-left text-xs font-medium text-text-muted uppercase tracking-wider">
                 Start Pos
               </th>
-              <th className="px-4 py-3 text-left text-xs font-medium text-gray-400 uppercase tracking-wider">
+              <th className="px-4 py-3 text-left text-xs font-medium text-text-muted uppercase tracking-wider">
                 Stop Pos
               </th>
-              <th className="px-4 py-3 text-left text-xs font-medium text-gray-400 uppercase tracking-wider">
+              <th className="px-4 py-3 text-left text-xs font-medium text-text-muted uppercase tracking-wider">
                 Size
               </th>
-              <th className="px-4 py-3 text-left text-xs font-medium text-gray-400 uppercase tracking-wider">
+              <th className="px-4 py-3 text-left text-xs font-medium text-text-muted uppercase tracking-wider">
                 Started
               </th>
-              <th className="px-4 py-3 text-left text-xs font-medium text-gray-400 uppercase tracking-wider">
+              <th className="px-4 py-3 text-left text-xs font-medium text-text-muted uppercase tracking-wider">
                 Stopped
               </th>
-              <th className="px-4 py-3 text-left text-xs font-medium text-gray-400 uppercase tracking-wider">
+              <th className="px-4 py-3 text-left text-xs font-medium text-text-muted uppercase tracking-wider">
                 Status
               </th>
-              <th className="px-4 py-3 text-left text-xs font-medium text-gray-400 uppercase tracking-wider">
+              <th className="px-4 py-3 text-left text-xs font-medium text-text-muted uppercase tracking-wider">
                 Actions
               </th>
             </tr>
           </thead>
-          <tbody className="divide-y divide-gray-800">
+          <tbody className="divide-y divide-border-subtle">
             {recordings.length === 0 ? (
               <tr>
-                <td colSpan={12} className="px-4 py-8 text-center text-gray-500">
+                <td colSpan={12} className="px-4 py-8 text-center text-text-muted">
                   {fetchLoading ? 'Loading recordings...' : 'No recordings available'}
                 </td>
               </tr>
@@ -474,11 +441,11 @@ export default function Archive() {
                 const size = rec.stopPosition > rec.startPosition ? rec.stopPosition - rec.startPosition : 0
                 const isInvalid = rec.state === 'INVALID'
                 const isDeleted = rec.state === 'DELETED'
-                const rowClass = isInvalid || isDeleted ? 'hover:bg-gray-800/50 opacity-60' : 'hover:bg-gray-800/50'
+                const rowClass = isInvalid || isDeleted ? 'hover:bg-elevated/50 opacity-60' : 'hover:bg-elevated/50'
                 return (
                   <tr key={`${rec.nodeId}-${rec.recordingId}`} className={rowClass}>
-                    <td className="px-4 py-2 text-gray-200">{nodeName(rec.nodeId, nodes.get(rec.nodeId)?.agentMode)}</td>
-                    <td className="px-4 py-2 font-mono text-gray-200">
+                    <td className="px-4 py-2 text-text-primary">{nodeName(rec.nodeId, nodes.get(rec.nodeId)?.agentMode)}</td>
+                    <td className="px-4 py-2 font-mono text-text-primary">
                       {rec.recordingId}
                     </td>
                     <td className="px-4 py-2">
@@ -486,50 +453,50 @@ export default function Archive() {
                         {rec.type}
                       </span>
                     </td>
-                    <td className="px-4 py-2 font-mono text-gray-400">
+                    <td className="px-4 py-2 font-mono text-text-secondary">
                       {rec.streamId}
                     </td>
-                    <td className="px-4 py-2 text-gray-400 max-w-xs truncate">
+                    <td className="px-4 py-2 text-text-secondary max-w-xs truncate">
                       {rec.channel}
                     </td>
-                    <td className="px-4 py-2 font-mono text-gray-400">
+                    <td className="px-4 py-2 font-mono text-text-secondary">
                       {rec.startPosition.toLocaleString()}
                     </td>
-                    <td className="px-4 py-2 font-mono text-gray-400">
+                    <td className="px-4 py-2 font-mono text-text-secondary">
                       {isActive ? '\u2014' : rec.stopPosition.toLocaleString()}
                     </td>
-                    <td className="px-4 py-2 font-mono text-gray-400">
+                    <td className="px-4 py-2 font-mono text-text-secondary">
                       {size > 0 ? formatBytes(size) : '\u2014'}
                     </td>
-                    <td className="px-4 py-2 text-gray-400 whitespace-nowrap">
+                    <td className="px-4 py-2 text-text-secondary whitespace-nowrap">
                       {formatTimestamp(rec.startTimestamp)}
                     </td>
-                    <td className="px-4 py-2 text-gray-400 whitespace-nowrap">
+                    <td className="px-4 py-2 text-text-secondary whitespace-nowrap">
                       {formatTimestamp(rec.stopTimestamp)}
                     </td>
                     <td className="px-4 py-2">
                       <div className="flex gap-1">
                         {isInvalid ? (
-                          <span className="inline-flex rounded-full px-2 py-0.5 text-xs font-medium bg-red-900/50 text-red-300">
+                          <span className="inline-flex rounded-full px-2 py-0.5 text-xs font-medium bg-critical-surface text-critical-text">
                             INVALID
                           </span>
                         ) : isDeleted ? (
-                          <span className="inline-flex rounded-full px-2 py-0.5 text-xs font-medium bg-red-900/50 text-red-400">
+                          <span className="inline-flex rounded-full px-2 py-0.5 text-xs font-medium bg-critical-surface text-critical-text">
                             DELETED
                           </span>
                         ) : isActive ? (
-                          <span className="inline-flex rounded-full px-2 py-0.5 text-xs font-medium bg-green-900/50 text-green-300">
+                          <span className="inline-flex rounded-full px-2 py-0.5 text-xs font-medium bg-success-surface text-success-text">
                             ACTIVE
                           </span>
                         ) : (
-                          <span className="inline-flex rounded-full px-2 py-0.5 text-xs font-medium bg-gray-700 text-gray-300">
+                          <span className="inline-flex rounded-full px-2 py-0.5 text-xs font-medium bg-elevated text-text-secondary">
                             STOPPED
                           </span>
                         )}
                       </div>
                     </td>
                     <td className="px-4 py-2">
-                      <div className="flex gap-1">
+                      <div className="flex items-center gap-2">
                         <button
                           disabled={loading !== null}
                           onClick={() => {
@@ -541,67 +508,32 @@ export default function Archive() {
                               mode: null,
                             })
                           }}
-                          title="View raw bytes of this recording in a hex dump viewer"
-                          className="rounded px-2 py-0.5 text-xs font-medium text-white transition-colors disabled:opacity-50 disabled:cursor-not-allowed bg-purple-600 hover:bg-purple-500"
+                          title="View raw bytes"
+                          className="text-info-text hover:underline text-xs disabled:opacity-50"
                         >
                           Bytes
                         </button>
-                        <button
-                          disabled={loading !== null}
-                          onClick={() => executeAction(
-                            `Describe #${rec.recordingId}`,
-                            rec.nodeId,
-                            `archive/recordings/${rec.recordingId}/describe`,
-                            'GET',
-                          )}
-                          title="Show recording metadata: channel, stream, positions, and segment file details"
-                          className="rounded px-2 py-0.5 text-xs font-medium text-white transition-colors disabled:opacity-50 disabled:cursor-not-allowed bg-gray-600 hover:bg-gray-500"
-                        >
-                          Describe
-                        </button>
-                        <button
-                          disabled={loading !== null}
-                          onClick={() => executeAction(
-                            `Verify #${rec.recordingId}`,
-                            rec.nodeId,
-                            `archive/recordings/${rec.recordingId}/verify`,
-                            'GET',
-                          )}
-                          title="Verify this recording's segment files are intact and checksums are valid"
-                          className="rounded px-2 py-0.5 text-xs font-medium text-white transition-colors disabled:opacity-50 disabled:cursor-not-allowed bg-gray-600 hover:bg-gray-500"
-                        >
-                          Verify
-                        </button>
-                        <button
-                          disabled={loading !== null}
-                          onClick={() => withConfirm(
-                            `Mark recording ${rec.recordingId} invalid`,
-                            () => executeAction(
-                              `Mark Invalid #${rec.recordingId}`,
-                              rec.nodeId,
-                              `archive/recordings/${rec.recordingId}/mark-invalid`,
-                            ),
-                          )}
-                          title="Mark this recording as invalid in the catalog. It will be skipped during recovery and eligible for compaction"
-                          className="rounded px-2 py-0.5 text-xs font-medium text-white transition-colors disabled:opacity-50 disabled:cursor-not-allowed bg-orange-600 hover:bg-orange-500"
-                        >
-                          Invalidate
-                        </button>
-                        <button
-                          disabled={loading !== null}
-                          onClick={() => withConfirm(
-                            `Mark recording ${rec.recordingId} valid`,
-                            () => executeAction(
-                              `Mark Valid #${rec.recordingId}`,
-                              rec.nodeId,
-                              `archive/recordings/${rec.recordingId}/mark-valid`,
-                            ),
-                          )}
-                          title="Restore a previously invalidated recording back to valid state in the catalog"
-                          className="rounded px-2 py-0.5 text-xs font-medium text-white transition-colors disabled:opacity-50 disabled:cursor-not-allowed bg-green-600 hover:bg-green-500"
-                        >
-                          Validate
-                        </button>
+                        <DropdownMenu>
+                          <DropdownMenuTrigger asChild>
+                            <button className="rounded p-1 hover:bg-elevated text-text-muted hover:text-text-primary">
+                              <MoreHorizontal className="h-4 w-4" />
+                            </button>
+                          </DropdownMenuTrigger>
+                          <DropdownMenuContent align="end" className="bg-elevated border-border-subtle">
+                            <DropdownMenuItem onClick={() => executeAction(`Describe #${rec.recordingId}`, rec.nodeId, `archive/recordings/${rec.recordingId}/describe`, 'GET')}>
+                              Describe
+                            </DropdownMenuItem>
+                            <DropdownMenuItem onClick={() => executeAction(`Verify #${rec.recordingId}`, rec.nodeId, `archive/recordings/${rec.recordingId}/verify`, 'GET')}>
+                              Verify
+                            </DropdownMenuItem>
+                            <DropdownMenuItem onClick={() => withConfirm(`Mark recording ${rec.recordingId} invalid`, () => executeAction(`Mark Invalid #${rec.recordingId}`, rec.nodeId, `archive/recordings/${rec.recordingId}/mark-invalid`))}>
+                              Invalidate
+                            </DropdownMenuItem>
+                            <DropdownMenuItem onClick={() => withConfirm(`Mark recording ${rec.recordingId} valid`, () => executeAction(`Mark Valid #${rec.recordingId}`, rec.nodeId, `archive/recordings/${rec.recordingId}/mark-valid`))}>
+                              Validate
+                            </DropdownMenuItem>
+                          </DropdownMenuContent>
+                        </DropdownMenu>
                       </div>
                     </td>
                   </tr>

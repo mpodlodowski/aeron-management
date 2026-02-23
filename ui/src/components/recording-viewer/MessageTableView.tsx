@@ -21,7 +21,7 @@ function keyFields(msg: DecodedMessage): string {
 export default function MessageTableView({ messages, onSelectMessage }: Props) {
   if (messages.length === 0) {
     return (
-      <div className="text-sm text-gray-500 py-8 text-center">
+      <div className="text-sm text-text-muted py-8 text-center">
         No messages decoded in this chunk
       </div>
     )
@@ -31,7 +31,7 @@ export default function MessageTableView({ messages, onSelectMessage }: Props) {
     <div className="overflow-auto">
       <table className="w-full text-xs">
         <thead>
-          <tr className="border-b border-gray-800 text-left text-gray-500 uppercase tracking-wider">
+          <tr className="border-b border-border-subtle text-left text-text-muted uppercase tracking-wider">
             <th className="px-3 py-2 w-8">#</th>
             <th className="px-3 py-2">Offset</th>
             <th className="px-3 py-2">Label</th>
@@ -41,20 +41,20 @@ export default function MessageTableView({ messages, onSelectMessage }: Props) {
             <th className="px-3 py-2">Key Fields</th>
           </tr>
         </thead>
-        <tbody className="divide-y divide-gray-800/50">
+        <tbody className="divide-y divide-border-subtle/50">
           {messages.map((msg, i) => (
             <tr
               key={i}
               onClick={() => onSelectMessage?.(i)}
-              className="hover:bg-gray-800/50 cursor-pointer transition-colors"
+              className="hover:bg-elevated/50 cursor-pointer transition-colors"
             >
-              <td className="px-3 py-1.5 text-gray-600">{i + 1}</td>
-              <td className="px-3 py-1.5 font-mono text-blue-400">{formatOffset(msg.offset)}</td>
-              <td className="px-3 py-1.5 text-gray-200">{msg.label}</td>
-              <td className="px-3 py-1.5 font-mono text-gray-400">{msg.schemaId ?? '\u2014'}</td>
-              <td className="px-3 py-1.5 font-mono text-gray-400">{msg.templateId ?? '\u2014'}</td>
-              <td className="px-3 py-1.5 font-mono text-gray-400">{msg.frameLength}</td>
-              <td className="px-3 py-1.5 text-gray-400 max-w-xs truncate">{keyFields(msg)}</td>
+              <td className="px-3 py-1.5 text-text-muted">{i + 1}</td>
+              <td className="px-3 py-1.5 font-mono text-info-text">{formatOffset(msg.offset)}</td>
+              <td className="px-3 py-1.5 text-text-primary">{msg.label}</td>
+              <td className="px-3 py-1.5 font-mono text-text-secondary">{msg.schemaId ?? '\u2014'}</td>
+              <td className="px-3 py-1.5 font-mono text-text-secondary">{msg.templateId ?? '\u2014'}</td>
+              <td className="px-3 py-1.5 font-mono text-text-secondary">{msg.frameLength}</td>
+              <td className="px-3 py-1.5 text-text-secondary max-w-xs truncate">{keyFields(msg)}</td>
             </tr>
           ))}
         </tbody>
