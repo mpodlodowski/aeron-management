@@ -130,36 +130,36 @@ export default function RecordingViewer({ clusterId, nodeId, recordingId, totalS
 
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 backdrop-blur-sm">
-      <div className="relative w-full max-w-5xl h-[90vh] flex flex-col rounded-lg border border-gray-700 bg-gray-900 shadow-2xl">
+      <div className="relative w-full max-w-5xl h-[90vh] flex flex-col rounded-lg border border-border-medium bg-surface shadow-2xl">
         {/* Header */}
-        <div className="flex items-center justify-between border-b border-gray-800 px-4 py-3">
+        <div className="flex items-center justify-between border-b border-border-subtle px-4 py-3">
           <div className="flex items-center gap-3">
-            <h2 className="text-sm font-semibold text-gray-200">
+            <h2 className="text-sm font-semibold text-text-primary">
               Recording #{recordingId}
             </h2>
-            <span className="text-xs text-gray-500">
+            <span className="text-xs text-text-muted">
               {formatBytes(totalSize)} total
             </span>
-            <span className="text-xs text-gray-500">
+            <span className="text-xs text-text-muted">
               Showing {offset.toLocaleString()}&ndash;{endOffset.toLocaleString()}
             </span>
             {decodedMessages.length > 0 && (
-              <span className="text-xs text-gray-500">
+              <span className="text-xs text-text-muted">
                 {decodedMessages.length} message{decodedMessages.length !== 1 ? 's' : ''}
               </span>
             )}
           </div>
           <div className="flex items-center gap-2">
             {/* View mode tabs */}
-            <div className="flex rounded-md border border-gray-700">
+            <div className="flex rounded-md border border-border-medium">
               {(['hex', 'tree', 'table'] as const).map((mode) => (
                 <button
                   key={mode}
                   onClick={() => setViewMode(mode)}
                   className={`px-2.5 py-1 text-xs font-medium transition-colors first:rounded-l-md last:rounded-r-md ${
                     viewMode === mode
-                      ? 'bg-blue-600 text-white'
-                      : 'text-gray-400 hover:text-gray-200 hover:bg-gray-800'
+                      ? 'bg-info-fill text-white'
+                      : 'text-text-secondary hover:text-text-primary hover:bg-elevated'
                   }`}
                 >
                   {VIEW_MODE_LABELS[mode]}
@@ -168,7 +168,7 @@ export default function RecordingViewer({ clusterId, nodeId, recordingId, totalS
             </div>
             <button
               onClick={() => setShowDecoders(true)}
-              className="rounded px-2 py-1 text-xs font-medium text-gray-400 hover:text-gray-200"
+              className="rounded px-2 py-1 text-xs font-medium text-text-secondary hover:text-text-primary"
             >
               Decoders
             </button>
@@ -176,14 +176,14 @@ export default function RecordingViewer({ clusterId, nodeId, recordingId, totalS
               <button
                 onClick={handleCopy}
                 disabled={!data}
-                className="rounded px-2 py-1 text-xs font-medium text-gray-400 hover:text-gray-200 disabled:opacity-30"
+                className="rounded px-2 py-1 text-xs font-medium text-text-secondary hover:text-text-primary disabled:opacity-30"
               >
                 {copied ? 'Copied!' : 'Copy'}
               </button>
             )}
             <button
               onClick={onClose}
-              className="rounded px-2 py-1 text-xs font-medium text-gray-400 hover:text-gray-200"
+              className="rounded px-2 py-1 text-xs font-medium text-text-secondary hover:text-text-primary"
             >
               Close
             </button>
@@ -193,12 +193,12 @@ export default function RecordingViewer({ clusterId, nodeId, recordingId, totalS
         {/* Body */}
         <div className="flex-1 overflow-auto p-4">
           {loading && (
-            <div className="flex items-center justify-center py-12 text-gray-500 text-sm">
+            <div className="flex items-center justify-center py-12 text-text-muted text-sm">
               Loading bytes...
             </div>
           )}
           {error && (
-            <div className="rounded-lg border border-red-800 bg-red-900/20 p-4 text-sm text-red-300">
+            <div className="rounded-lg border border-critical-fill/40 bg-critical-surface p-4 text-sm text-critical-text">
               {error}
             </div>
           )}
@@ -217,19 +217,19 @@ export default function RecordingViewer({ clusterId, nodeId, recordingId, totalS
         </div>
 
         {/* Footer — pagination */}
-        <div className="flex items-center justify-between border-t border-gray-800 px-4 py-2">
+        <div className="flex items-center justify-between border-t border-border-subtle px-4 py-2">
           <div className="flex items-center gap-1.5">
             <button
               onClick={() => fetchBytes(0)}
               disabled={offset === 0 || loading}
-              className="rounded-md bg-gray-800 px-2 py-1.5 text-xs font-medium text-gray-300 hover:bg-gray-700 disabled:opacity-30"
+              className="rounded-md bg-elevated px-2 py-1.5 text-xs font-medium text-text-secondary hover:bg-elevated disabled:opacity-30"
             >
               First
             </button>
             <button
               onClick={handlePrev}
               disabled={offset === 0 || loading}
-              className="rounded-md bg-gray-800 px-2 py-1.5 text-xs font-medium text-gray-300 hover:bg-gray-700 disabled:opacity-30"
+              className="rounded-md bg-elevated px-2 py-1.5 text-xs font-medium text-text-secondary hover:bg-elevated disabled:opacity-30"
             >
               Prev
             </button>
@@ -253,18 +253,18 @@ export default function RecordingViewer({ clusterId, nodeId, recordingId, totalS
                     name="chunkPage"
                     key={offset}
                     defaultValue={currentPage}
-                    className="w-12 rounded bg-gray-800 border border-gray-700 px-1.5 py-1 text-xs text-gray-200 text-center"
+                    className="w-12 rounded bg-elevated border border-border-medium px-1.5 py-1 text-xs text-text-primary text-center"
                     onBlur={(e) => {
                       const v = parseInt(e.target.value, 10)
                       if (!isNaN(v) && v >= 1 && (lastPage === null || v <= lastPage)) fetchBytes((v - 1) * CHUNK_SIZE)
                       else e.target.value = String(currentPage)
                     }}
                   />
-                  {lastPage !== null && <span className="text-xs text-gray-500">/ {lastPage}</span>}
+                  {lastPage !== null && <span className="text-xs text-text-muted">/ {lastPage}</span>}
                 </form>
               )
             })()}
-            <span className="text-gray-600 text-xs">|</span>
+            <span className="text-text-muted text-xs">|</span>
             <form
               className="flex items-center gap-1"
               onSubmit={(e) => {
@@ -277,12 +277,12 @@ export default function RecordingViewer({ clusterId, nodeId, recordingId, totalS
                 input.value = String(offset)
               }}
             >
-              <span className="text-xs text-gray-500">pos</span>
+              <span className="text-xs text-text-muted">pos</span>
               <input
                 name="posInput"
                 key={offset}
                 defaultValue={offset}
-                className="w-24 rounded bg-gray-800 border border-gray-700 px-1.5 py-1 text-xs text-gray-200 text-center font-mono"
+                className="w-24 rounded bg-elevated border border-border-medium px-1.5 py-1 text-xs text-text-primary text-center font-mono"
                 onBlur={(e) => {
                   const v = parseInt(e.target.value, 10)
                   if (!isNaN(v) && v >= 0 && (totalSize <= 0 || v < totalSize)) {
@@ -293,7 +293,7 @@ export default function RecordingViewer({ clusterId, nodeId, recordingId, totalS
                 }}
               />
             </form>
-            <span className="text-xs text-gray-500">
+            <span className="text-xs text-text-muted">
               {totalSize > 0 && `${Math.round((endOffset / totalSize) * 100)}%`}
             </span>
           </div>
@@ -301,14 +301,14 @@ export default function RecordingViewer({ clusterId, nodeId, recordingId, totalS
             <button
               onClick={handleNext}
               disabled={loading || (totalSize > 0 ? offset + CHUNK_SIZE >= totalSize : data !== null && data.length < CHUNK_SIZE)}
-              className="rounded-md bg-gray-800 px-2 py-1.5 text-xs font-medium text-gray-300 hover:bg-gray-700 disabled:opacity-30"
+              className="rounded-md bg-elevated px-2 py-1.5 text-xs font-medium text-text-secondary hover:bg-elevated disabled:opacity-30"
             >
               Next
             </button>
             <button
               onClick={() => { if (totalSize > 0) fetchBytes(Math.max(0, Math.ceil(totalSize / CHUNK_SIZE) - 1) * CHUNK_SIZE) }}
               disabled={loading || totalSize <= 0 || offset + CHUNK_SIZE >= totalSize}
-              className="rounded-md bg-gray-800 px-2 py-1.5 text-xs font-medium text-gray-300 hover:bg-gray-700 disabled:opacity-30"
+              className="rounded-md bg-elevated px-2 py-1.5 text-xs font-medium text-text-secondary hover:bg-elevated disabled:opacity-30"
             >
               Last
             </button>

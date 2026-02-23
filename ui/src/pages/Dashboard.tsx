@@ -1,16 +1,13 @@
 import { useState } from 'react'
 import { useParams } from 'react-router-dom'
+import { toast } from 'sonner'
 import { useClusterStore } from '../stores/clusterStore'
 import { useWebSocket } from '../hooks/useWebSocket'
 import NodeCard from '../components/NodeCard'
 import { EventsTimeline } from '../components/events/EventsTimeline'
+import { ConfirmDialog } from '../components/ConfirmDialog'
+import { StatusBanner } from '../components/StatusBanner'
 import { formatNsAsMs } from '../utils/counters'
-
-interface ActionResult {
-  action: string
-  success: boolean
-  message: string
-}
 
 export default function Dashboard() {
   const { clusterId } = useParams<{ clusterId: string }>()
@@ -21,7 +18,6 @@ export default function Dashboard() {
   const clusterState = cluster?.clusterState ?? null
   const clusterStats = cluster?.clusterStats ?? null
   const [loading, setLoading] = useState<string | null>(null)
-  const [actionResult, setActionResult] = useState<ActionResult | null>(null)
   const [confirmAction, setConfirmAction] = useState<{ label: string; fn: () => void } | null>(null)
   const [recordingDuration, setRecordingDuration] = useState('60')
   const [showRecordingDialog, setShowRecordingDialog] = useState(false)
@@ -37,21 +33,17 @@ export default function Dashboard() {
 
   async function clusterAction(label: string, endpoint: string) {
     setLoading(label)
-    setActionResult(null)
     try {
       const res = await fetch(`/api/clusters/${clusterId}/${endpoint}`, { method: 'POST' })
       const data = await res.json()
-      setActionResult({
-        action: label,
-        success: data.success !== false,
-        message: data.message ?? (data.success !== false ? 'Action completed' : 'Action failed'),
-      })
+      if (data.success !== false) {
+        toast.success(`${label}: ${data.message ?? 'Action completed'}`)
+      } else {
+        toast.error(`${label}: ${data.message ?? 'Action failed'}`)
+      }
     } catch (err) {
-      setActionResult({
-        action: label,
-        success: false,
-        message: err instanceof Error ? err.message : 'Network error',
-      })
+      const message = err instanceof Error ? err.message : 'Network error'
+      toast.error(`${label}: ${message}`)
     } finally {
       setLoading(null)
     }
@@ -67,24 +59,20 @@ export default function Dashboard() {
     const duration = recordingDuration ? parseInt(recordingDuration) : 0
     setShowRecordingDialog(false)
     setLoading('Record')
-    setActionResult(null)
     try {
       const res = await fetch(
         `/api/clusters/${clusterId}/egress-recording/start?durationSeconds=${duration}`,
         { method: 'POST' }
       )
       const data = await res.json()
-      setActionResult({
-        action: 'Record Egress',
-        success: data.success !== false,
-        message: data.message ?? (data.success !== false ? 'Recording started on leader' : 'Failed to start recording'),
-      })
+      if (data.success !== false) {
+        toast.success(`Record Egress: ${data.message ?? 'Recording started on leader'}`)
+      } else {
+        toast.error(`Record Egress: ${data.message ?? 'Failed to start recording'}`)
+      }
     } catch (err) {
-      setActionResult({
-        action: 'Record Egress',
-        success: false,
-        message: err instanceof Error ? err.message : 'Network error',
-      })
+      const message = err instanceof Error ? err.message : 'Network error'
+      toast.error(`Record Egress: ${message}`)
     } finally {
       setLoading(null)
     }
@@ -92,21 +80,17 @@ export default function Dashboard() {
 
   async function stopClusterRecording() {
     setLoading('Stop Record')
-    setActionResult(null)
     try {
       const res = await fetch(`/api/clusters/${clusterId}/egress-recording/stop`, { method: 'POST' })
       const data = await res.json()
-      setActionResult({
-        action: 'Stop Recording',
-        success: data.success !== false,
-        message: data.message ?? (data.success !== false ? 'Recording stopped' : 'Failed to stop recording'),
-      })
+      if (data.success !== false) {
+        toast.success(`Stop Recording: ${data.message ?? 'Recording stopped'}`)
+      } else {
+        toast.error(`Stop Recording: ${data.message ?? 'Failed to stop recording'}`)
+      }
     } catch (err) {
-      setActionResult({
-        action: 'Stop Recording',
-        success: false,
-        message: err instanceof Error ? err.message : 'Network error',
-      })
+      const message = err instanceof Error ? err.message : 'Network error'
+      toast.error(`Stop Recording: ${message}`)
     } finally {
       setLoading(null)
     }
@@ -114,34 +98,35 @@ export default function Dashboard() {
 
   return (
     <div className="space-y-6">
-      {/* Suspended Banner */}
-      {clusterState === 'SUSPENDED' && (
-        <div className="rounded-lg border border-yellow-700 bg-yellow-900/30 px-4 py-3 flex items-center gap-3">
-          <span className="inline-flex rounded-full bg-yellow-600 px-2.5 py-0.5 text-xs font-bold text-white">SUSPENDED</span>
-          <span className="text-sm text-yellow-200">Cluster is suspended — log processing is paused. Resume from the leader node to accept new commands.</span>
-        </div>
-      )}
+      <StatusBanner
+        clusterState={clusterState}
+        downNodes={sortedNodes
+          .filter(n => n.agentConnected !== false && n.cncAccessible !== false && n.nodeReachable === false)
+          .map(n => n.nodeId)}
+        onResume={() => clusterAction('Resume', 'resume')}
+      />
 
       {/* Cluster Overview */}
       {cs && (
-        <div className="rounded-lg border border-gray-800 bg-gray-900 p-4">
+        <div className="rounded-lg border border-border-subtle bg-surface p-4">
           <div className="flex items-center justify-between mb-3">
             <div className="flex items-center gap-2">
-              <h2 className="text-sm font-medium text-gray-300">Cluster Overview</h2>
+              <h2 className="text-sm font-medium text-text-secondary">Cluster Overview</h2>
               {clusterState && (
-                <span className={`inline-flex rounded-full px-2 py-0.5 text-xs font-medium text-white ${
-                  clusterState === 'ACTIVE' ? 'bg-green-600' :
-                  clusterState === 'SUSPENDED' ? 'bg-yellow-600' :
-                  clusterState === 'SNAPSHOT' ? 'bg-blue-600' :
-                  clusterState === 'INIT' ? 'bg-gray-500' :
-                  'bg-red-600'
-                }`}>
-                  {clusterState}
+                <span className="inline-flex items-center gap-1.5 text-xs">
+                  <span className={`inline-block h-2 w-2 rounded-full ${
+                    clusterState === 'ACTIVE' ? 'bg-success-text' :
+                    clusterState === 'SUSPENDED' ? 'bg-warning-text' :
+                    clusterState === 'SNAPSHOT' ? 'bg-info-text' :
+                    clusterState === 'INIT' ? 'bg-text-muted' :
+                    'bg-critical-text'
+                  }`} />
+                  <span className="text-text-secondary">{clusterState}</span>
                 </span>
               )}
             </div>
             {cs.aeronVersion && (
-              <span className="text-xs text-gray-500">Aeron {cs.aeronVersion}</span>
+              <span className="text-xs text-text-muted">Aeron {cs.aeronVersion}</span>
             )}
           </div>
           <div className="grid grid-cols-2 md:grid-cols-4 lg:grid-cols-6 gap-3">
@@ -176,13 +161,13 @@ export default function Dashboard() {
           </div>
 
           {/* Cluster Admin Actions */}
-          <div className="mt-3 pt-3 border-t border-gray-800 flex flex-wrap items-center gap-1.5">
-            <span className="text-xs font-medium text-gray-500 mr-1">Actions</span>
+          <div className="mt-3 pt-3 border-t border-border-subtle flex flex-wrap items-center gap-1.5">
+            <span className="text-xs font-medium text-text-muted mr-1">Actions</span>
             <button
               disabled={loading !== null}
               onClick={() => clusterAction('Snapshot', 'snapshot')}
               title="Trigger a cluster snapshot to compact the log and create a recovery point"
-              className="rounded px-2.5 py-1 text-xs font-medium text-white transition-colors disabled:opacity-50 disabled:cursor-not-allowed bg-blue-600 hover:bg-blue-500"
+              className="rounded border border-border-medium px-2.5 py-1 text-xs font-medium text-text-primary hover:bg-elevated transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
             >
               {loading === 'Snapshot' ? '...' : 'Snapshot'}
             </button>
@@ -190,7 +175,7 @@ export default function Dashboard() {
               disabled={loading !== null}
               onClick={() => withConfirm('Suspend', () => clusterAction('Suspend', 'suspend'))}
               title="Suspend cluster log processing. The cluster will stop accepting new commands until resumed"
-              className="rounded px-2.5 py-1 text-xs font-medium text-white transition-colors disabled:opacity-50 disabled:cursor-not-allowed bg-yellow-600 hover:bg-yellow-500"
+              className="rounded border border-border-medium px-2.5 py-1 text-xs font-medium text-text-primary hover:bg-elevated transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
             >
               Suspend
             </button>
@@ -198,7 +183,7 @@ export default function Dashboard() {
               disabled={loading !== null}
               onClick={() => clusterAction('Resume', 'resume')}
               title="Resume cluster log processing after a suspend"
-              className="rounded px-2.5 py-1 text-xs font-medium text-white transition-colors disabled:opacity-50 disabled:cursor-not-allowed bg-green-600 hover:bg-green-500"
+              className="rounded border border-border-medium px-2.5 py-1 text-xs font-medium text-text-primary hover:bg-elevated transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
             >
               {loading === 'Resume' ? '...' : 'Resume'}
             </button>
@@ -206,7 +191,7 @@ export default function Dashboard() {
               disabled={loading !== null}
               onClick={() => withConfirm('Shutdown', () => clusterAction('Shutdown', 'shutdown'))}
               title="Gracefully shut down the cluster. Takes a snapshot before stopping all nodes"
-              className="rounded px-2.5 py-1 text-xs font-medium text-white transition-colors disabled:opacity-50 disabled:cursor-not-allowed bg-red-600 hover:bg-red-500"
+              className="rounded border border-critical-fill/40 px-2.5 py-1 text-xs font-medium text-critical-text hover:bg-critical-surface transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
             >
               Shutdown
             </button>
@@ -214,7 +199,7 @@ export default function Dashboard() {
               disabled={loading !== null}
               onClick={() => withConfirm('Abort', () => clusterAction('Abort', 'abort'))}
               title="Immediately abort the cluster without taking a snapshot. Use only as a last resort"
-              className="rounded px-2.5 py-1 text-xs font-medium text-white transition-colors disabled:opacity-50 disabled:cursor-not-allowed bg-red-700 hover:bg-red-600"
+              className="rounded border border-critical-fill/40 px-2.5 py-1 text-xs font-medium text-critical-text hover:bg-critical-surface transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
             >
               Abort
             </button>
@@ -223,9 +208,9 @@ export default function Dashboard() {
                 disabled={loading !== null}
                 onClick={stopClusterRecording}
                 title="Stop egress recording on the leader"
-                className="rounded px-2.5 py-1 text-xs font-medium text-white transition-colors disabled:opacity-50 disabled:cursor-not-allowed bg-purple-700 hover:bg-purple-600 flex items-center gap-1"
+                className="rounded border border-critical-fill/40 px-2.5 py-1 text-xs font-medium text-critical-text hover:bg-critical-surface transition-colors disabled:opacity-50 disabled:cursor-not-allowed flex items-center gap-1"
               >
-                <span className="inline-flex h-1.5 w-1.5 rounded-full bg-red-400 animate-pulse" />
+                <span className="inline-flex h-1.5 w-1.5 rounded-full bg-critical-text animate-pulse" />
                 {loading === 'Stop Record' ? '...' : 'Stop Recording'}
               </button>
             ) : (
@@ -233,75 +218,40 @@ export default function Dashboard() {
                 disabled={loading !== null}
                 onClick={() => setShowRecordingDialog(true)}
                 title="Start spy recording of egress (stream 102) on the leader"
-                className="rounded px-2.5 py-1 text-xs font-medium text-white transition-colors disabled:opacity-50 disabled:cursor-not-allowed bg-purple-600 hover:bg-purple-500"
+                className="rounded border border-border-medium px-2.5 py-1 text-xs font-medium text-text-primary hover:bg-elevated transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
               >
                 Record Egress
               </button>
             )}
           </div>
 
-          {/* Confirm Dialog */}
-          {confirmAction && (
-            <div className="mt-2 rounded-lg border border-yellow-800 bg-yellow-900/20 p-3">
-              <p className="text-sm text-yellow-200">
-                Confirm: <strong>{confirmAction.label}</strong>?
-              </p>
-              <div className="mt-2 flex gap-2">
-                <button
-                  onClick={() => { confirmAction.fn(); setConfirmAction(null) }}
-                  className="rounded-md bg-yellow-700 px-3 py-1 text-xs font-medium text-white hover:bg-yellow-600"
-                >
-                  Confirm
-                </button>
-                <button
-                  onClick={() => setConfirmAction(null)}
-                  className="rounded-md bg-gray-700 px-3 py-1 text-xs font-medium text-gray-300 hover:bg-gray-600"
-                >
-                  Cancel
-                </button>
-              </div>
-            </div>
-          )}
-
           {showRecordingDialog && (
-            <div className="mt-2 rounded-lg border border-purple-800 bg-purple-900/20 p-3">
-              <p className="text-sm text-purple-200 mb-2">Start egress recording on the leader node</p>
+            <div className="mt-2 rounded-lg border border-border-subtle bg-surface p-3">
+              <p className="text-sm text-text-secondary mb-2">Start egress recording on the leader node</p>
               <div className="flex items-center gap-2">
-                <label className="text-xs text-gray-400">Duration (seconds, 0=unlimited):</label>
+                <label className="text-xs text-text-muted">Duration (seconds, 0=unlimited):</label>
                 <input
                   type="number"
                   value={recordingDuration}
                   onChange={(e) => setRecordingDuration(e.target.value)}
                   placeholder="60"
-                  className="w-24 rounded border border-gray-700 bg-gray-800 px-2 py-1 text-xs text-gray-200"
+                  className="w-24 rounded border border-border-subtle bg-canvas px-2 py-1 text-xs text-text-primary"
                 />
               </div>
               <div className="mt-2 flex gap-2">
                 <button
                   onClick={startClusterRecording}
-                  className="rounded-md bg-purple-700 px-3 py-1 text-xs font-medium text-white hover:bg-purple-600"
+                  className="rounded-md bg-info-fill text-white hover:bg-info-fill/80 px-3 py-1 text-xs font-medium"
                 >
                   Start
                 </button>
                 <button
                   onClick={() => setShowRecordingDialog(false)}
-                  className="rounded-md bg-gray-700 px-3 py-1 text-xs font-medium text-gray-300 hover:bg-gray-600"
+                  className="rounded-md bg-elevated border border-border-medium text-text-primary hover:bg-border-subtle px-3 py-1 text-xs font-medium"
                 >
                   Cancel
                 </button>
               </div>
-            </div>
-          )}
-
-          {/* Action Result */}
-          {actionResult && (
-            <div className={`mt-2 rounded-md px-3 py-2 text-sm flex items-center justify-between ${
-              actionResult.success
-                ? 'bg-green-900/50 text-green-300 border border-green-800'
-                : 'bg-red-900/50 text-red-300 border border-red-800'
-            }`}>
-              <span><span className="font-medium">{actionResult.action}:</span> {actionResult.message}</span>
-              <button onClick={() => setActionResult(null)} className="text-gray-500 hover:text-gray-300 text-xs ml-2">dismiss</button>
             </div>
           )}
         </div>
@@ -309,7 +259,7 @@ export default function Dashboard() {
 
       {/* Node Cards */}
       {sortedNodes.length === 0 ? (
-        <div className="text-gray-500">
+        <div className="text-text-muted">
           No nodes reporting. Waiting for cluster data...
         </div>
       ) : (
@@ -326,6 +276,19 @@ export default function Dashboard() {
       )}
 
       <EventsTimeline clusterId={clusterId!} />
+
+      <ConfirmDialog
+        open={confirmAction !== null}
+        title={`${confirmAction?.label}?`}
+        description={
+          confirmAction?.label === 'Shutdown' ? 'This will gracefully shut down the cluster after taking a snapshot.' :
+          confirmAction?.label === 'Abort' ? 'This will immediately abort the cluster without a snapshot. Use only as a last resort.' :
+          undefined
+        }
+        destructive={confirmAction?.label === 'Shutdown' || confirmAction?.label === 'Abort'}
+        onConfirm={() => { confirmAction?.fn(); setConfirmAction(null) }}
+        onCancel={() => setConfirmAction(null)}
+      />
     </div>
   )
 }
@@ -333,11 +296,11 @@ export default function Dashboard() {
 function StatCard({ label, value, alert, tooltip }: { label: string; value: string; alert?: boolean; tooltip?: string }) {
   return (
     <div
-      className={`rounded-lg border px-3 py-2 ${alert ? 'border-red-800 bg-red-900/20' : 'border-gray-800 bg-gray-950'} ${tooltip ? 'cursor-help' : ''}`}
+      className={`rounded-lg border px-3 py-2 ${alert ? 'border-critical-fill/40 bg-critical-surface' : 'border-border-subtle bg-canvas'} ${tooltip ? 'cursor-help' : ''}`}
       title={tooltip}
     >
-      <div className="text-xs text-gray-500 mb-0.5">{label}</div>
-      <div className={`text-sm font-mono truncate ${alert ? 'text-red-400' : 'text-gray-200'}`}>{value}</div>
+      <div className="text-xs text-text-muted mb-0.5">{label}</div>
+      <div className={`text-sm font-mono truncate ${alert ? 'text-critical-text' : 'text-text-primary'}`}>{value}</div>
     </div>
   )
 }

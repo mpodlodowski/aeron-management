@@ -1,9 +1,11 @@
 import { useState } from 'react'
 import { useParams } from 'react-router-dom'
+import { toast } from 'sonner'
 import { useClusterStore } from '../stores/clusterStore'
 import { useWebSocket } from '../hooks/useWebSocket'
 import CounterTable from '../components/CounterTable'
 import { DiskGrowthStats } from '../types'
+import { diskBarColor, ttfColor } from '../utils/statusColors'
 import { totalErrors, counterByType, counterByLabel, formatBytes, formatNsAsMs, backupStateName, formatDuration, formatGrowthRate, COUNTER_TYPE } from '../utils/counters'
 
 function DiskUsageBar({ recordings, used, total, growth }: { recordings: number; used: number; total: number; growth?: DiskGrowthStats }) {
@@ -13,28 +15,28 @@ function DiskUsageBar({ recordings, used, total, growth }: { recordings: number;
   const rate = growth?.growthRate1h ?? growth?.growthRate5m ?? null
   const ttf = growth?.timeToFullSeconds ?? null
   return (
-    <div className="rounded-lg border border-gray-800 bg-gray-900 p-3">
+    <div className="rounded-lg border border-border-subtle bg-surface p-3">
       <div className="flex items-center justify-between mb-1.5">
-        <span className="text-xs font-medium text-gray-300">Archive Disk</span>
+        <span className="text-xs font-medium text-text-secondary">Archive Disk</span>
         <div className="flex items-center gap-2">
           {rate !== null && rate !== 0 && (
-            <span className={`text-xs ${rate > 0 ? 'text-yellow-400' : 'text-green-400'}`}>
+            <span className={`text-xs ${rate > 0 ? 'text-warning-text' : 'text-success-text'}`}>
               {formatGrowthRate(rate)}
             </span>
           )}
-          <span className="text-xs text-gray-400">{usedPct}% used</span>
+          <span className="text-xs text-text-secondary">{usedPct}% used</span>
         </div>
       </div>
-      <div className="flex h-2 rounded-full bg-gray-800 overflow-hidden">
-        <div className="bg-blue-500" style={{ width: `${recPct}%` }} title={`Recordings: ${formatBytes(recordings)}`} />
-        <div className={usedPct > 90 ? 'bg-red-500' : usedPct > 75 ? 'bg-yellow-500' : 'bg-amber-700'} style={{ width: `${otherPct}%` }} title={`Other: ${formatBytes(used - recordings)}`} />
+      <div className="flex h-2 rounded-full bg-elevated overflow-hidden">
+        <div className="bg-info-fill" style={{ width: `${recPct}%` }} title={`Recordings: ${formatBytes(recordings)}`} />
+        <div className={diskBarColor(usedPct)} style={{ width: `${otherPct}%` }} title={`Other: ${formatBytes(used - recordings)}`} />
       </div>
-      <div className="mt-1.5 flex gap-3 text-xs text-gray-500">
-        <span><span className="inline-block w-2 h-2 rounded-full bg-blue-500 mr-1" />Recordings {formatBytes(recordings)}</span>
-        <span><span className={`inline-block w-2 h-2 rounded-full ${usedPct > 90 ? 'bg-red-500' : usedPct > 75 ? 'bg-yellow-500' : 'bg-amber-700'} mr-1`} />Other {formatBytes(Math.max(0, used - recordings))}</span>
+      <div className="mt-1.5 flex gap-3 text-xs text-text-muted">
+        <span><span className="inline-block w-2 h-2 rounded-full bg-info-fill mr-1" />Recordings {formatBytes(recordings)}</span>
+        <span><span className={`inline-block w-2 h-2 rounded-full ${diskBarColor(usedPct)} mr-1`} />Other {formatBytes(Math.max(0, used - recordings))}</span>
         <span className="ml-auto flex gap-3">
           {ttf !== null && (
-            <span className={`${ttf < 3600 ? 'text-red-400' : ttf < 86400 ? 'text-yellow-400' : 'text-gray-500'}`}>
+            <span className={ttfColor(ttf)}>
               Full in {formatDuration(ttf)}
             </span>
           )}
@@ -45,13 +47,6 @@ function DiskUsageBar({ recordings, used, total, growth }: { recordings: number;
   )
 }
 
-interface ActionResult {
-  action: string
-  success: boolean
-  message: string
-  output?: string
-}
-
 export default function NodeDetail() {
   const { clusterId, nodeId } = useParams<{ clusterId: string; nodeId: string }>()
   useWebSocket(clusterId)
@@ -59,7 +54,7 @@ export default function NodeDetail() {
   const nodes = useClusterStore((s) => s.clusters.get(clusterId ?? '')?.nodes ?? new Map())
   const metrics = nodes.get(id)
   const isBackup = metrics?.agentMode === 'backup'
-  const [actionResult, setActionResult] = useState<ActionResult | null>(null)
+  const [actionResult, setActionResult] = useState<{ action: string; output?: string } | null>(null)
   const [loading, setLoading] = useState<string | null>(null)
   const [recordingStreamId, setRecordingStreamId] = useState('102')
   const [recordingDuration, setRecordingDuration] = useState('60')
@@ -68,22 +63,24 @@ export default function NodeDetail() {
 
   async function executeAction(action: string, endpoint: string, method: 'POST' | 'GET' = 'POST') {
     setLoading(action)
-    setActionResult(null)
     try {
       const res = await fetch(`/api/clusters/${clusterId}/nodes/${id}/${endpoint}`, { method })
       const data = await res.json()
-      setActionResult({
-        action,
-        success: res.ok,
-        message: data.message ?? (res.ok ? 'Action completed' : 'Action failed'),
-        output: data.output,
-      })
+      const message = data.message ?? (res.ok ? 'Action completed' : 'Action failed')
+      if (res.ok) {
+        toast.success(message)
+        if (data.output) {
+          setActionResult({ action, output: data.output })
+        } else {
+          setActionResult(null)
+        }
+      } else {
+        toast.error(message)
+        setActionResult(null)
+      }
     } catch (err) {
-      setActionResult({
-        action,
-        success: false,
-        message: err instanceof Error ? err.message : 'Network error',
-      })
+      toast.error(err instanceof Error ? err.message : 'Network error')
+      setActionResult(null)
     } finally {
       setLoading(null)
     }
@@ -91,7 +88,7 @@ export default function NodeDetail() {
 
   if (!metrics) {
     return (
-      <div className="text-gray-500">
+      <div className="text-text-muted">
         No data available for Node {id}. Waiting for metrics...
       </div>
     )
@@ -110,8 +107,8 @@ export default function NodeDetail() {
   const naksRecv = counterByLabel(c, 'NAKs received')?.value ?? 0
 
   const actions = [
-    { id: 'INVALIDATE_SNAPSHOT', label: 'Invalidate Snapshot', endpoint: 'invalidate-snapshot', color: 'bg-orange-600 hover:bg-orange-500', tooltip: 'Mark the latest snapshot as invalid so the node recovers from the log on next restart' },
-    { id: 'SEED_RECORDING_LOG', label: 'Seed Recording Log', endpoint: 'seed-recording-log', color: 'bg-orange-600 hover:bg-orange-500', tooltip: 'Rebuild recording log from the latest valid snapshot. Use when the node fails to start due to missing recordings.' },
+    { id: 'INVALIDATE_SNAPSHOT', label: 'Invalidate Snapshot', endpoint: 'invalidate-snapshot', tooltip: 'Mark the latest snapshot as invalid so the node recovers from the log on next restart' },
+    { id: 'SEED_RECORDING_LOG', label: 'Seed Recording Log', endpoint: 'seed-recording-log', tooltip: 'Rebuild recording log from the latest valid snapshot. Use when the node fails to start due to missing recordings.' },
   ]
 
   const diagnostics = [
@@ -241,8 +238,8 @@ export default function NodeDetail() {
       {/* Admin Actions & Diagnostics */}
       {!isBackup && (
         <div className={`grid grid-cols-1 ${isLeader ? 'lg:grid-cols-3' : 'lg:grid-cols-2'} gap-4`}>
-          <div className="rounded-lg border border-gray-800 bg-gray-900 p-4">
-            <h3 className="text-xs font-medium text-gray-400 mb-2">Admin Actions</h3>
+          <div className="rounded-lg border border-border-subtle bg-surface p-4">
+            <h3 className="text-xs font-medium text-text-muted mb-2">Admin Actions</h3>
             <div className="flex flex-wrap gap-1.5">
               {actions.map((action) => (
                 <button
@@ -250,15 +247,15 @@ export default function NodeDetail() {
                   onClick={() => executeAction(action.id, action.endpoint)}
                   disabled={loading !== null}
                   title={action.tooltip}
-                  className={`rounded px-2.5 py-1 text-xs font-medium text-white transition-colors disabled:opacity-50 disabled:cursor-not-allowed ${action.color}`}
+                  className="rounded px-2.5 py-1 text-xs font-medium transition-colors disabled:opacity-50 disabled:cursor-not-allowed border border-border-medium text-text-primary hover:bg-elevated"
                 >
                   {loading === action.id ? '...' : action.label}
                 </button>
               ))}
             </div>
           </div>
-          <div className="rounded-lg border border-gray-800 bg-gray-900 p-4">
-            <h3 className="text-xs font-medium text-gray-400 mb-2">Diagnostics</h3>
+          <div className="rounded-lg border border-border-subtle bg-surface p-4">
+            <h3 className="text-xs font-medium text-text-muted mb-2">Diagnostics</h3>
             <div className="flex flex-wrap gap-1.5">
               {diagnostics.map((diag) => (
                 <button
@@ -266,7 +263,7 @@ export default function NodeDetail() {
                   onClick={() => executeAction(diag.id, diag.endpoint, 'GET')}
                   disabled={loading !== null}
                   title={diag.tooltip}
-                  className="rounded px-2.5 py-1 text-xs font-medium text-white transition-colors disabled:opacity-50 disabled:cursor-not-allowed bg-gray-600 hover:bg-gray-500"
+                  className="rounded px-2.5 py-1 text-xs font-medium transition-colors disabled:opacity-50 disabled:cursor-not-allowed border border-border-medium text-text-primary hover:bg-elevated"
                 >
                   {loading === diag.id ? '...' : diag.label}
                 </button>
@@ -274,17 +271,17 @@ export default function NodeDetail() {
             </div>
           </div>
           {isLeader && (
-            <div className="rounded-lg border border-gray-800 bg-gray-900 p-4">
-              <h3 className="text-xs font-medium text-gray-400 mb-2">Egress Recording</h3>
+            <div className="rounded-lg border border-border-subtle bg-surface p-4">
+              <h3 className="text-xs font-medium text-text-muted mb-2">Egress Recording</h3>
               {metrics.egressRecording?.active ? (
                 <div className="space-y-2">
                   <div className="flex items-center gap-2">
-                    <span className="inline-flex h-2 w-2 rounded-full bg-red-500 animate-pulse" />
-                    <span className="text-xs text-gray-300">
+                    <span className="inline-flex h-2 w-2 rounded-full bg-critical-text animate-pulse" />
+                    <span className="text-xs text-text-secondary">
                       Stream {metrics.egressRecording.streamId}
                     </span>
                   </div>
-                  <div className="text-xs text-gray-500 truncate" title={metrics.egressRecording.channel}>
+                  <div className="text-xs text-text-muted truncate" title={metrics.egressRecording.channel}>
                     {new Date(metrics.egressRecording.startTimeMs).toLocaleTimeString()}
                     {metrics.egressRecording.durationLimitSeconds > 0 &&
                       ` \u2022 ${metrics.egressRecording.durationLimitSeconds}s limit`}
@@ -292,7 +289,7 @@ export default function NodeDetail() {
                   <button
                     onClick={() => executeAction('Stop Recording', 'egress-recording/stop')}
                     disabled={loading !== null}
-                    className="rounded px-2.5 py-1 text-xs font-medium text-white transition-colors disabled:opacity-50 disabled:cursor-not-allowed bg-red-600 hover:bg-red-500"
+                    className="rounded px-2.5 py-1 text-xs font-medium transition-colors disabled:opacity-50 disabled:cursor-not-allowed border border-critical-fill/40 text-critical-text hover:bg-critical-surface"
                   >
                     {loading === 'Stop Recording' ? '...' : 'Stop Recording'}
                   </button>
@@ -300,19 +297,19 @@ export default function NodeDetail() {
               ) : (
                 <div className="space-y-2">
                   <div className="flex items-center gap-2">
-                    <label className="text-xs text-gray-500">Stream</label>
+                    <label className="text-xs text-text-muted">Stream</label>
                     <input
                       type="number"
                       value={recordingStreamId}
                       onChange={(e) => setRecordingStreamId(e.target.value)}
-                      className="w-16 rounded border border-gray-700 bg-gray-800 px-2 py-1 text-xs text-gray-200"
+                      className="w-16 rounded border border-border-medium bg-elevated px-2 py-1 text-xs text-text-primary"
                     />
-                    <label className="text-xs text-gray-500">Duration</label>
+                    <label className="text-xs text-text-muted">Duration</label>
                     <input
                       type="number"
                       value={recordingDuration}
                       onChange={(e) => setRecordingDuration(e.target.value)}
-                      className="w-16 rounded border border-gray-700 bg-gray-800 px-2 py-1 text-xs text-gray-200"
+                      className="w-16 rounded border border-border-medium bg-elevated px-2 py-1 text-xs text-text-primary"
                       placeholder="0"
                     />
                   </div>
@@ -322,7 +319,7 @@ export default function NodeDetail() {
                       `egress-recording/start?streamId=${recordingStreamId}&durationSeconds=${recordingDuration}`
                     )}
                     disabled={loading !== null}
-                    className="rounded px-2.5 py-1 text-xs font-medium text-white transition-colors disabled:opacity-50 disabled:cursor-not-allowed bg-purple-600 hover:bg-purple-500"
+                    className="rounded px-2.5 py-1 text-xs font-medium transition-colors disabled:opacity-50 disabled:cursor-not-allowed border border-border-medium text-text-primary hover:bg-elevated"
                   >
                     {loading === 'Start Recording' ? '...' : 'Record Spy'}
                   </button>
@@ -332,29 +329,15 @@ export default function NodeDetail() {
           )}
         </div>
       )}
-      {actionResult && (
-        <div className="space-y-2">
-          <div
-            className={`rounded-md px-4 py-2 text-sm ${
-              actionResult.success
-                ? 'bg-green-900/50 text-green-300 border border-green-800'
-                : 'bg-red-900/50 text-red-300 border border-red-800'
-            }`}
-          >
-            <span className="font-medium">{actionResult.action}:</span>{' '}
-            {actionResult.message}
-          </div>
-          {actionResult.output && (
-            <pre className="rounded-md bg-black/80 border border-gray-700 px-4 py-3 text-xs font-mono text-gray-300 overflow-x-auto whitespace-pre-wrap">
-              {actionResult.output}
-            </pre>
-          )}
-        </div>
+      {actionResult?.output && (
+        <pre className="rounded-md bg-canvas border border-border-subtle px-4 py-3 text-xs font-mono text-text-secondary overflow-x-auto whitespace-pre-wrap">
+          {actionResult.output}
+        </pre>
       )}
 
       {/* Counters Table */}
       <div>
-        <h3 className="text-sm font-medium text-gray-400 mb-3">
+        <h3 className="text-sm font-medium text-text-muted mb-3">
           Aeron Counters ({counters?.length ?? 0})
         </h3>
         <CounterTable counters={counters ?? []} />
@@ -366,11 +349,11 @@ export default function NodeDetail() {
 function SummaryCard({ label, value, alert, tooltip }: { label: string; value: string; alert?: boolean; tooltip?: string }) {
   return (
     <div
-      className={`rounded-lg border px-3 py-2 ${alert ? 'border-red-800 bg-red-900/20' : 'border-gray-800 bg-gray-900'} ${tooltip ? 'cursor-help' : ''}`}
+      className={`rounded-lg border px-3 py-2 ${alert ? 'border-critical-fill/40 bg-critical-surface' : 'border-border-subtle bg-surface'} ${tooltip ? 'cursor-help' : ''}`}
       title={tooltip}
     >
-      <div className="text-xs text-gray-500 mb-0.5">{label}</div>
-      <div className={`text-sm font-mono truncate ${alert ? 'text-red-400' : 'text-gray-200'}`}>{value}</div>
+      <div className="text-xs text-text-muted mb-0.5">{label}</div>
+      <div className={`text-sm font-mono truncate ${alert ? 'text-critical-text' : 'text-text-primary'}`}>{value}</div>
     </div>
   )
 }
