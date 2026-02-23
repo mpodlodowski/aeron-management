@@ -89,6 +89,9 @@ export function TimelineOverview() {
             <YAxis hide />
             <Tooltip
               contentStyle={{ background: 'var(--elevated)', border: '1px solid var(--border-subtle)', borderRadius: '6px', fontSize: '12px' }}
+              itemStyle={{ color: 'var(--text-secondary)' }}
+              labelStyle={{ color: 'var(--text-primary)' }}
+              cursor={{ fill: 'var(--border-subtle)', fillOpacity: 0.3 }}
               labelFormatter={(label) => new Date(label as number).toLocaleString()}
             />
             <Bar dataKey="error" stackId="a" fill={SEVERITY_FILL.error} name="Error" isAnimationActive={false} />

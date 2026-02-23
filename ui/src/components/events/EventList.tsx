@@ -31,7 +31,7 @@ export function EventList({ clusterId }: { clusterId: string }) {
           Events <span className="text-text-muted">({totalElements})</span>
         </h3>
       </div>
-      <div className="divide-y divide-border-subtle/50">
+      <div>
         {events.map((event) => (
           <EventRow
             key={event.id}
