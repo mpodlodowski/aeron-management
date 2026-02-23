@@ -68,13 +68,15 @@ export function DiskDonut({ label, recordings, used, total, growth, compact, cla
             </div>
             <div className="flex items-center justify-between text-[10px] text-text-secondary mt-0.5">
               <div className="flex flex-wrap gap-x-2 gap-y-0">
-                <span className="flex items-center gap-1">
-                  <span className="inline-block w-1.5 h-1.5 rounded-full bg-bar-recordings" />
-                  Rec {formatBytes(recordings)}
-                </span>
+                {recordings > 0 && (
+                  <span className="flex items-center gap-1">
+                    <span className="inline-block w-1.5 h-1.5 rounded-full bg-bar-recordings" />
+                    Rec {formatBytes(recordings)}
+                  </span>
+                )}
                 <span className="flex items-center gap-1">
                   <span className="inline-block w-1.5 h-1.5 rounded-full bg-bar-other" />
-                  Other {formatBytes(Math.max(0, used - recordings))}
+                  {recordings > 0 ? 'Other' : 'Used'} {formatBytes(recordings > 0 ? Math.max(0, used - recordings) : used)}
                 </span>
                 <span className="flex items-center gap-1">
                   <span className="inline-block w-1.5 h-1.5 rounded-full bg-elevated" />
@@ -124,13 +126,15 @@ export function DiskDonut({ label, recordings, used, total, growth, compact, cla
           </div>
           <div className="flex items-center justify-between text-[10px] text-text-muted mt-0.5">
             <div className="flex flex-wrap gap-x-2.5 gap-y-0">
-              <span className="flex items-center gap-1">
-                <span className="inline-block w-1.5 h-1.5 rounded-full bg-bar-recordings" />
-                Rec {formatBytes(recordings)}
-              </span>
+              {recordings > 0 && (
+                <span className="flex items-center gap-1">
+                  <span className="inline-block w-1.5 h-1.5 rounded-full bg-bar-recordings" />
+                  Rec {formatBytes(recordings)}
+                </span>
+              )}
               <span className="flex items-center gap-1">
                 <span className="inline-block w-1.5 h-1.5 rounded-full bg-bar-other" />
-                Other {formatBytes(Math.max(0, used - recordings))}
+                {recordings > 0 ? 'Other' : 'Used'} {formatBytes(recordings > 0 ? Math.max(0, used - recordings) : used)}
               </span>
               <span className="flex items-center gap-1">
                 <span className="inline-block w-1.5 h-1.5 rounded-full bg-elevated" />

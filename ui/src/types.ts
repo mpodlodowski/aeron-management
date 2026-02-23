@@ -35,6 +35,9 @@ export interface SystemMetrics {
   archiveDiskUsedBytes: number
   archiveDiskAvailableBytes: number
   archiveDiskTotalBytes: number
+  shmDiskUsedBytes: number
+  shmDiskAvailableBytes: number
+  shmDiskTotalBytes: number
 }
 
 export interface DiskGrowthStats {

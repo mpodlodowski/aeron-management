@@ -541,6 +541,9 @@ public class ClusterStateAggregator {
             sys.put("archiveDiskUsedBytes", report.getSystemMetrics().getArchiveDiskUsedBytes());
             sys.put("archiveDiskAvailableBytes", report.getSystemMetrics().getArchiveDiskAvailableBytes());
             sys.put("archiveDiskTotalBytes", report.getSystemMetrics().getArchiveDiskTotalBytes());
+            sys.put("shmDiskUsedBytes", report.getSystemMetrics().getShmDiskUsedBytes());
+            sys.put("shmDiskAvailableBytes", report.getSystemMetrics().getShmDiskAvailableBytes());
+            sys.put("shmDiskTotalBytes", report.getSystemMetrics().getShmDiskTotalBytes());
             result.put("systemMetrics", sys);
 
             if (report.getSystemMetrics().getArchiveDiskTotalBytes() > 0) {

@@ -23,10 +23,12 @@ public class MetricsCollector {
     private final String clusterId;
     private final SpyRecordingManager spyRecordingManager;
     private final StateChangeBuffer stateChangeBuffer;
+    private final File shmDir;
 
     public MetricsCollector(CncReader cncReader, ArchiveMetricsCollector archiveCollector,
                             int nodeId, String agentMode, String clusterId,
-                            SpyRecordingManager spyRecordingManager, StateChangeBuffer stateChangeBuffer) {
+                            SpyRecordingManager spyRecordingManager, StateChangeBuffer stateChangeBuffer,
+                            String aeronDir) {
         this.cncReader = cncReader;
         this.archiveCollector = archiveCollector;
         this.nodeId = nodeId;
@@ -34,6 +36,8 @@ public class MetricsCollector {
         this.clusterId = clusterId;
         this.spyRecordingManager = spyRecordingManager;
         this.stateChangeBuffer = stateChangeBuffer;
+        // aeronDir is e.g. /dev/shm/-0-driver — resolve parent to get the SHM mount
+        this.shmDir = new File(aeronDir).getParentFile();
     }
 
     public MetricsReport collect() {
@@ -70,17 +74,26 @@ public class MetricsCollector {
 
     private SystemMetrics collectSystemMetrics() {
         File archiveDir = archiveCollector.getArchiveDir();
-        long totalSpace = archiveDir.getTotalSpace();
-        long usableSpace = archiveDir.getUsableSpace();
+        long archiveTotal = archiveDir.getTotalSpace();
+        long archiveUsable = archiveDir.getUsableSpace();
         long rssBytes = readRssBytes();
 
-        return SystemMetrics.newBuilder()
+        SystemMetrics.Builder builder = SystemMetrics.newBuilder()
                 .setHeapUsedBytes(rssBytes)
                 .setHeapMaxBytes(rssBytes)
-                .setArchiveDiskTotalBytes(totalSpace)
-                .setArchiveDiskAvailableBytes(usableSpace)
-                .setArchiveDiskUsedBytes(totalSpace - usableSpace)
-                .build();
+                .setArchiveDiskTotalBytes(archiveTotal)
+                .setArchiveDiskAvailableBytes(archiveUsable)
+                .setArchiveDiskUsedBytes(archiveTotal - archiveUsable);
+
+        if (shmDir != null && shmDir.exists()) {
+            long shmTotal = shmDir.getTotalSpace();
+            long shmUsable = shmDir.getUsableSpace();
+            builder.setShmDiskTotalBytes(shmTotal)
+                    .setShmDiskAvailableBytes(shmUsable)
+                    .setShmDiskUsedBytes(shmTotal - shmUsable);
+        }
+
+        return builder.build();
     }
 
     private long readRssBytes() {
