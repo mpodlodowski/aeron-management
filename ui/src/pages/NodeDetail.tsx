@@ -4,6 +4,7 @@ import { toast } from 'sonner'
 import { useClusterStore } from '../stores/clusterStore'
 import { useWebSocket } from '../hooks/useWebSocket'
 import CounterTable from '../components/CounterTable'
+import { ConfirmDialog } from '../components/ConfirmDialog'
 import { DiskDonut } from '../components/DiskDonut'
 import { totalErrors, counterByType, counterByLabel, formatBytes, formatNsAsMs, backupStateName, COUNTER_TYPE } from '../utils/counters'
 
@@ -16,6 +17,7 @@ export default function NodeDetail() {
   const isBackup = metrics?.agentMode === 'backup'
   const [actionResult, setActionResult] = useState<{ action: string; output?: string } | null>(null)
   const [loading, setLoading] = useState<string | null>(null)
+  const [confirmAction, setConfirmAction] = useState<{ label: string; description: string; fn: () => void } | null>(null)
   const [recordingStreamId, setRecordingStreamId] = useState('102')
   const [recordingDuration, setRecordingDuration] = useState('60')
 
@@ -66,8 +68,8 @@ export default function NodeDetail() {
   const bytesMapped = counterByLabel(c, 'Bytes currently mapped')?.value ?? 0
 
   const actions = [
-    { id: 'INVALIDATE_SNAPSHOT', label: 'Invalidate Snapshot', endpoint: 'invalidate-snapshot', tooltip: 'Mark the latest snapshot as invalid so the node recovers from the log on next restart' },
-    { id: 'SEED_RECORDING_LOG', label: 'Seed Recording Log', endpoint: 'seed-recording-log', tooltip: 'Rebuild recording log from the latest valid snapshot. Use when the node fails to start due to missing recordings.' },
+    { id: 'INVALIDATE_SNAPSHOT', label: 'Invalidate Snapshot', endpoint: 'invalidate-snapshot', tooltip: 'Mark the latest snapshot as invalid so the node recovers from the log on next restart', description: 'This marks the latest snapshot as invalid. On next restart, the node will recover from the consensus log instead of the snapshot. Use this when you suspect snapshot corruption.' },
+    { id: 'SEED_RECORDING_LOG', label: 'Seed Recording Log', endpoint: 'seed-recording-log', tooltip: 'Rebuild recording log from the latest valid snapshot. Use when the node fails to start due to missing recordings.', description: 'This rebuilds the recording log from the latest valid snapshot. Existing recording log entries will be replaced. Use this when the node fails to start due to missing or corrupt recording log.' },
   ]
 
   const diagnostics = [
@@ -205,10 +207,10 @@ export default function NodeDetail() {
               {actions.map((action) => (
                 <button
                   key={action.id}
-                  onClick={() => executeAction(action.id, action.endpoint)}
+                  onClick={() => setConfirmAction({ label: action.label, description: action.description, fn: () => executeAction(action.id, action.endpoint) })}
                   disabled={loading !== null}
                   title={action.tooltip}
-                  className="rounded px-2.5 py-1 text-xs font-medium transition-colors disabled:opacity-50 disabled:cursor-not-allowed border border-border-medium text-text-primary hover:bg-elevated"
+                  className="rounded px-2.5 py-1 text-xs font-medium transition-colors disabled:opacity-50 disabled:cursor-not-allowed border border-critical-fill/40 text-critical-text hover:bg-critical-surface"
                 >
                   {loading === action.id ? '...' : action.label}
                 </button>
@@ -292,6 +294,16 @@ export default function NodeDetail() {
           {actionResult.output}
         </pre>
       )}
+
+      {/* Confirm Dialog */}
+      <ConfirmDialog
+        open={confirmAction !== null}
+        title={confirmAction?.label ?? ''}
+        description={confirmAction?.description}
+        destructive
+        onConfirm={() => { confirmAction?.fn(); setConfirmAction(null) }}
+        onCancel={() => setConfirmAction(null)}
+      />
 
       {/* Counters Table */}
       <div>
