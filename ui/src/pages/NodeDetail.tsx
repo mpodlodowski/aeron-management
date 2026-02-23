@@ -130,6 +130,16 @@ export default function NodeDetail() {
               className="w-full lg:col-span-2"
             />
           )}
+          {metrics.systemMetrics && metrics.systemMetrics.shmDiskTotalBytes > 0 && (
+            <DiskDonut
+              label="SHM"
+              recordings={0}
+              used={metrics.systemMetrics.shmDiskUsedBytes}
+              total={metrics.systemMetrics.shmDiskTotalBytes}
+              compact
+              className="w-full lg:col-span-2"
+            />
+          )}
         </>) : (<>
           <SummaryCard
             label="Module State"
@@ -190,6 +200,16 @@ export default function NodeDetail() {
               used={metrics.systemMetrics.archiveDiskUsedBytes}
               total={metrics.systemMetrics.archiveDiskTotalBytes}
               growth={metrics.diskGrowth}
+              compact
+              className="w-full lg:col-span-2"
+            />
+          )}
+          {metrics.systemMetrics && metrics.systemMetrics.shmDiskTotalBytes > 0 && (
+            <DiskDonut
+              label="SHM"
+              recordings={0}
+              used={metrics.systemMetrics.shmDiskUsedBytes}
+              total={metrics.systemMetrics.shmDiskTotalBytes}
               compact
               className="w-full lg:col-span-2"
             />

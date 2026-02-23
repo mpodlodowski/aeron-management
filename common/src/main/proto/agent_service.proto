@@ -87,6 +87,9 @@ message SystemMetrics {
   int64 archive_disk_used_bytes = 6;
   int64 archive_disk_available_bytes = 7;
   int64 archive_disk_total_bytes = 8;
+  int64 shm_disk_used_bytes = 9;
+  int64 shm_disk_available_bytes = 10;
+  int64 shm_disk_total_bytes = 11;
 }
 
 message EgressRecordingStatus {
