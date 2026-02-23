@@ -4,9 +4,12 @@ import { toast } from 'sonner'
 import { useClusterStore } from '../stores/clusterStore'
 import { useWebSocket } from '../hooks/useWebSocket'
 import NodeCard from '../components/NodeCard'
-import { EventsTimeline } from '../components/events/EventsTimeline'
+
 import { ConfirmDialog } from '../components/ConfirmDialog'
-import { StatusBanner } from '../components/StatusBanner'
+import {
+  DropdownMenu, DropdownMenuTrigger, DropdownMenuContent, DropdownMenuItem, DropdownMenuSeparator,
+} from '@/components/ui/dropdown-menu'
+import { ChevronDown } from 'lucide-react'
 import { formatNsAsMs } from '../utils/counters'
 
 export default function Dashboard() {
@@ -98,14 +101,6 @@ export default function Dashboard() {
 
   return (
     <div className="space-y-6">
-      <StatusBanner
-        clusterState={clusterState}
-        downNodes={sortedNodes
-          .filter(n => n.agentConnected !== false && n.cncAccessible !== false && n.nodeReachable === false)
-          .map(n => n.nodeId)}
-        onResume={() => clusterAction('Resume', 'resume')}
-      />
-
       {/* Cluster Overview */}
       {cs && (
         <div className="rounded-lg border border-border-subtle bg-surface p-4">
@@ -162,7 +157,6 @@ export default function Dashboard() {
 
           {/* Cluster Admin Actions */}
           <div className="mt-3 pt-3 border-t border-border-subtle flex flex-wrap items-center gap-1.5">
-            <span className="text-xs font-medium text-text-muted mr-1">Actions</span>
             <button
               disabled={loading !== null}
               onClick={() => clusterAction('Snapshot', 'snapshot')}
@@ -187,28 +181,12 @@ export default function Dashboard() {
             >
               {loading === 'Resume' ? '...' : 'Resume'}
             </button>
-            <button
-              disabled={loading !== null}
-              onClick={() => withConfirm('Shutdown', () => clusterAction('Shutdown', 'shutdown'))}
-              title="Gracefully shut down the cluster. Takes a snapshot before stopping all nodes"
-              className="rounded border border-critical-fill/40 px-2.5 py-1 text-xs font-medium text-critical-text hover:bg-critical-surface transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
-            >
-              Shutdown
-            </button>
-            <button
-              disabled={loading !== null}
-              onClick={() => withConfirm('Abort', () => clusterAction('Abort', 'abort'))}
-              title="Immediately abort the cluster without taking a snapshot. Use only as a last resort"
-              className="rounded border border-critical-fill/40 px-2.5 py-1 text-xs font-medium text-critical-text hover:bg-critical-surface transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
-            >
-              Abort
-            </button>
             {anyNodeRecording ? (
               <button
                 disabled={loading !== null}
                 onClick={stopClusterRecording}
                 title="Stop egress recording on the leader"
-                className="rounded border border-critical-fill/40 px-2.5 py-1 text-xs font-medium text-critical-text hover:bg-critical-surface transition-colors disabled:opacity-50 disabled:cursor-not-allowed flex items-center gap-1"
+                className="rounded bg-critical-surface px-2.5 py-1 text-xs font-medium text-critical-text hover:bg-critical-fill/30 transition-colors disabled:opacity-50 disabled:cursor-not-allowed flex items-center gap-1"
               >
                 <span className="inline-flex h-1.5 w-1.5 rounded-full bg-critical-text animate-pulse" />
                 {loading === 'Stop Record' ? '...' : 'Stop Recording'}
@@ -223,6 +201,32 @@ export default function Dashboard() {
                 Record Egress
               </button>
             )}
+            <DropdownMenu>
+              <DropdownMenuTrigger asChild>
+                <button className="rounded border border-border-subtle px-2.5 py-1 text-xs text-text-muted hover:text-text-secondary transition-colors flex items-center gap-1">
+                  Danger <ChevronDown className="h-3 w-3" />
+                </button>
+              </DropdownMenuTrigger>
+              <DropdownMenuContent align="end" className="bg-elevated border-border-subtle">
+                <DropdownMenuItem
+                  disabled={loading !== null}
+                  onClick={() => withConfirm('Shutdown', () => clusterAction('Shutdown', 'shutdown'))}
+                  className="text-text-primary text-xs"
+                >
+                  <span>Shutdown</span>
+                  <span className="ml-auto text-text-muted text-[10px]">graceful</span>
+                </DropdownMenuItem>
+                <DropdownMenuSeparator className="bg-border-subtle" />
+                <DropdownMenuItem
+                  disabled={loading !== null}
+                  onClick={() => withConfirm('Abort', () => clusterAction('Abort', 'abort'))}
+                  className="text-critical-text text-xs"
+                >
+                  <span>Abort</span>
+                  <span className="ml-auto text-text-muted text-[10px]">no snapshot</span>
+                </DropdownMenuItem>
+              </DropdownMenuContent>
+            </DropdownMenu>
           </div>
 
           {showRecordingDialog && (
@@ -275,14 +279,13 @@ export default function Dashboard() {
         </div>
       )}
 
-      <EventsTimeline clusterId={clusterId!} />
-
       <ConfirmDialog
         open={confirmAction !== null}
         title={`${confirmAction?.label}?`}
         description={
-          confirmAction?.label === 'Shutdown' ? 'This will gracefully shut down the cluster after taking a snapshot.' :
-          confirmAction?.label === 'Abort' ? 'This will immediately abort the cluster without a snapshot. Use only as a last resort.' :
+          confirmAction?.label === 'Suspend' ? 'This will pause log processing. The cluster will stop accepting new commands from clients until resumed.' :
+          confirmAction?.label === 'Shutdown' ? 'This will gracefully shut down the cluster after taking a snapshot. All nodes will stop.' :
+          confirmAction?.label === 'Abort' ? 'This will immediately abort the cluster without taking a snapshot. Use only as a last resort — data since the last snapshot may be lost.' :
           undefined
         }
         destructive={confirmAction?.label === 'Shutdown' || confirmAction?.label === 'Abort'}

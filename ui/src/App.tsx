@@ -1,40 +1,42 @@
 import { useState, useEffect, useRef } from 'react'
-import { BrowserRouter, Routes, Route, Link, Navigate, useLocation, useNavigate, useMatch } from 'react-router-dom'
+import { BrowserRouter, Routes, Route, Link, Navigate, useNavigate, useMatch } from 'react-router-dom'
 import { useClusterStore } from './stores/clusterStore'
 import { ClusterSummary } from './types'
 import Cluster from './pages/Dashboard'
 import NodeDetail from './pages/NodeDetail'
 import Archive from './pages/Archive'
+import Events from './pages/Events'
+import { StatusBanner } from './components/StatusBanner'
 
-function PageTitle() {
-  const location = useLocation()
-  const match = useMatch('/clusters/:clusterId/*')
+function NodeBreadcrumb() {
+  const match = useMatch('/clusters/:clusterId/nodes/:nodeId')
   const clusterId = match?.params.clusterId
   const nodes = useClusterStore((s) => s.clusters.get(clusterId ?? '')?.nodes ?? new Map())
 
-  const isHome = location.pathname === '/' || location.pathname === '/clusters' || (match && !match.params['*'])
-  if (isHome) return <>Cluster</>
-  if (match?.params['*'] === 'archive') return <>Archive</>
+  if (!match) return null
 
-  const nodeMatch = match?.params['*']?.match(/^nodes\/(-?\d+)$/)
-  if (nodeMatch) {
-    const id = Number(nodeMatch[1])
-    const metrics = nodes.get(id)
-    const agentDown = metrics?.agentConnected === false
-    const noCnc = !agentDown && metrics?.cncAccessible === false
-    const nodeDown = !agentDown && !noCnc && metrics?.nodeReachable === false
-    const isBackup = metrics?.agentMode === 'backup'
-    const name = isBackup ? 'Backup' : `Node ${id}`
+  const id = Number(match.params.nodeId)
+  const metrics = nodes.get(id)
+  const agentDown = metrics?.agentConnected === false
+  const noCnc = !agentDown && metrics?.cncAccessible === false
+  const nodeDown = !agentDown && !noCnc && metrics?.nodeReachable === false
+  const isBackup = metrics?.agentMode === 'backup'
+  const name = isBackup ? 'Backup' : `Node ${id}`
 
-    if (agentDown) return <>{name} <RoleBadge role="OFFLINE" /></>
-    if (noCnc) return <>{name} <RoleBadge role="DETACHED" /></>
-    if (nodeDown) return <>{name} <RoleBadge role="DOWN" /></>
+  const role = agentDown ? 'OFFLINE' :
+    noCnc ? 'DETACHED' :
+    nodeDown ? 'DOWN' :
+    isBackup ? 'BACKUP' :
+    (metrics?.clusterMetrics?.nodeRole ?? 'UNKNOWN')
 
-    const role = isBackup ? 'BACKUP' : (metrics?.clusterMetrics?.nodeRole ?? 'UNKNOWN')
-    return <>{name} <RoleBadge role={role} /></>
-  }
-
-  return null
+  return (
+    <>
+      <span className="text-text-muted">/</span>
+      <span className="text-sm text-text-secondary flex items-center gap-1.5">
+        {name} <RoleBadge role={role} />
+      </span>
+    </>
+  )
 }
 
 function RoleBadge({ role }: { role: string }) {
@@ -158,48 +160,55 @@ function ClusterSelector() {
   )
 }
 
+function NavLink({ to, active, children }: { to: string; active: boolean; children: React.ReactNode }) {
+  return (
+    <Link
+      to={to}
+      className={`px-2 py-1 rounded transition-colors ${
+        active
+          ? 'text-text-primary bg-elevated'
+          : 'text-text-secondary hover:text-text-primary'
+      }`}
+    >
+      {children}
+    </Link>
+  )
+}
+
 function Header() {
-  const location = useLocation()
   const match = useMatch('/clusters/:clusterId/*')
   const clusterId = match?.params.clusterId
-  const isHome = location.pathname === '/' || location.pathname === '/clusters' || (match && !match.params['*'])
+  const subPath = match?.params['*'] ?? ''
   const connected = useClusterStore((s) => s.connected)
 
+  const isCluster = !subPath || subPath.startsWith('nodes/')
+  const isArchive = subPath === 'archive'
+  const isEvents = subPath === 'events'
+
   return (
-    <header className="border-b border-border-subtle px-6 py-3 flex items-center gap-4">
-      <div className="w-6">
-        {!isHome && (
-          <Link to={clusterId ? `/clusters/${clusterId}` : '/clusters'} className="text-text-secondary hover:text-text-primary transition-colors">
-            &larr;
-          </Link>
-        )}
-      </div>
+    <header className="border-b border-border-subtle px-6 py-3 flex items-center gap-3">
       <Link to={clusterId ? `/clusters/${clusterId}` : '/clusters'} className="text-lg font-semibold hover:text-text-primary transition-colors">
         Aeron Management
       </Link>
       <ClusterSelector />
-      <span className="text-text-muted">|</span>
-      <span className="text-sm text-text-secondary">
-        <PageTitle />
-      </span>
-      <nav className="ml-auto flex items-center gap-4 text-sm">
-        <Link
-          to={clusterId ? `/clusters/${clusterId}` : '/clusters'}
-          className={`transition-colors ${isHome ? 'text-text-primary' : 'text-text-secondary hover:text-text-primary'}`}
-        >
+      <NodeBreadcrumb />
+      <nav className="ml-auto flex items-center gap-1 text-sm">
+        <NavLink to={clusterId ? `/clusters/${clusterId}` : '/clusters'} active={isCluster}>
           Cluster
-        </Link>
-        <Link
-          to={clusterId ? `/clusters/${clusterId}/archive` : '/clusters'}
-          className={`transition-colors ${match?.params['*'] === 'archive' ? 'text-text-primary' : 'text-text-secondary hover:text-text-primary'}`}
-        >
+        </NavLink>
+        <NavLink to={clusterId ? `/clusters/${clusterId}/archive` : '/clusters'} active={isArchive}>
           Archive
-        </Link>
-        <AuthBadge />
-        <span
-          className={`inline-block h-2 w-2 rounded-full ${connected ? 'bg-success-text' : 'bg-critical-text'}`}
-          title={connected ? 'WebSocket connected' : 'WebSocket disconnected'}
-        />
+        </NavLink>
+        <NavLink to={clusterId ? `/clusters/${clusterId}/events` : '/clusters'} active={isEvents}>
+          Events
+        </NavLink>
+        <div className="ml-3 flex items-center gap-3">
+          <AuthBadge />
+          <span
+            className={`inline-block h-2 w-2 rounded-full ${connected ? 'bg-success-text' : 'bg-critical-text'}`}
+            title={connected ? 'WebSocket connected' : 'WebSocket disconnected'}
+          />
+        </div>
       </nav>
     </header>
   )
@@ -210,6 +219,7 @@ export default function App() {
     <BrowserRouter>
       <div className="min-h-screen bg-canvas text-text-primary">
         <Header />
+        <StatusBanner />
         <main className="p-6">
           <Routes>
             <Route path="/" element={<Navigate to="/clusters" replace />} />
@@ -217,6 +227,7 @@ export default function App() {
             <Route path="/clusters/:clusterId" element={<Cluster />} />
             <Route path="/clusters/:clusterId/nodes/:nodeId" element={<NodeDetail />} />
             <Route path="/clusters/:clusterId/archive" element={<Archive />} />
+            <Route path="/clusters/:clusterId/events" element={<Events />} />
           </Routes>
         </main>
       </div>

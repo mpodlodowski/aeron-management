@@ -289,7 +289,7 @@ export default function NodeDetail() {
                   <button
                     onClick={() => executeAction('Stop Recording', 'egress-recording/stop')}
                     disabled={loading !== null}
-                    className="rounded px-2.5 py-1 text-xs font-medium transition-colors disabled:opacity-50 disabled:cursor-not-allowed border border-critical-fill/40 text-critical-text hover:bg-critical-surface"
+                    className="rounded px-2.5 py-1 text-xs font-medium transition-colors disabled:opacity-50 disabled:cursor-not-allowed bg-critical-surface text-critical-text hover:bg-critical-fill/30"
                   >
                     {loading === 'Stop Recording' ? '...' : 'Stop Recording'}
                   </button>
