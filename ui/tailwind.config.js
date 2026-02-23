@@ -40,6 +40,8 @@ export default {
           surface: 'var(--info-surface)',
         },
         'role-backup': 'var(--role-backup)',
+        'bar-recordings': 'var(--bar-recordings)',
+        'bar-other': 'var(--bar-other)',
         // shadcn compat
         background: 'var(--background)',
         foreground: 'var(--foreground)',

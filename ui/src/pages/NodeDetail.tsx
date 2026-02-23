@@ -4,48 +4,8 @@ import { toast } from 'sonner'
 import { useClusterStore } from '../stores/clusterStore'
 import { useWebSocket } from '../hooks/useWebSocket'
 import CounterTable from '../components/CounterTable'
-import { DiskGrowthStats } from '../types'
-import { diskBarColor, ttfColor } from '../utils/statusColors'
-import { totalErrors, counterByType, counterByLabel, formatBytes, formatNsAsMs, backupStateName, formatDuration, formatGrowthRate, COUNTER_TYPE } from '../utils/counters'
-
-function DiskUsageBar({ recordings, used, total, growth }: { recordings: number; used: number; total: number; growth?: DiskGrowthStats }) {
-  const recPct = (recordings / total) * 100
-  const otherPct = (Math.max(0, used - recordings) / total) * 100
-  const usedPct = Math.round((used / total) * 100)
-  const rate = growth?.growthRate1h ?? growth?.growthRate5m ?? null
-  const ttf = growth?.timeToFullSeconds ?? null
-  return (
-    <div className="rounded-lg border border-border-subtle bg-surface p-3">
-      <div className="flex items-center justify-between mb-1.5">
-        <span className="text-xs font-medium text-text-secondary">Archive Disk</span>
-        <div className="flex items-center gap-2">
-          {rate !== null && rate !== 0 && (
-            <span className={`text-xs ${rate > 0 ? 'text-warning-text' : 'text-success-text'}`}>
-              {formatGrowthRate(rate)}
-            </span>
-          )}
-          <span className="text-xs text-text-secondary">{usedPct}% used</span>
-        </div>
-      </div>
-      <div className="flex h-2 rounded-full bg-elevated overflow-hidden">
-        <div className="bg-info-fill" style={{ width: `${recPct}%` }} title={`Recordings: ${formatBytes(recordings)}`} />
-        <div className={diskBarColor(usedPct)} style={{ width: `${otherPct}%` }} title={`Other: ${formatBytes(used - recordings)}`} />
-      </div>
-      <div className="mt-1.5 flex gap-3 text-xs text-text-muted">
-        <span><span className="inline-block w-2 h-2 rounded-full bg-info-fill mr-1" />Recordings {formatBytes(recordings)}</span>
-        <span><span className={`inline-block w-2 h-2 rounded-full ${diskBarColor(usedPct)} mr-1`} />Other {formatBytes(Math.max(0, used - recordings))}</span>
-        <span className="ml-auto flex gap-3">
-          {ttf !== null && (
-            <span className={ttfColor(ttf)}>
-              Full in {formatDuration(ttf)}
-            </span>
-          )}
-          <span>{formatBytes(total - used)} free</span>
-        </span>
-      </div>
-    </div>
-  )
-}
+import { DiskDonut } from '../components/DiskDonut'
+import { totalErrors, counterByType, counterByLabel, formatBytes, formatNsAsMs, backupStateName, COUNTER_TYPE } from '../utils/counters'
 
 export default function NodeDetail() {
   const { clusterId, nodeId } = useParams<{ clusterId: string; nodeId: string }>()
@@ -104,7 +64,6 @@ export default function NodeDetail() {
   const sentPerSec = metrics.bytesSentPerSec ?? 0
   const recvPerSec = metrics.bytesRecvPerSec ?? 0
   const bytesMapped = counterByLabel(c, 'Bytes currently mapped')?.value ?? 0
-  const naksRecv = counterByLabel(c, 'NAKs received')?.value ?? 0
 
   const actions = [
     { id: 'INVALIDATE_SNAPSHOT', label: 'Invalidate Snapshot', endpoint: 'invalidate-snapshot', tooltip: 'Mark the latest snapshot as invalid so the node recovers from the log on next restart' },
@@ -123,7 +82,7 @@ export default function NodeDetail() {
 
   return (
     <div className="space-y-6">
-      {/* Summary Cards */}
+      {/* Summary Cards + Disk */}
       <div className="grid grid-cols-3 md:grid-cols-4 lg:grid-cols-6 gap-3">
         {isBackup ? (<>
           <SummaryCard
@@ -158,6 +117,17 @@ export default function NodeDetail() {
             value={formatBytes(bytesMapped)}
             tooltip="Total bytes of memory-mapped files used by the Aeron media driver (log buffers, CnC, etc.)"
           />
+          {metrics.systemMetrics && metrics.systemMetrics.archiveDiskTotalBytes > 0 && (
+            <DiskDonut
+              label="Archive Disk"
+              recordings={metrics.recordingsTotalBytes ?? 0}
+              used={metrics.systemMetrics.archiveDiskUsedBytes}
+              total={metrics.systemMetrics.archiveDiskTotalBytes}
+              growth={metrics.diskGrowth}
+              compact
+              className="w-full lg:col-span-2"
+            />
+          )}
         </>) : (<>
           <SummaryCard
             label="Module State"
@@ -207,39 +177,30 @@ export default function NodeDetail() {
             tooltip="Worst-case duty cycle time of the consensus module. High values indicate processing delays or GC pauses"
           />
           <SummaryCard
-            label="NAKs Received"
-            value={String(naksRecv)}
-            alert={naksRecv > 0}
-            tooltip="Negative acknowledgements received, indicating packet loss requiring retransmission"
-          />
-          <SummaryCard
             label="Traffic"
             value={`\u2191${formatBytes(sentPerSec)}/s \u2193${formatBytes(recvPerSec)}/s`}
             tooltip="Current network throughput (bytes/sec) of the Aeron media driver on this node"
           />
-          <SummaryCard
-            label="Mapped Memory"
-            value={formatBytes(bytesMapped)}
-            tooltip="Total bytes of memory-mapped files used by the Aeron media driver (log buffers, CnC, etc.)"
-          />
+          {metrics.systemMetrics && metrics.systemMetrics.archiveDiskTotalBytes > 0 && (
+            <DiskDonut
+              label="Archive Disk"
+              recordings={metrics.recordingsTotalBytes ?? 0}
+              used={metrics.systemMetrics.archiveDiskUsedBytes}
+              total={metrics.systemMetrics.archiveDiskTotalBytes}
+              growth={metrics.diskGrowth}
+              compact
+              className="w-full lg:col-span-2"
+            />
+          )}
         </>)}
       </div>
 
-      {/* Disk Usage */}
-      {metrics.systemMetrics && metrics.systemMetrics.archiveDiskTotalBytes > 0 && (
-        <DiskUsageBar
-          recordings={metrics.recordingsTotalBytes ?? 0}
-          used={metrics.systemMetrics.archiveDiskUsedBytes}
-          total={metrics.systemMetrics.archiveDiskTotalBytes}
-          growth={metrics.diskGrowth}
-        />
-      )}
-
-      {/* Admin Actions & Diagnostics */}
+      {/* Node Actions */}
       {!isBackup && (
-        <div className={`grid grid-cols-1 ${isLeader ? 'lg:grid-cols-3' : 'lg:grid-cols-2'} gap-4`}>
-          <div className="rounded-lg border border-border-subtle bg-surface p-4">
-            <h3 className="text-xs font-medium text-text-muted mb-2">Admin Actions</h3>
+        <div className="rounded-lg border border-border-subtle bg-surface p-4">
+          <div className="flex flex-wrap items-center gap-x-4 gap-y-2">
+            {/* Admin Actions */}
+            <span className="text-xs font-medium text-text-muted">Admin</span>
             <div className="flex flex-wrap gap-1.5">
               {actions.map((action) => (
                 <button
@@ -253,9 +214,11 @@ export default function NodeDetail() {
                 </button>
               ))}
             </div>
-          </div>
-          <div className="rounded-lg border border-border-subtle bg-surface p-4">
-            <h3 className="text-xs font-medium text-text-muted mb-2">Diagnostics</h3>
+
+            <span className="hidden lg:block w-px h-5 bg-border-subtle" />
+
+            {/* Diagnostics */}
+            <span className="text-xs font-medium text-text-muted">Diagnostics</span>
             <div className="flex flex-wrap gap-1.5">
               {diagnostics.map((diag) => (
                 <button
@@ -269,23 +232,20 @@ export default function NodeDetail() {
                 </button>
               ))}
             </div>
-          </div>
-          {isLeader && (
-            <div className="rounded-lg border border-border-subtle bg-surface p-4">
-              <h3 className="text-xs font-medium text-text-muted mb-2">Egress Recording</h3>
+
+            {isLeader && (<>
+              <span className="hidden lg:block w-px h-5 bg-border-subtle" />
+
+              {/* Egress Recording */}
               {metrics.egressRecording?.active ? (
-                <div className="space-y-2">
-                  <div className="flex items-center gap-2">
-                    <span className="inline-flex h-2 w-2 rounded-full bg-critical-text animate-pulse" />
-                    <span className="text-xs text-text-secondary">
-                      Stream {metrics.egressRecording.streamId}
-                    </span>
-                  </div>
-                  <div className="text-xs text-text-muted truncate" title={metrics.egressRecording.channel}>
-                    {new Date(metrics.egressRecording.startTimeMs).toLocaleTimeString()}
+                <div className="flex items-center gap-2">
+                  <span className="inline-flex h-2 w-2 rounded-full bg-critical-text animate-pulse" />
+                  <span className="text-xs text-text-secondary">
+                    Stream {metrics.egressRecording.streamId}
+                    {' \u2022 '}{new Date(metrics.egressRecording.startTimeMs).toLocaleTimeString()}
                     {metrics.egressRecording.durationLimitSeconds > 0 &&
                       ` \u2022 ${metrics.egressRecording.durationLimitSeconds}s limit`}
-                  </div>
+                  </span>
                   <button
                     onClick={() => executeAction('Stop Recording', 'egress-recording/stop')}
                     disabled={loading !== null}
@@ -295,24 +255,22 @@ export default function NodeDetail() {
                   </button>
                 </div>
               ) : (
-                <div className="space-y-2">
-                  <div className="flex items-center gap-2">
-                    <label className="text-xs text-text-muted">Stream</label>
-                    <input
-                      type="number"
-                      value={recordingStreamId}
-                      onChange={(e) => setRecordingStreamId(e.target.value)}
-                      className="w-16 rounded border border-border-medium bg-elevated px-2 py-1 text-xs text-text-primary"
-                    />
-                    <label className="text-xs text-text-muted">Duration</label>
-                    <input
-                      type="number"
-                      value={recordingDuration}
-                      onChange={(e) => setRecordingDuration(e.target.value)}
-                      className="w-16 rounded border border-border-medium bg-elevated px-2 py-1 text-xs text-text-primary"
-                      placeholder="0"
-                    />
-                  </div>
+                <div className="flex items-center gap-2">
+                  <label className="text-xs text-text-muted">Stream</label>
+                  <input
+                    type="number"
+                    value={recordingStreamId}
+                    onChange={(e) => setRecordingStreamId(e.target.value)}
+                    className="w-14 rounded border border-border-medium bg-elevated px-2 py-1 text-xs text-text-primary"
+                  />
+                  <label className="text-xs text-text-muted">Duration</label>
+                  <input
+                    type="number"
+                    value={recordingDuration}
+                    onChange={(e) => setRecordingDuration(e.target.value)}
+                    className="w-14 rounded border border-border-medium bg-elevated px-2 py-1 text-xs text-text-primary"
+                    placeholder="0"
+                  />
                   <button
                     onClick={() => executeAction(
                       'Start Recording',
@@ -325,8 +283,8 @@ export default function NodeDetail() {
                   </button>
                 </div>
               )}
-            </div>
-          )}
+            </>)}
+          </div>
         </div>
       )}
       {actionResult?.output && (
@@ -357,3 +315,4 @@ function SummaryCard({ label, value, alert, tooltip }: { label: string; value: s
     </div>
   )
 }
+

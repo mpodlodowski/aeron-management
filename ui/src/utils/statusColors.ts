@@ -27,11 +27,18 @@ export function diskUsageColor(pct: number): string {
   return 'text-text-secondary'
 }
 
-/** Disk usage bar segment color */
+/** Disk usage bar segment color (muted by default, semantic only when critical) */
 export function diskBarColor(pct: number): string {
-  if (pct > 90) return 'bg-critical-fill'
-  if (pct > 75) return 'bg-warning-fill'
-  return 'bg-border-medium'
+  if (pct > 95) return 'bg-critical-fill'
+  if (pct > 90) return 'bg-warning-fill'
+  return 'bg-bar-other'
+}
+
+/** Disk usage "other" segment CSS color for SVG */
+export function diskOtherCssColor(pct: number): string {
+  if (pct > 95) return 'var(--critical-fill)'
+  if (pct > 90) return 'var(--warning-fill)'
+  return 'var(--bar-other)'
 }
 
 /** Time-to-full color based on urgency */

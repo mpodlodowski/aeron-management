@@ -5,10 +5,10 @@ import { useWebSocket } from '../hooks/useWebSocket'
 import { RecordingRow, RecordingType, DiskGrowthStats } from '../types'
 import RecordingViewer from '../components/RecordingViewer'
 import type { ViewMode } from '../lib/decoder'
-import { formatBytes, formatGrowthRate, formatDuration } from '../utils/counters'
+import { formatBytes } from '../utils/counters'
 import { toast } from 'sonner'
 import { ConfirmDialog } from '../components/ConfirmDialog'
-import { diskBarColor, ttfColor } from '../utils/statusColors'
+import { DiskDonut } from '../components/DiskDonut'
 import {
   DropdownMenu, DropdownMenuTrigger, DropdownMenuContent, DropdownMenuItem,
 } from '@/components/ui/dropdown-menu'
@@ -182,44 +182,16 @@ export default function Archive() {
       {/* Disk Usage Summary */}
       {diskStats.length > 0 && (
         <div className="flex flex-wrap gap-4">
-          {diskStats.map((d) => {
-            const recPct = (d.recordings / d.total) * 100
-            const otherPct = (Math.max(0, d.used - d.recordings) / d.total) * 100
-            const usedPct = Math.round((d.used / d.total) * 100)
-            const rate = d.growth?.growthRate1h ?? d.growth?.growthRate5m ?? null
-            const ttf = d.growth?.timeToFullSeconds ?? null
-            return (
-              <div key={d.nodeId} className="flex-1 min-w-[240px] rounded-lg border border-border-subtle bg-surface p-3">
-                <div className="flex items-center justify-between mb-1.5">
-                  <span className="text-xs font-medium text-text-secondary">{d.name}</span>
-                  <div className="flex items-center gap-2">
-                    {rate !== null && rate !== 0 && (
-                      <span className={`text-xs ${rate > 0 ? 'text-warning-text' : 'text-success-text'}`}>
-                        {formatGrowthRate(rate)}
-                      </span>
-                    )}
-                    <span className="text-xs text-text-secondary">{usedPct}% used</span>
-                  </div>
-                </div>
-                <div className="flex h-2 rounded-full bg-elevated overflow-hidden">
-                  <div className="bg-info-fill" style={{ width: `${recPct}%` }} title={`Recordings: ${formatBytes(d.recordings)}`} />
-                  <div className={diskBarColor(usedPct)} style={{ width: `${otherPct}%` }} title={`Other: ${formatBytes(d.used - d.recordings)}`} />
-                </div>
-                <div className="mt-1.5 flex gap-3 text-xs text-text-muted">
-                  <span><span className="inline-block w-2 h-2 rounded-full bg-info-fill mr-1" />Recordings {formatBytes(d.recordings)}</span>
-                  <span><span className={`inline-block w-2 h-2 rounded-full ${diskBarColor(usedPct)} mr-1`} />Other {formatBytes(Math.max(0, d.used - d.recordings))}</span>
-                  <span className="ml-auto flex gap-3">
-                    {ttf !== null && (
-                      <span className={ttfColor(ttf)}>
-                        Full in {formatDuration(ttf)}
-                      </span>
-                    )}
-                    <span>{formatBytes(d.total - d.used)} free</span>
-                  </span>
-                </div>
-              </div>
-            )
-          })}
+          {diskStats.map((d) => (
+            <DiskDonut
+              key={d.nodeId}
+              label={d.name}
+              recordings={d.recordings}
+              used={d.used}
+              total={d.total}
+              growth={d.growth}
+            />
+          ))}
         </div>
       )}
 

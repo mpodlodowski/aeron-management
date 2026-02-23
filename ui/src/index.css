@@ -39,6 +39,10 @@
     /* Role-specific */
     --role-backup: #a78bfa;
 
+    /* Disk usage bar (muted, non-semantic) */
+    --bar-recordings: #4a7ab5;
+    --bar-other: #6a6a78;
+
     /* Chart colors */
     --chart-1: #6e9fff;
     --chart-2: #6ccf8e;
