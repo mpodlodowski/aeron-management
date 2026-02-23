@@ -11,8 +11,9 @@ import { ConfirmDialog } from '../components/ConfirmDialog'
 import { DiskDonut } from '../components/DiskDonut'
 import {
   DropdownMenu, DropdownMenuTrigger, DropdownMenuContent, DropdownMenuItem,
+  DropdownMenuCheckboxItem,
 } from '@/components/ui/dropdown-menu'
-import { MoreHorizontal } from 'lucide-react'
+import { ChevronDown, MoreHorizontal } from 'lucide-react'
 
 function nodeName(nodeId: number, agentMode?: string) {
   return agentMode === 'backup' ? 'Backup' : `Node ${nodeId}`
@@ -42,7 +43,7 @@ export default function Archive() {
   const [searchParams, setSearchParams] = useSearchParams()
   const [actionResult, setActionResult] = useState<{ action: string; output?: string } | null>(null)
   const [loading, setLoading] = useState<string | null>(null)
-  const [confirmAction, setConfirmAction] = useState<{ label: string; fn: () => void } | null>(null)
+  const [confirmAction, setConfirmAction] = useState<{ label: string; description?: string; fn: () => void } | null>(null)
   const pageSize = 100
 
   // Derive filterable state from URL search params
@@ -155,8 +156,8 @@ export default function Archive() {
     }
   }
 
-  function withConfirm(label: string, fn: () => void) {
-    setConfirmAction({ label, fn })
+  function withConfirm(label: string, description: string, fn: () => void) {
+    setConfirmAction({ label, description, fn })
   }
 
   const diskStats = useMemo(() => {
@@ -195,111 +196,117 @@ export default function Archive() {
         </div>
       )}
 
-      {/* Filters */}
-      <div className="space-y-2">
-        <div className="flex items-center gap-2">
-          <span className="text-xs font-medium text-text-muted w-10">Node</span>
+      {/* Filters + Actions + Pagination */}
+      <div className="flex flex-wrap items-center gap-2">
+        {/* Node filter chips (grouped like Events range selector) */}
+        <div className="flex items-center gap-0.5 rounded bg-surface border border-border-subtle p-0.5">
+          <button
+            onClick={() => updateParams({ node: null, page: null })}
+            className={`rounded px-2 py-0.5 text-xs font-medium transition-colors ${
+              filterNode === null ? 'bg-elevated text-text-primary' : 'text-text-secondary hover:text-text-primary'
+            }`}
+          >
+            All
+          </button>
           {nodeIds.map((id) => (
             <button
               key={id}
               onClick={() => updateParams({ node: filterNode === id ? null : String(id), page: null })}
-              className={`rounded-md px-3 py-1.5 text-xs font-medium transition-colors ${
-                filterNode === id
-                  ? 'bg-elevated text-text-primary border border-border-medium'
-                  : 'bg-surface text-text-secondary border border-border-subtle hover:text-text-primary'
+              className={`rounded px-2 py-0.5 text-xs font-medium transition-colors ${
+                filterNode === id ? 'bg-elevated text-text-primary' : 'text-text-secondary hover:text-text-primary'
               }`}
             >
               {nodeName(id, nodes.get(id)?.agentMode)}
             </button>
           ))}
         </div>
-        <div className="flex items-center gap-2">
-          <span className="text-xs font-medium text-text-muted w-10">Type</span>
-          {recordingTypes.map((t) => (
-            <button
-              key={t}
-              onClick={() => updateParams({ type: filterType === t ? null : t, page: null })}
-              className={`rounded-md px-3 py-1.5 text-xs font-medium transition-colors ${
-                filterType === t
-                  ? 'bg-elevated text-text-primary border border-border-medium'
-                  : 'bg-surface text-text-secondary border border-border-subtle hover:text-text-primary'
-              }`}
-            >
-              {t}
-            </button>
-          ))}
-        </div>
-        <div className="flex items-center gap-2">
-          <span className="text-xs font-medium text-text-muted w-10">Sort</span>
-          {([['desc', 'Newest first'], ['asc', 'Oldest first']] as const).map(([val, label]) => (
-            <button
-              key={val}
-              onClick={() => val !== sortOrder && updateParams({ sort: val === 'desc' ? null : val, page: null })}
-              className={`rounded-md px-3 py-1.5 text-xs font-medium transition-colors ${
-                sortOrder === val
-                  ? 'bg-elevated text-text-primary border border-border-medium'
-                  : 'bg-surface text-text-secondary border border-border-subtle hover:text-text-primary'
-              }`}
-            >
-              {label}
-            </button>
-          ))}
-        </div>
-      </div>
 
-      {/* Global Archive Actions */}
-      <div className="flex flex-wrap gap-2">
+        {/* Type dropdown */}
+        <DropdownMenu>
+          <DropdownMenuTrigger asChild>
+            <button className="rounded px-2 py-1 text-xs text-text-secondary hover:text-text-primary transition-colors flex items-center gap-1">
+              Type
+              {filterType ? (
+                <span className="rounded-full bg-info-fill/20 text-info-text px-1.5 text-[10px]">{filterType}</span>
+              ) : (
+                <ChevronDown className="h-3 w-3 opacity-50" />
+              )}
+            </button>
+          </DropdownMenuTrigger>
+          <DropdownMenuContent align="start" className="bg-elevated border-border-subtle">
+            {recordingTypes.map((t) => (
+              <DropdownMenuCheckboxItem
+                key={t}
+                checked={filterType === t}
+                onCheckedChange={() => updateParams({ type: filterType === t ? null : t, page: null })}
+                className="text-text-primary text-xs"
+              >
+                {t}
+              </DropdownMenuCheckboxItem>
+            ))}
+          </DropdownMenuContent>
+        </DropdownMenu>
+
+        {/* Sort dropdown */}
+        <DropdownMenu>
+          <DropdownMenuTrigger asChild>
+            <button className="rounded px-2 py-1 text-xs text-text-secondary hover:text-text-primary transition-colors flex items-center gap-1">
+              {sortOrder === 'desc' ? 'Newest first' : 'Oldest first'}
+              <ChevronDown className="h-3 w-3 opacity-50" />
+            </button>
+          </DropdownMenuTrigger>
+          <DropdownMenuContent align="start" className="bg-elevated border-border-subtle">
+            <DropdownMenuItem onClick={() => updateParams({ sort: null, page: null })} className="text-text-primary text-xs">
+              Newest first
+            </DropdownMenuItem>
+            <DropdownMenuItem onClick={() => updateParams({ sort: 'asc', page: null })} className="text-text-primary text-xs">
+              Oldest first
+            </DropdownMenuItem>
+          </DropdownMenuContent>
+        </DropdownMenu>
+
+        <div className="w-px h-5 bg-border-subtle" />
+
+        {/* Actions */}
+        <span className="text-xs text-text-muted">Actions</span>
         <button
           disabled={loading !== null || filterNode === null}
           onClick={() => filterNode !== null && executeAction('Verify Archive', filterNode, 'archive/verify', 'GET')}
-          title={filterNode === null ? 'Select a node to verify its archive' : 'Check archive integrity by verifying the catalog and all recording segment files'}
-          className="rounded-md border border-border-medium px-3 py-1.5 text-xs font-medium text-text-primary hover:bg-elevated disabled:opacity-50 disabled:cursor-not-allowed"
+          title={filterNode === null ? 'Select a node first' : 'Check archive integrity'}
+          className="rounded border border-border-medium px-2.5 py-1 text-xs font-medium text-text-primary hover:bg-elevated transition-colors disabled:opacity-40 disabled:cursor-not-allowed"
         >
-          {loading === 'Verify Archive' ? 'Verifying...' : 'Verify Archive'}
+          {loading === 'Verify Archive' ? '...' : 'Verify'}
         </button>
         <button
           disabled={loading !== null || filterNode === null}
-          onClick={() => filterNode !== null && withConfirm('Compact Archive', () => executeAction('Compact Archive', filterNode, 'archive/compact'))}
-          title={filterNode === null ? 'Select a node to compact its archive' : 'Remove deleted and invalidated recording segments to reclaim disk space'}
-          className="rounded-md border border-border-medium px-3 py-1.5 text-xs font-medium text-text-primary hover:bg-elevated disabled:opacity-50 disabled:cursor-not-allowed"
+          onClick={() => filterNode !== null && withConfirm(
+            'Compact Archive',
+            `This will remove deleted and invalidated recording segments from ${nodeName(filterNode!, nodes.get(filterNode!)?.agentMode)} to reclaim disk space. Active recordings are not affected.`,
+            () => executeAction('Compact Archive', filterNode, 'archive/compact'),
+          )}
+          title={filterNode === null ? 'Select a node first' : 'Compact archive to reclaim space'}
+          className="rounded border border-critical-fill/40 px-2.5 py-1 text-xs font-medium text-critical-text hover:bg-critical-surface transition-colors disabled:opacity-40 disabled:cursor-not-allowed"
         >
           Compact
         </button>
         <button
           disabled={loading !== null || filterNode === null}
-          onClick={() => filterNode !== null && withConfirm('Delete Orphaned Segments', () => executeAction('Delete Orphaned', filterNode, 'archive/delete-orphaned'))}
-          title={filterNode === null ? 'Select a node to delete orphaned segments' : 'Delete segment files on disk that are not referenced by any recording in the catalog'}
-          className="rounded-md border border-border-medium px-3 py-1.5 text-xs font-medium text-text-primary hover:bg-elevated disabled:opacity-50 disabled:cursor-not-allowed"
+          onClick={() => filterNode !== null && withConfirm(
+            'Delete Orphaned Segments',
+            `This will permanently delete segment files on ${nodeName(filterNode!, nodes.get(filterNode!)?.agentMode)} that are not referenced by any recording in the catalog. This cannot be undone.`,
+            () => executeAction('Delete Orphaned', filterNode, 'archive/delete-orphaned'),
+          )}
+          title={filterNode === null ? 'Select a node first' : 'Delete orphaned segment files'}
+          className="rounded border border-critical-fill/40 px-2.5 py-1 text-xs font-medium text-critical-text hover:bg-critical-surface transition-colors disabled:opacity-40 disabled:cursor-not-allowed"
         >
           Delete Orphaned
         </button>
-      </div>
 
-      {/* Confirm Dialog */}
-      <ConfirmDialog
-        open={confirmAction !== null}
-        title={`Confirm: ${confirmAction?.label}?`}
-        destructive={confirmAction?.label?.includes('Invalid') || confirmAction?.label?.includes('Delete') || false}
-        onConfirm={() => { confirmAction?.fn(); setConfirmAction(null) }}
-        onCancel={() => setConfirmAction(null)}
-      />
-
-      {/* Action Output */}
-      {actionResult?.output && (
-        <pre className="rounded-md bg-canvas border border-border-subtle px-4 py-3 text-xs font-mono text-text-secondary overflow-x-auto whitespace-pre-wrap max-h-60">
-          <div className="flex justify-between items-center mb-2">
-            <span className="text-text-muted">{actionResult.action}</span>
-            <button onClick={() => setActionResult(null)} className="text-text-muted hover:text-text-primary text-xs">dismiss</button>
-          </div>
-          {actionResult.output}
-        </pre>
-      )}
-
-      {/* Summary + Pagination */}
-      <div className="flex items-center justify-between">
-        <span className="text-xs text-text-secondary">
-          {fetchLoading ? 'Loading...' : `${totalElements.toLocaleString()} recordings`}
-        </span>
+        {/* Right side: count + pagination */}
+        <div className="ml-auto flex items-center gap-1.5">
+          <span className="text-xs text-text-muted">
+            {fetchLoading ? '...' : `${totalElements.toLocaleString()}`}
+          </span>
         {totalPages > 1 && (
           <div className="flex items-center gap-1.5">
             <button
@@ -355,7 +362,29 @@ export default function Archive() {
             </button>
           </div>
         )}
+        </div>
       </div>
+
+      {/* Confirm Dialog */}
+      <ConfirmDialog
+        open={confirmAction !== null}
+        title={confirmAction?.label ?? ''}
+        description={confirmAction?.description}
+        destructive={confirmAction?.label?.includes('Invalid') || confirmAction?.label?.includes('Delete') || confirmAction?.label?.includes('Compact') || false}
+        onConfirm={() => { confirmAction?.fn(); setConfirmAction(null) }}
+        onCancel={() => setConfirmAction(null)}
+      />
+
+      {/* Action Output */}
+      {actionResult?.output && (
+        <pre className="rounded-md bg-canvas border border-border-subtle px-4 py-3 text-xs font-mono text-text-secondary overflow-x-auto whitespace-pre-wrap max-h-60">
+          <div className="flex justify-between items-center mb-2">
+            <span className="text-text-muted">{actionResult.action}</span>
+            <button onClick={() => setActionResult(null)} className="text-text-muted hover:text-text-primary text-xs">dismiss</button>
+          </div>
+          {actionResult.output}
+        </pre>
+      )}
 
       {/* Recordings Table */}
       <div className="rounded-lg border border-border-subtle bg-surface overflow-auto">
@@ -416,7 +445,7 @@ export default function Archive() {
                 const rowClass = isInvalid || isDeleted ? 'hover:bg-elevated/50 opacity-60' : 'hover:bg-elevated/50'
                 return (
                   <tr key={`${rec.nodeId}-${rec.recordingId}`} className={rowClass}>
-                    <td className="px-4 py-2 text-text-primary">{nodeName(rec.nodeId, nodes.get(rec.nodeId)?.agentMode)}</td>
+                    <td className="px-4 py-2 font-mono text-text-primary">{rec.nodeId}</td>
                     <td className="px-4 py-2 font-mono text-text-primary">
                       {rec.recordingId}
                     </td>
@@ -498,10 +527,18 @@ export default function Archive() {
                             <DropdownMenuItem onClick={() => executeAction(`Verify #${rec.recordingId}`, rec.nodeId, `archive/recordings/${rec.recordingId}/verify`, 'GET')}>
                               Verify
                             </DropdownMenuItem>
-                            <DropdownMenuItem onClick={() => withConfirm(`Mark recording ${rec.recordingId} invalid`, () => executeAction(`Mark Invalid #${rec.recordingId}`, rec.nodeId, `archive/recordings/${rec.recordingId}/mark-invalid`))}>
+                            <DropdownMenuItem onClick={() => withConfirm(
+                              `Mark recording ${rec.recordingId} invalid`,
+                              'This marks the recording as invalid in the catalog. It will be skipped during recovery and can be removed by compacting the archive.',
+                              () => executeAction(`Mark Invalid #${rec.recordingId}`, rec.nodeId, `archive/recordings/${rec.recordingId}/mark-invalid`),
+                            )}>
                               Invalidate
                             </DropdownMenuItem>
-                            <DropdownMenuItem onClick={() => withConfirm(`Mark recording ${rec.recordingId} valid`, () => executeAction(`Mark Valid #${rec.recordingId}`, rec.nodeId, `archive/recordings/${rec.recordingId}/mark-valid`))}>
+                            <DropdownMenuItem onClick={() => withConfirm(
+                              `Mark recording ${rec.recordingId} valid`,
+                              'This restores a previously invalidated recording so it can be used for recovery again.',
+                              () => executeAction(`Mark Valid #${rec.recordingId}`, rec.nodeId, `archive/recordings/${rec.recordingId}/mark-valid`),
+                            )}>
                               Validate
                             </DropdownMenuItem>
                           </DropdownMenuContent>
