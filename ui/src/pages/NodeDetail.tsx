@@ -61,7 +61,6 @@ export default function NodeDetail() {
   const c = counters ?? []
   const errors = totalErrors(c)
   const snapshots = counterByType(c, COUNTER_TYPE.SNAPSHOT_COUNT)?.value ?? 0
-  const electionCount = counterByType(c, COUNTER_TYPE.ELECTION_COUNT)?.value ?? 0
   const maxCycleNs = counterByType(c, COUNTER_TYPE.MAX_CYCLE_TIME_NS)?.value ?? 0
   const sentPerSec = metrics.bytesSentPerSec ?? 0
   const recvPerSec = metrics.bytesRecvPerSec ?? 0
@@ -131,13 +130,11 @@ export default function NodeDetail() {
             />
           )}
           {metrics.systemMetrics && metrics.systemMetrics.shmDiskTotalBytes > 0 && (
-            <DiskDonut
+            <SummaryCard
               label="SHM"
-              recordings={0}
-              used={metrics.systemMetrics.shmDiskUsedBytes}
-              total={metrics.systemMetrics.shmDiskTotalBytes}
-              compact
-              className="w-full lg:col-span-2"
+              value={`${formatBytes(metrics.systemMetrics.shmDiskUsedBytes)} / ${formatBytes(metrics.systemMetrics.shmDiskTotalBytes)}`}
+              alert={metrics.systemMetrics.shmDiskTotalBytes > 0 && (metrics.systemMetrics.shmDiskUsedBytes / metrics.systemMetrics.shmDiskTotalBytes) > 0.9}
+              tooltip="Shared memory (/dev/shm) usage. Aeron uses SHM for log buffers, CnC file, and IPC channels"
             />
           )}
         </>) : (<>
@@ -179,11 +176,6 @@ export default function NodeDetail() {
             tooltip="Number of snapshots taken by the consensus module for log compaction and recovery"
           />
           <SummaryCard
-            label="Elections"
-            value={String(electionCount)}
-            tooltip="Total number of leader elections since the node started. Frequent elections may indicate instability"
-          />
-          <SummaryCard
             label="Max Cycle Time"
             value={formatNsAsMs(maxCycleNs)}
             tooltip="Worst-case duty cycle time of the consensus module. High values indicate processing delays or GC pauses"
@@ -205,13 +197,11 @@ export default function NodeDetail() {
             />
           )}
           {metrics.systemMetrics && metrics.systemMetrics.shmDiskTotalBytes > 0 && (
-            <DiskDonut
+            <SummaryCard
               label="SHM"
-              recordings={0}
-              used={metrics.systemMetrics.shmDiskUsedBytes}
-              total={metrics.systemMetrics.shmDiskTotalBytes}
-              compact
-              className="w-full lg:col-span-2"
+              value={`${formatBytes(metrics.systemMetrics.shmDiskUsedBytes)} / ${formatBytes(metrics.systemMetrics.shmDiskTotalBytes)}`}
+              alert={metrics.systemMetrics.shmDiskTotalBytes > 0 && (metrics.systemMetrics.shmDiskUsedBytes / metrics.systemMetrics.shmDiskTotalBytes) > 0.9}
+              tooltip="Shared memory (/dev/shm) usage. Aeron uses SHM for log buffers, CnC file, and IPC channels"
             />
           )}
         </>)}
