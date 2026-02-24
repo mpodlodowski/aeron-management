@@ -1,10 +1,8 @@
 import { useEffect, useState, useMemo, useCallback } from 'react'
-import { useParams, useSearchParams } from 'react-router-dom'
+import { useParams, useSearchParams, Link } from 'react-router-dom'
 import { useClusterStore } from '../stores/clusterStore'
 import { useWebSocket } from '../hooks/useWebSocket'
 import { RecordingRow, RecordingType, DiskGrowthStats } from '../types'
-import RecordingViewer from '../components/RecordingViewer'
-import type { ViewMode } from '../lib/decoder'
 import { formatBytes } from '../utils/counters'
 import { toast } from 'sonner'
 import { ConfirmDialog } from '../components/ConfirmDialog'
@@ -52,14 +50,6 @@ export default function Archive() {
   const sortOrder: 'desc' | 'asc' = searchParams.get('sort') === 'asc' ? 'asc' : 'desc'
   const rawPage = parseInt(searchParams.get('page') ?? '', 10)
   const page = isNaN(rawPage) || rawPage < 1 ? 0 : rawPage - 1
-  const hexViewTarget = searchParams.has('rec') ? {
-    nodeId: Number(searchParams.get('recNode') ?? '0'),
-    recordingId: Number(searchParams.get('rec')),
-    totalSize: Number(searchParams.get('recSize') ?? '0'),
-  } : null
-  const viewerOffset = Number(searchParams.get('offset') ?? '0')
-  const rawMode = searchParams.get('mode')
-  const viewerMode: ViewMode = rawMode === 'tree' || rawMode === 'table' ? rawMode : 'hex'
 
   const updateParams = useCallback((updates: Record<string, string | null>, replace = false) => {
     setSearchParams((prev) => {
@@ -76,16 +66,6 @@ export default function Archive() {
     updateParams({ page: p > 0 ? String(p + 1) : null }, true)
   }, [updateParams])
 
-  const handleViewerStateChange = useCallback((state: { offset: number; viewMode: ViewMode }) => {
-    setSearchParams((prev) => {
-      const next = new URLSearchParams(prev)
-      if (state.offset > 0) next.set('offset', String(state.offset))
-      else next.delete('offset')
-      if (state.viewMode !== 'hex') next.set('mode', state.viewMode)
-      else next.delete('mode')
-      return next
-    }, { replace: true })
-  }, [setSearchParams])
 
   const [recordings, setRecordings] = useState<RecordingRow[]>([])
   const [totalElements, setTotalElements] = useState(0)
@@ -498,22 +478,13 @@ export default function Archive() {
                     </td>
                     <td className="px-4 py-2">
                       <div className="flex items-center gap-2">
-                        <button
-                          disabled={loading !== null}
-                          onClick={() => {
-                            updateParams({
-                              rec: String(rec.recordingId),
-                              recNode: String(rec.nodeId),
-                              recSize: String(size > 0 ? size : 0),
-                              offset: null,
-                              mode: null,
-                            })
-                          }}
+                        <Link
+                          to={`/clusters/${clusterId}/nodes/${rec.nodeId}/recordings/${rec.recordingId}`}
                           title="View raw bytes"
-                          className="text-info-text hover:underline text-xs disabled:opacity-50"
+                          className="text-info-text hover:underline text-xs"
                         >
                           Bytes
-                        </button>
+                        </Link>
                         <DropdownMenu>
                           <DropdownMenuTrigger asChild>
                             <button className="rounded p-1 hover:bg-elevated text-text-muted hover:text-text-primary">
@@ -552,19 +523,6 @@ export default function Archive() {
           </tbody>
         </table>
       </div>
-      {hexViewTarget && (
-        <RecordingViewer
-          key={`${hexViewTarget.nodeId}-${hexViewTarget.recordingId}`}
-          clusterId={clusterId!}
-          nodeId={hexViewTarget.nodeId}
-          recordingId={hexViewTarget.recordingId}
-          totalSize={hexViewTarget.totalSize}
-          initialOffset={viewerOffset}
-          initialViewMode={viewerMode}
-          onClose={() => updateParams({ rec: null, recNode: null, recSize: null, offset: null, mode: null })}
-          onStateChange={handleViewerStateChange}
-        />
-      )}
     </div>
   )
 }
