@@ -1,4 +1,4 @@
-import type { DecodedField, DecodedMessage } from './types'
+import type { DecodedField, DecodedMessage, DecodeChunkResult } from './types'
 import type { DecoderRegistry } from './registry'
 import { decodeFrameHeader, FRAME_HEADER_LENGTH, FRAME_ALIGNMENT } from './builtins/frameDecoder'
 import { decodeSbeHeader, SBE_HEADER_LENGTH } from './builtins/sbeHeaderDecoder'
@@ -30,10 +30,12 @@ export function decodeChunk(
   data: Uint8Array,
   baseOffset: number,
   registry: DecoderRegistry,
-): DecodedMessage[] {
+  defaultFetchSize: number = 65536,
+): DecodeChunkResult {
   const messages: DecodedMessage[] = []
   const view = new DataView(data.buffer, data.byteOffset, data.byteLength)
   let pos = 0
+  let truncatedFrameLength = 0
 
   while (pos + FRAME_HEADER_LENGTH <= data.length) {
     const frameLength = view.getInt32(pos, true)
@@ -44,7 +46,24 @@ export function decodeChunk(
       continue
     }
 
-    if (pos + frameLength > data.length) break
+    if (pos + frameLength > data.length) {
+      // Frame extends beyond this chunk — decode what we can
+      truncatedFrameLength = frameLength
+      const fields: DecodedField[] = []
+      if (pos + FRAME_HEADER_LENGTH <= data.length) {
+        const frameResult = decodeFrameHeader(view, pos)
+        fields.push(...frameResult.fields)
+      }
+      messages.push({
+        offset: baseOffset + pos,
+        localOffset: pos,
+        frameLength,
+        fields,
+        label: `Truncated (${frameLength} bytes, chunk boundary)`,
+        raw: data.slice(pos, data.length),
+      })
+      break
+    }
 
     const frameType = view.getUint16(pos + 6, true)
     if (frameType === 0) {
@@ -158,5 +177,11 @@ export function decodeChunk(
     pos += align(frameLength, FRAME_ALIGNMENT)
   }
 
-  return messages
+  const nextOffset = baseOffset + pos
+  // If a truncated frame was detected, ensure next fetch is large enough to cover it
+  const nextFetchSize = truncatedFrameLength > 0
+    ? Math.max(defaultFetchSize, align(truncatedFrameLength, FRAME_ALIGNMENT))
+    : defaultFetchSize
+
+  return { messages, nextOffset, nextFetchSize }
 }

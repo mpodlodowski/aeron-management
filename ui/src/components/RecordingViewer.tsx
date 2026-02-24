@@ -2,7 +2,7 @@ import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { Link } from 'react-router-dom'
 import { formatBytes } from '../utils/counters'
 import { decodeChunk, DecoderRegistry } from '../lib/decoder'
-import type { DecodedMessage, ViewMode } from '../lib/decoder'
+import type { DecodeChunkResult, ViewMode } from '../lib/decoder'
 import AnnotatedHexView from './recording-viewer/AnnotatedHexView'
 import TreeView from './recording-viewer/TreeView'
 import MessageTableView from './recording-viewer/MessageTableView'
@@ -47,20 +47,25 @@ export default function RecordingViewer({ clusterId, nodeId, recordingId, totalS
   const [showDecoders, setShowDecoders] = useState(false)
   const [decoderVersion, setDecoderVersion] = useState(0)
   const [selectedMessageIndex, setSelectedMessageIndex] = useState(0)
+  const [offsetHistory, setOffsetHistory] = useState<number[]>([])
+  const [fetchSize, setFetchSize] = useState(CHUNK_SIZE)
 
   const registry = useMemo(() => new DecoderRegistry(), [decoderVersion])
 
-  const decodedMessages: DecodedMessage[] = useMemo(() => {
-    if (!data) return []
-    return decodeChunk(data, offset, registry)
+  const decodeResult: DecodeChunkResult = useMemo(() => {
+    if (!data) return { messages: [], nextOffset: offset, nextFetchSize: CHUNK_SIZE }
+    return decodeChunk(data, offset, registry, CHUNK_SIZE)
   }, [data, offset, registry])
 
-  const fetchBytes = useCallback((fetchOffset: number) => {
+  const decodedMessages = decodeResult.messages
+
+  const fetchBytes = useCallback((fetchOffset: number, length: number = CHUNK_SIZE) => {
     setLoading(true)
     setError(null)
+    setFetchSize(length)
     const params = new URLSearchParams({
       offset: String(fetchOffset),
-      length: String(CHUNK_SIZE),
+      length: String(length),
     })
     fetch(`/api/clusters/${clusterId}/nodes/${nodeId}/archive/recordings/${recordingId}/bytes?${params}`)
       .then((res) => res.json())
@@ -97,17 +102,25 @@ export default function RecordingViewer({ clusterId, nodeId, recordingId, totalS
     onStateChange?.({ offset, viewMode })
   }, [offset, viewMode, onStateChange])
 
+  const navigateTo = useCallback((target: number, size?: number) => {
+    setOffsetHistory((prev) => [...prev, offset])
+    fetchBytes(target, size)
+  }, [offset, fetchBytes])
+
   const handlePrev = () => {
-    const newOffset = Math.max(0, offset - CHUNK_SIZE)
-    fetchBytes(newOffset)
+    if (offsetHistory.length > 0) {
+      const prev = offsetHistory[offsetHistory.length - 1]
+      setOffsetHistory((h) => h.slice(0, -1))
+      fetchBytes(prev)
+    }
   }
 
   const handleNext = () => {
     const hasMore = totalSize > 0
-      ? offset + CHUNK_SIZE < totalSize
-      : data !== null && data.length === CHUNK_SIZE // unknown size: assume more if we got a full chunk
+      ? decodeResult.nextOffset < totalSize
+      : data !== null && data.length >= fetchSize
     if (hasMore) {
-      fetchBytes(offset + CHUNK_SIZE)
+      navigateTo(decodeResult.nextOffset, decodeResult.nextFetchSize)
     }
   }
 
@@ -231,7 +244,7 @@ export default function RecordingViewer({ clusterId, nodeId, recordingId, totalS
       <div className="flex items-center justify-between border-t border-border-subtle px-4 py-2">
         <div className="flex items-center gap-1.5">
           <button
-            onClick={() => fetchBytes(0)}
+            onClick={() => { setOffsetHistory([]); fetchBytes(0) }}
             disabled={offset === 0 || loading}
             className="rounded-md bg-elevated px-2 py-1.5 text-xs font-medium text-text-secondary hover:bg-elevated disabled:opacity-30"
           >
@@ -239,43 +252,13 @@ export default function RecordingViewer({ clusterId, nodeId, recordingId, totalS
           </button>
           <button
             onClick={handlePrev}
-            disabled={offset === 0 || loading}
+            disabled={offsetHistory.length === 0 || loading}
             className="rounded-md bg-elevated px-2 py-1.5 text-xs font-medium text-text-secondary hover:bg-elevated disabled:opacity-30"
           >
             Prev
           </button>
         </div>
         <div className="flex items-center gap-2">
-          {(() => {
-            const currentPage = Math.floor(offset / CHUNK_SIZE) + 1
-            const lastPage = totalSize > 0 ? Math.max(1, Math.ceil(totalSize / CHUNK_SIZE)) : null
-            return (
-              <form
-                className="flex items-center gap-1"
-                onSubmit={(e) => {
-                  e.preventDefault()
-                  const input = (e.currentTarget.elements.namedItem('chunkPage') as HTMLInputElement)
-                  const v = parseInt(input.value, 10)
-                  if (!isNaN(v) && v >= 1 && (lastPage === null || v <= lastPage)) fetchBytes((v - 1) * CHUNK_SIZE)
-                  input.value = String(currentPage)
-                }}
-              >
-                <input
-                  name="chunkPage"
-                  key={offset}
-                  defaultValue={currentPage}
-                  className="w-12 rounded bg-elevated border border-border-medium px-1.5 py-1 text-xs text-text-primary text-center"
-                  onBlur={(e) => {
-                    const v = parseInt(e.target.value, 10)
-                    if (!isNaN(v) && v >= 1 && (lastPage === null || v <= lastPage)) fetchBytes((v - 1) * CHUNK_SIZE)
-                    else e.target.value = String(currentPage)
-                  }}
-                />
-                {lastPage !== null && <span className="text-xs text-text-muted">/ {lastPage}</span>}
-              </form>
-            )
-          })()}
-          <span className="text-text-muted text-xs">|</span>
           <form
             className="flex items-center gap-1"
             onSubmit={(e) => {
@@ -283,7 +266,7 @@ export default function RecordingViewer({ clusterId, nodeId, recordingId, totalS
               const input = (e.currentTarget.elements.namedItem('posInput') as HTMLInputElement)
               const v = parseInt(input.value, 10)
               if (!isNaN(v) && v >= 0 && (totalSize <= 0 || v < totalSize)) {
-                fetchBytes(Math.floor(v / CHUNK_SIZE) * CHUNK_SIZE)
+                navigateTo(v)
               }
               input.value = String(offset)
             }}
@@ -297,7 +280,7 @@ export default function RecordingViewer({ clusterId, nodeId, recordingId, totalS
               onBlur={(e) => {
                 const v = parseInt(e.target.value, 10)
                 if (!isNaN(v) && v >= 0 && (totalSize <= 0 || v < totalSize)) {
-                  fetchBytes(Math.floor(v / CHUNK_SIZE) * CHUNK_SIZE)
+                  navigateTo(v)
                 } else {
                   e.target.value = String(offset)
                 }
@@ -311,14 +294,14 @@ export default function RecordingViewer({ clusterId, nodeId, recordingId, totalS
         <div className="flex items-center gap-1.5">
           <button
             onClick={handleNext}
-            disabled={loading || (totalSize > 0 ? offset + CHUNK_SIZE >= totalSize : data !== null && data.length < CHUNK_SIZE)}
+            disabled={loading || (totalSize > 0 ? decodeResult.nextOffset >= totalSize : data !== null && data.length < fetchSize)}
             className="rounded-md bg-elevated px-2 py-1.5 text-xs font-medium text-text-secondary hover:bg-elevated disabled:opacity-30"
           >
             Next
           </button>
           <button
-            onClick={() => { if (totalSize > 0) fetchBytes(Math.max(0, Math.ceil(totalSize / CHUNK_SIZE) - 1) * CHUNK_SIZE) }}
-            disabled={loading || totalSize <= 0 || offset + CHUNK_SIZE >= totalSize}
+            onClick={() => { if (totalSize > 0) navigateTo(Math.max(0, totalSize - CHUNK_SIZE)) }}
+            disabled={loading || totalSize <= 0 || (totalSize > 0 && decodeResult.nextOffset >= totalSize)}
             className="rounded-md bg-elevated px-2 py-1.5 text-xs font-medium text-text-secondary hover:bg-elevated disabled:opacity-30"
           >
             Last

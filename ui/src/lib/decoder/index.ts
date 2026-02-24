@@ -3,6 +3,7 @@ export { DecoderRegistry } from './registry'
 export type {
   DecodedField,
   DecodedMessage,
+  DecodeChunkResult,
   DecoderResult,
   Decoder,
   CustomDecoderConfig,

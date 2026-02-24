@@ -37,4 +37,10 @@ export interface CustomDecoderConfig {
   code: string  // JS function body receiving (view, offset, length)
 }
 
+export interface DecodeChunkResult {
+  messages: DecodedMessage[]
+  nextOffset: number       // absolute offset where next fetch should start (frame-aligned)
+  nextFetchSize: number    // minimum bytes to fetch from nextOffset (may exceed default if a large frame was detected)
+}
+
 export type ViewMode = 'hex' | 'tree' | 'table'
