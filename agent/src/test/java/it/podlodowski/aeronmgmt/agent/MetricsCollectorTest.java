@@ -12,7 +12,7 @@ class MetricsCollectorTest {
         CncReader cncReader = new CncReader("/tmp/nonexistent-aeron-dir");
         ArchiveMetricsCollector archiveCollector = new ArchiveMetricsCollector("/tmp/nonexistent-cluster-dir");
         SpyRecordingManager spyRecordingManager = new SpyRecordingManager("/tmp/nonexistent-aeron-dir", cncReader);
-        MetricsCollector collector = new MetricsCollector(cncReader, archiveCollector, 99, "backup", "test-cluster", spyRecordingManager, new StateChangeBuffer(100));
+        MetricsCollector collector = new MetricsCollector(cncReader, archiveCollector, 99, "backup", "test-cluster", spyRecordingManager, new StateChangeBuffer(100), "/tmp/nonexistent-aeron-dir");
 
         MetricsReport report = collector.collect();
 
@@ -26,7 +26,7 @@ class MetricsCollectorTest {
         CncReader cncReader = new CncReader("/tmp/nonexistent-aeron-dir");
         ArchiveMetricsCollector archiveCollector = new ArchiveMetricsCollector("/tmp/nonexistent-cluster-dir");
         SpyRecordingManager spyRecordingManager = new SpyRecordingManager("/tmp/nonexistent-aeron-dir", cncReader);
-        MetricsCollector collector = new MetricsCollector(cncReader, archiveCollector, 0, "cluster", "default", spyRecordingManager, new StateChangeBuffer(100));
+        MetricsCollector collector = new MetricsCollector(cncReader, archiveCollector, 0, "cluster", "default", spyRecordingManager, new StateChangeBuffer(100), "/tmp/nonexistent-aeron-dir");
 
         MetricsReport report = collector.collect();
 
