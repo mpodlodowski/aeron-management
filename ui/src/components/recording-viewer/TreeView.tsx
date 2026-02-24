@@ -1,4 +1,4 @@
-import { useState } from 'react'
+import { useCallback, useEffect, useRef, useState } from 'react'
 import type { DecodedMessage, DecodedField } from '../../lib/decoder/types'
 
 interface Props {
@@ -88,6 +88,78 @@ function CollapsibleGroup({ group, schemaId, templateId }: {
   )
 }
 
+const ITEM_HEIGHT = 40 // px per message row
+const OVERSCAN = 5
+
+function VirtualMessageList({ messages, selectedIndex, onSelect }: {
+  messages: DecodedMessage[]
+  selectedIndex: number
+  onSelect: (i: number) => void
+}) {
+  const containerRef = useRef<HTMLDivElement>(null)
+  const [scrollTop, setScrollTop] = useState(0)
+  const [containerHeight, setContainerHeight] = useState(600)
+
+  useEffect(() => {
+    const el = containerRef.current
+    if (!el) return
+    setContainerHeight(el.clientHeight)
+    const observer = new ResizeObserver((entries) => {
+      setContainerHeight(entries[0].contentRect.height)
+    })
+    observer.observe(el)
+    return () => observer.disconnect()
+  }, [])
+
+  // Scroll selected item into view on mount
+  useEffect(() => {
+    const el = containerRef.current
+    if (!el) return
+    const itemTop = selectedIndex * ITEM_HEIGHT
+    if (itemTop < el.scrollTop || itemTop + ITEM_HEIGHT > el.scrollTop + containerHeight) {
+      el.scrollTop = Math.max(0, itemTop - containerHeight / 2)
+    }
+  }, []) // eslint-disable-line react-hooks/exhaustive-deps
+
+  const handleScroll = useCallback((e: React.UIEvent<HTMLDivElement>) => {
+    setScrollTop(e.currentTarget.scrollTop)
+  }, [])
+
+  const totalHeight = messages.length * ITEM_HEIGHT
+  const startIndex = Math.max(0, Math.floor(scrollTop / ITEM_HEIGHT) - OVERSCAN)
+  const endIndex = Math.min(messages.length, Math.ceil((scrollTop + containerHeight) / ITEM_HEIGHT) + OVERSCAN)
+
+  return (
+    <div ref={containerRef} className="w-72 shrink-0 overflow-y-auto border-r border-border-subtle pr-2" onScroll={handleScroll}>
+      <div style={{ height: totalHeight, position: 'relative' }}>
+        {Array.from({ length: endIndex - startIndex }, (_, j) => {
+          const i = startIndex + j
+          const msg = messages[i]
+          return (
+            <button
+              key={i}
+              onClick={() => onSelect(i)}
+              style={{ position: 'absolute', top: i * ITEM_HEIGHT, height: ITEM_HEIGHT, left: 0, right: 0 }}
+              className={`w-full text-left px-2 py-1.5 text-xs font-mono rounded transition-colors ${
+                i === selectedIndex
+                  ? 'bg-elevated text-text-primary'
+                  : 'text-text-secondary hover:bg-elevated/50 hover:text-text-secondary'
+              }`}
+            >
+              <span className="text-text-muted">[{i + 1}]</span>{' '}
+              <span className="text-info-text">0x{msg.offset.toString(16).padStart(8, '0')}</span>{' '}
+              <span>{msg.label}</span>
+              {msg.schemaId != null && msg.templateId != null && (
+                <span className="text-text-muted"> ({msg.schemaId}/{msg.templateId})</span>
+              )}
+            </button>
+          )
+        })}
+      </div>
+    </div>
+  )
+}
+
 export default function TreeView({ messages, initialSelectedIndex }: Props) {
   const [selectedIndex, setSelectedIndex] = useState(initialSelectedIndex ?? 0)
 
@@ -104,27 +176,8 @@ export default function TreeView({ messages, initialSelectedIndex }: Props) {
 
   return (
     <div className="flex h-full min-h-[300px]">
-      {/* Left panel: message list */}
-      <div className="w-72 shrink-0 overflow-y-auto border-r border-border-subtle pr-2">
-        {messages.map((msg, i) => (
-          <button
-            key={i}
-            onClick={() => setSelectedIndex(i)}
-            className={`w-full text-left px-2 py-1.5 text-xs font-mono rounded transition-colors ${
-              i === selectedIndex
-                ? 'bg-elevated text-text-primary'
-                : 'text-text-secondary hover:bg-elevated/50 hover:text-text-secondary'
-            }`}
-          >
-            <span className="text-text-muted">[{i + 1}]</span>{' '}
-            <span className="text-info-text">0x{msg.offset.toString(16).padStart(8, '0')}</span>{' '}
-            <span>{msg.label}</span>
-            {msg.schemaId != null && msg.templateId != null && (
-              <span className="text-text-muted"> ({msg.schemaId}/{msg.templateId})</span>
-            )}
-          </button>
-        ))}
-      </div>
+      {/* Left panel: virtualized message list */}
+      <VirtualMessageList messages={messages} selectedIndex={selectedIndex} onSelect={setSelectedIndex} />
 
       {/* Right panel: field tree */}
       <div className="flex-1 overflow-y-auto pl-4">
