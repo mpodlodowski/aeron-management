@@ -1,4 +1,5 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
+import { Link } from 'react-router-dom'
 import { formatBytes } from '../utils/counters'
 import { decodeChunk, DecoderRegistry } from '../lib/decoder'
 import type { DecodedMessage, ViewMode } from '../lib/decoder'
@@ -14,7 +15,7 @@ interface Props {
   totalSize: number
   initialOffset?: number
   initialViewMode?: ViewMode
-  onClose: () => void
+  onClose?: () => void
   onStateChange?: (state: { offset: number; viewMode: ViewMode }) => void
 }
 
@@ -129,201 +130,210 @@ export default function RecordingViewer({ clusterId, nodeId, recordingId, totalS
   const endOffset = data ? offset + data.length : offset
 
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 backdrop-blur-sm">
-      <div className="relative w-full max-w-5xl h-[90vh] flex flex-col rounded-lg border border-border-medium bg-surface shadow-2xl">
-        {/* Header */}
-        <div className="flex items-center justify-between border-b border-border-subtle px-4 py-3">
-          <div className="flex items-center gap-3">
-            <h2 className="text-sm font-semibold text-text-primary">
-              Recording #{recordingId}
-            </h2>
-            <span className="text-xs text-text-muted">
-              {formatBytes(totalSize)} total
-            </span>
-            <span className="text-xs text-text-muted">
-              Showing {offset.toLocaleString()}&ndash;{endOffset.toLocaleString()}
-            </span>
-            {decodedMessages.length > 0 && (
-              <span className="text-xs text-text-muted">
-                {decodedMessages.length} message{decodedMessages.length !== 1 ? 's' : ''}
-              </span>
-            )}
-          </div>
-          <div className="flex items-center gap-2">
-            {/* View mode tabs */}
-            <div className="flex rounded-md border border-border-medium">
-              {(['hex', 'tree', 'table'] as const).map((mode) => (
-                <button
-                  key={mode}
-                  onClick={() => setViewMode(mode)}
-                  className={`px-2.5 py-1 text-xs font-medium transition-colors first:rounded-l-md last:rounded-r-md ${
-                    viewMode === mode
-                      ? 'bg-info-fill text-white'
-                      : 'text-text-secondary hover:text-text-primary hover:bg-elevated'
-                  }`}
-                >
-                  {VIEW_MODE_LABELS[mode]}
-                </button>
-              ))}
-            </div>
-            <button
-              onClick={() => setShowDecoders(true)}
-              className="rounded px-2 py-1 text-xs font-medium text-text-secondary hover:text-text-primary"
+    <div className="flex flex-col h-[calc(100vh-8rem)] rounded-lg border border-border-medium bg-surface">
+      {/* Header */}
+      <div className="flex items-center justify-between border-b border-border-subtle px-4 py-3">
+        <div className="flex items-center gap-3">
+          {!onClose && (
+            <Link
+              to={`/clusters/${clusterId}/archive`}
+              className="text-text-muted hover:text-text-primary transition-colors"
+              title="Back to Archive"
             >
-              Decoders
-            </button>
-            {viewMode === 'hex' && (
+              &larr;
+            </Link>
+          )}
+          <h2 className="text-sm font-semibold text-text-primary">
+            Recording #{recordingId}
+          </h2>
+          <span className="text-xs text-text-muted">
+            {formatBytes(totalSize)} total
+          </span>
+          <span className="text-xs text-text-muted">
+            Showing {offset.toLocaleString()}&ndash;{endOffset.toLocaleString()}
+          </span>
+          {decodedMessages.length > 0 && (
+            <span className="text-xs text-text-muted">
+              {decodedMessages.length} message{decodedMessages.length !== 1 ? 's' : ''}
+            </span>
+          )}
+        </div>
+        <div className="flex items-center gap-2">
+          {/* View mode tabs */}
+          <div className="flex rounded-md border border-border-medium">
+            {(['hex', 'tree', 'table'] as const).map((mode) => (
               <button
-                onClick={handleCopy}
-                disabled={!data}
-                className="rounded px-2 py-1 text-xs font-medium text-text-secondary hover:text-text-primary disabled:opacity-30"
+                key={mode}
+                onClick={() => setViewMode(mode)}
+                className={`px-2.5 py-1 text-xs font-medium transition-colors first:rounded-l-md last:rounded-r-md ${
+                  viewMode === mode
+                    ? 'bg-info-fill text-white'
+                    : 'text-text-secondary hover:text-text-primary hover:bg-elevated'
+                }`}
               >
-                {copied ? 'Copied!' : 'Copy'}
+                {VIEW_MODE_LABELS[mode]}
               </button>
-            )}
+            ))}
+          </div>
+          <button
+            onClick={() => setShowDecoders(true)}
+            className="rounded px-2 py-1 text-xs font-medium text-text-secondary hover:text-text-primary"
+          >
+            Decoders
+          </button>
+          {viewMode === 'hex' && (
+            <button
+              onClick={handleCopy}
+              disabled={!data}
+              className="rounded px-2 py-1 text-xs font-medium text-text-secondary hover:text-text-primary disabled:opacity-30"
+            >
+              {copied ? 'Copied!' : 'Copy'}
+            </button>
+          )}
+          {onClose && (
             <button
               onClick={onClose}
               className="rounded px-2 py-1 text-xs font-medium text-text-secondary hover:text-text-primary"
             >
               Close
             </button>
-          </div>
+          )}
         </div>
+      </div>
 
-        {/* Body */}
-        <div className="flex-1 overflow-auto p-4">
-          {loading && (
-            <div className="flex items-center justify-center py-12 text-text-muted text-sm">
-              Loading bytes...
-            </div>
-          )}
-          {error && (
-            <div className="rounded-lg border border-critical-fill/40 bg-critical-surface p-4 text-sm text-critical-text">
-              {error}
-            </div>
-          )}
-          {data && !loading && viewMode === 'hex' && (
-            <AnnotatedHexView data={data} baseOffset={offset} messages={decodedMessages} />
-          )}
-          {data && !loading && viewMode === 'tree' && (
-            <TreeView messages={decodedMessages} initialSelectedIndex={selectedMessageIndex} />
-          )}
-          {data && !loading && viewMode === 'table' && (
-            <MessageTableView
-              messages={decodedMessages}
-              onSelectMessage={(i) => { setSelectedMessageIndex(i); setViewMode('tree') }}
-            />
-          )}
-        </div>
-
-        {/* Footer — pagination */}
-        <div className="flex items-center justify-between border-t border-border-subtle px-4 py-2">
-          <div className="flex items-center gap-1.5">
-            <button
-              onClick={() => fetchBytes(0)}
-              disabled={offset === 0 || loading}
-              className="rounded-md bg-elevated px-2 py-1.5 text-xs font-medium text-text-secondary hover:bg-elevated disabled:opacity-30"
-            >
-              First
-            </button>
-            <button
-              onClick={handlePrev}
-              disabled={offset === 0 || loading}
-              className="rounded-md bg-elevated px-2 py-1.5 text-xs font-medium text-text-secondary hover:bg-elevated disabled:opacity-30"
-            >
-              Prev
-            </button>
+      {/* Body */}
+      <div className="flex-1 overflow-auto p-4">
+        {loading && (
+          <div className="flex items-center justify-center py-12 text-text-muted text-sm">
+            Loading bytes...
           </div>
-          <div className="flex items-center gap-2">
-            {(() => {
-              const currentPage = Math.floor(offset / CHUNK_SIZE) + 1
-              const lastPage = totalSize > 0 ? Math.max(1, Math.ceil(totalSize / CHUNK_SIZE)) : null
-              return (
-                <form
-                  className="flex items-center gap-1"
-                  onSubmit={(e) => {
-                    e.preventDefault()
-                    const input = (e.currentTarget.elements.namedItem('chunkPage') as HTMLInputElement)
-                    const v = parseInt(input.value, 10)
-                    if (!isNaN(v) && v >= 1 && (lastPage === null || v <= lastPage)) fetchBytes((v - 1) * CHUNK_SIZE)
-                    input.value = String(currentPage)
-                  }}
-                >
-                  <input
-                    name="chunkPage"
-                    key={offset}
-                    defaultValue={currentPage}
-                    className="w-12 rounded bg-elevated border border-border-medium px-1.5 py-1 text-xs text-text-primary text-center"
-                    onBlur={(e) => {
-                      const v = parseInt(e.target.value, 10)
-                      if (!isNaN(v) && v >= 1 && (lastPage === null || v <= lastPage)) fetchBytes((v - 1) * CHUNK_SIZE)
-                      else e.target.value = String(currentPage)
-                    }}
-                  />
-                  {lastPage !== null && <span className="text-xs text-text-muted">/ {lastPage}</span>}
-                </form>
-              )
-            })()}
-            <span className="text-text-muted text-xs">|</span>
-            <form
-              className="flex items-center gap-1"
-              onSubmit={(e) => {
-                e.preventDefault()
-                const input = (e.currentTarget.elements.namedItem('posInput') as HTMLInputElement)
-                const v = parseInt(input.value, 10)
-                if (!isNaN(v) && v >= 0 && (totalSize <= 0 || v < totalSize)) {
-                  fetchBytes(Math.floor(v / CHUNK_SIZE) * CHUNK_SIZE)
-                }
-                input.value = String(offset)
-              }}
-            >
-              <span className="text-xs text-text-muted">pos</span>
-              <input
-                name="posInput"
-                key={offset}
-                defaultValue={offset}
-                className="w-24 rounded bg-elevated border border-border-medium px-1.5 py-1 text-xs text-text-primary text-center font-mono"
-                onBlur={(e) => {
-                  const v = parseInt(e.target.value, 10)
-                  if (!isNaN(v) && v >= 0 && (totalSize <= 0 || v < totalSize)) {
-                    fetchBytes(Math.floor(v / CHUNK_SIZE) * CHUNK_SIZE)
-                  } else {
-                    e.target.value = String(offset)
-                  }
-                }}
-              />
-            </form>
-            <span className="text-xs text-text-muted">
-              {totalSize > 0 && `${Math.round((endOffset / totalSize) * 100)}%`}
-            </span>
+        )}
+        {error && (
+          <div className="rounded-lg border border-critical-fill/40 bg-critical-surface p-4 text-sm text-critical-text">
+            {error}
           </div>
-          <div className="flex items-center gap-1.5">
-            <button
-              onClick={handleNext}
-              disabled={loading || (totalSize > 0 ? offset + CHUNK_SIZE >= totalSize : data !== null && data.length < CHUNK_SIZE)}
-              className="rounded-md bg-elevated px-2 py-1.5 text-xs font-medium text-text-secondary hover:bg-elevated disabled:opacity-30"
-            >
-              Next
-            </button>
-            <button
-              onClick={() => { if (totalSize > 0) fetchBytes(Math.max(0, Math.ceil(totalSize / CHUNK_SIZE) - 1) * CHUNK_SIZE) }}
-              disabled={loading || totalSize <= 0 || offset + CHUNK_SIZE >= totalSize}
-              className="rounded-md bg-elevated px-2 py-1.5 text-xs font-medium text-text-secondary hover:bg-elevated disabled:opacity-30"
-            >
-              Last
-            </button>
-          </div>
-        </div>
-        {showDecoders && (
-          <DecoderEditor
-            registry={registry}
-            onClose={() => setShowDecoders(false)}
-            onUpdate={() => setDecoderVersion((v) => v + 1)}
-            data={data}
+        )}
+        {data && !loading && viewMode === 'hex' && (
+          <AnnotatedHexView data={data} baseOffset={offset} messages={decodedMessages} />
+        )}
+        {data && !loading && viewMode === 'tree' && (
+          <TreeView messages={decodedMessages} initialSelectedIndex={selectedMessageIndex} />
+        )}
+        {data && !loading && viewMode === 'table' && (
+          <MessageTableView
             messages={decodedMessages}
+            onSelectMessage={(i) => { setSelectedMessageIndex(i); setViewMode('tree') }}
           />
         )}
       </div>
+
+      {/* Footer — pagination */}
+      <div className="flex items-center justify-between border-t border-border-subtle px-4 py-2">
+        <div className="flex items-center gap-1.5">
+          <button
+            onClick={() => fetchBytes(0)}
+            disabled={offset === 0 || loading}
+            className="rounded-md bg-elevated px-2 py-1.5 text-xs font-medium text-text-secondary hover:bg-elevated disabled:opacity-30"
+          >
+            First
+          </button>
+          <button
+            onClick={handlePrev}
+            disabled={offset === 0 || loading}
+            className="rounded-md bg-elevated px-2 py-1.5 text-xs font-medium text-text-secondary hover:bg-elevated disabled:opacity-30"
+          >
+            Prev
+          </button>
+        </div>
+        <div className="flex items-center gap-2">
+          {(() => {
+            const currentPage = Math.floor(offset / CHUNK_SIZE) + 1
+            const lastPage = totalSize > 0 ? Math.max(1, Math.ceil(totalSize / CHUNK_SIZE)) : null
+            return (
+              <form
+                className="flex items-center gap-1"
+                onSubmit={(e) => {
+                  e.preventDefault()
+                  const input = (e.currentTarget.elements.namedItem('chunkPage') as HTMLInputElement)
+                  const v = parseInt(input.value, 10)
+                  if (!isNaN(v) && v >= 1 && (lastPage === null || v <= lastPage)) fetchBytes((v - 1) * CHUNK_SIZE)
+                  input.value = String(currentPage)
+                }}
+              >
+                <input
+                  name="chunkPage"
+                  key={offset}
+                  defaultValue={currentPage}
+                  className="w-12 rounded bg-elevated border border-border-medium px-1.5 py-1 text-xs text-text-primary text-center"
+                  onBlur={(e) => {
+                    const v = parseInt(e.target.value, 10)
+                    if (!isNaN(v) && v >= 1 && (lastPage === null || v <= lastPage)) fetchBytes((v - 1) * CHUNK_SIZE)
+                    else e.target.value = String(currentPage)
+                  }}
+                />
+                {lastPage !== null && <span className="text-xs text-text-muted">/ {lastPage}</span>}
+              </form>
+            )
+          })()}
+          <span className="text-text-muted text-xs">|</span>
+          <form
+            className="flex items-center gap-1"
+            onSubmit={(e) => {
+              e.preventDefault()
+              const input = (e.currentTarget.elements.namedItem('posInput') as HTMLInputElement)
+              const v = parseInt(input.value, 10)
+              if (!isNaN(v) && v >= 0 && (totalSize <= 0 || v < totalSize)) {
+                fetchBytes(Math.floor(v / CHUNK_SIZE) * CHUNK_SIZE)
+              }
+              input.value = String(offset)
+            }}
+          >
+            <span className="text-xs text-text-muted">pos</span>
+            <input
+              name="posInput"
+              key={offset}
+              defaultValue={offset}
+              className="w-24 rounded bg-elevated border border-border-medium px-1.5 py-1 text-xs text-text-primary text-center font-mono"
+              onBlur={(e) => {
+                const v = parseInt(e.target.value, 10)
+                if (!isNaN(v) && v >= 0 && (totalSize <= 0 || v < totalSize)) {
+                  fetchBytes(Math.floor(v / CHUNK_SIZE) * CHUNK_SIZE)
+                } else {
+                  e.target.value = String(offset)
+                }
+              }}
+            />
+          </form>
+          <span className="text-xs text-text-muted">
+            {totalSize > 0 && `${Math.round((endOffset / totalSize) * 100)}%`}
+          </span>
+        </div>
+        <div className="flex items-center gap-1.5">
+          <button
+            onClick={handleNext}
+            disabled={loading || (totalSize > 0 ? offset + CHUNK_SIZE >= totalSize : data !== null && data.length < CHUNK_SIZE)}
+            className="rounded-md bg-elevated px-2 py-1.5 text-xs font-medium text-text-secondary hover:bg-elevated disabled:opacity-30"
+          >
+            Next
+          </button>
+          <button
+            onClick={() => { if (totalSize > 0) fetchBytes(Math.max(0, Math.ceil(totalSize / CHUNK_SIZE) - 1) * CHUNK_SIZE) }}
+            disabled={loading || totalSize <= 0 || offset + CHUNK_SIZE >= totalSize}
+            className="rounded-md bg-elevated px-2 py-1.5 text-xs font-medium text-text-secondary hover:bg-elevated disabled:opacity-30"
+          >
+            Last
+          </button>
+        </div>
+      </div>
+      {showDecoders && (
+        <DecoderEditor
+          registry={registry}
+          onClose={() => setShowDecoders(false)}
+          onUpdate={() => setDecoderVersion((v) => v + 1)}
+          data={data}
+          messages={decodedMessages}
+        />
+      )}
     </div>
   )
 }

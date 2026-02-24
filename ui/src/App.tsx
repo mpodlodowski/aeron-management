@@ -5,6 +5,7 @@ import { ClusterSummary } from './types'
 import Cluster from './pages/Dashboard'
 import NodeDetail from './pages/NodeDetail'
 import Archive from './pages/Archive'
+import RecordingDetail from './pages/RecordingDetail'
 import Events from './pages/Events'
 import { StatusBanner } from './components/StatusBanner'
 
@@ -34,6 +35,24 @@ function NodeBreadcrumb() {
       <span className="text-text-muted">/</span>
       <span className="text-sm text-text-secondary flex items-center gap-1.5">
         {name} <RoleBadge role={role} />
+      </span>
+    </>
+  )
+}
+
+function RecordingBreadcrumb() {
+  const match = useMatch('/clusters/:clusterId/nodes/:nodeId/recordings/:recordingId')
+  if (!match) return null
+  const { clusterId, nodeId, recordingId } = match.params
+  return (
+    <>
+      <span className="text-text-muted">/</span>
+      <Link to={`/clusters/${clusterId}/archive`} className="text-sm text-text-secondary hover:text-text-primary transition-colors">
+        Archive
+      </Link>
+      <span className="text-text-muted">/</span>
+      <span className="text-sm text-text-secondary">
+        Node {nodeId} &middot; Recording #{recordingId}
       </span>
     </>
   )
@@ -181,8 +200,9 @@ function Header() {
   const subPath = match?.params['*'] ?? ''
   const connected = useClusterStore((s) => s.connected)
 
-  const isCluster = !subPath || subPath.startsWith('nodes/')
-  const isArchive = subPath === 'archive'
+  const isRecording = subPath.includes('/recordings/')
+  const isCluster = !isRecording && (!subPath || subPath.startsWith('nodes/'))
+  const isArchive = subPath === 'archive' || isRecording
   const isEvents = subPath === 'events'
 
   return (
@@ -192,6 +212,7 @@ function Header() {
       </Link>
       <ClusterSelector />
       <NodeBreadcrumb />
+      <RecordingBreadcrumb />
       <nav className="ml-auto flex items-center gap-1 text-sm">
         <NavLink to={clusterId ? `/clusters/${clusterId}` : '/clusters'} active={isCluster}>
           Cluster
@@ -226,6 +247,7 @@ export default function App() {
             <Route path="/clusters" element={<ClusterRedirect />} />
             <Route path="/clusters/:clusterId" element={<Cluster />} />
             <Route path="/clusters/:clusterId/nodes/:nodeId" element={<NodeDetail />} />
+            <Route path="/clusters/:clusterId/nodes/:nodeId/recordings/:recordingId" element={<RecordingDetail />} />
             <Route path="/clusters/:clusterId/archive" element={<Archive />} />
             <Route path="/clusters/:clusterId/events" element={<Events />} />
           </Routes>
