@@ -54,7 +54,7 @@ describe('decodeChunk', () => {
     const sbe = buildSbeMessage(99, 200, payload)
     const frame = buildFrame(sbe)
 
-    const messages = decodeChunk(frame, 0, registry)
+    const { messages } = decodeChunk(frame, 0, registry)
     expect(messages).toHaveLength(1)
     expect(messages[0].label).toBe('Schema 200 / Template 99')
     expect(messages[0].templateId).toBe(99)
@@ -73,7 +73,7 @@ describe('decodeChunk', () => {
     data.set(p1, 0)
     data.set(p2, p1.length)
 
-    const messages = decodeChunk(data, 1000, registry)
+    const { messages } = decodeChunk(data, 1000, registry)
     expect(messages).toHaveLength(2)
     expect(messages[0].offset).toBe(1000)
     expect(messages[1].offset).toBe(1000 + p1.length)
@@ -86,7 +86,7 @@ describe('decodeChunk', () => {
     data.set(pad, 0)
     data.set(frame, pad.length)
 
-    const messages = decodeChunk(data, 0, registry)
+    const { messages } = decodeChunk(data, 0, registry)
     expect(messages).toHaveLength(1)
     expect(messages[0].localOffset).toBe(pad.length)
   })
@@ -98,7 +98,7 @@ describe('decodeChunk', () => {
     const sbe = buildSbeMessage(100, 111, markerPayload)
     const frame = buildFrame(sbe)
 
-    const messages = decodeChunk(frame, 0, registry)
+    const { messages } = decodeChunk(frame, 0, registry)
     expect(messages).toHaveLength(1)
     expect(messages[0].label).toBe('SnapshotMarker')
     const payloadFields = messages[0].fields.filter(f => f.layer === 'payload')
@@ -115,7 +115,7 @@ describe('decodeChunk', () => {
     // zeros in the middle (already zero-initialized)
     data.set(frame2, frame.length + FRAME_ALIGNMENT)
 
-    const messages = decodeChunk(data, 0, registry)
+    const { messages } = decodeChunk(data, 0, registry)
     expect(messages).toHaveLength(2)
   })
 
@@ -124,8 +124,45 @@ describe('decodeChunk', () => {
     const view = new DataView(buf.buffer)
     view.setInt32(0, FRAME_HEADER_LENGTH, true)
     view.setUint16(6, 1, true) // DATA
-    const messages = decodeChunk(buf, 0, registry)
+    const { messages } = decodeChunk(buf, 0, registry)
     expect(messages).toHaveLength(1)
     expect(messages[0].fields.filter(f => f.layer === 'sbe')).toHaveLength(0)
+  })
+
+  it('returns frame-aligned nextOffset after last complete frame', () => {
+    const frame = buildFrame(buildSbeMessage(1, 100, new Uint8Array(8)))
+    const result = decodeChunk(frame, 500, registry)
+    expect(result.nextOffset).toBe(500 + frame.length)
+    expect(result.nextFetchSize).toBe(65536)
+  })
+
+  it('returns nextOffset at truncated frame start when frame spans chunk boundary', () => {
+    const frame1 = buildFrame(buildSbeMessage(1, 100, new Uint8Array(8)))
+    // Create a buffer that has frame1 + a partial frame header claiming 1000 bytes
+    const data = new Uint8Array(frame1.length + FRAME_HEADER_LENGTH)
+    data.set(frame1, 0)
+    const view = new DataView(data.buffer)
+    view.setInt32(frame1.length, 1000, true)      // frameLength = 1000 (exceeds buffer)
+    view.setUint16(frame1.length + 6, 1, true)    // type = DATA
+
+    const result = decodeChunk(data, 200, registry)
+    expect(result.messages).toHaveLength(2)
+    expect(result.messages[1].label).toContain('Truncated')
+    expect(result.nextOffset).toBe(200 + frame1.length) // start of truncated frame
+    expect(result.nextFetchSize).toBe(65536) // 1000 < default chunk size
+  })
+
+  it('returns larger nextFetchSize when truncated frame exceeds default chunk', () => {
+    // Single frame header claiming 100000 bytes (larger than 64KB default)
+    const data = new Uint8Array(FRAME_HEADER_LENGTH + 32)
+    const view = new DataView(data.buffer)
+    view.setInt32(0, 100000, true)     // frameLength = 100000
+    view.setUint16(6, 1, true)        // type = DATA
+
+    const result = decodeChunk(data, 0, registry)
+    expect(result.messages).toHaveLength(1)
+    expect(result.messages[0].label).toContain('Truncated')
+    expect(result.nextOffset).toBe(0)
+    expect(result.nextFetchSize).toBeGreaterThanOrEqual(100000)
   })
 })
